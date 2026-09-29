@@ -25,6 +25,9 @@
     run('show');
   }
   let drawing = $derived(session.mode === 'draw');
+  // A non-interactive copy of the toolbar shows where the real one will appear.
+  // It is held open by the tutorial state and replaced by the live toolbar while drawing.
+  const previewSession: Session = { ...structuredClone(defaults), mode: 'draw', tutorial: 'draw' };
   $effect(() => { document.documentElement.classList.toggle('annotating', drawing); });
   onMount(() => {
     let disposed = false, stop = () => {};
@@ -35,6 +38,9 @@
 
 <svelte:window onkeydown={keydown} onclick={click} />
 <div class="glassboard-layer">
+  {#if !drawing}
+    <div class="toolbar-preview" inert aria-hidden="true"><Toolbar session={previewSession} error="" onerror={() => {}} /></div>
+  {/if}
   <Overlay {session} {onerror} />
   <Toolbar {session} {error} {onerror} />
   {#if drawing}
@@ -48,14 +54,15 @@
 <style>
   /* One stacking context above all page content, so the canvas always wins. */
   .glassboard-layer { position: relative; z-index: 50; }
-  .banner { position: fixed; z-index: 20; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 8px 8px 8px 18px; border-radius: 999px; background: #143d33; color: #e6f1ec; font-family: inherit; font-size: 14px; line-height: 1.4; box-shadow: 0 8px 24px #0a1f1a55; animation: banner-in 180ms ease-out both; }
+  .toolbar-preview :global(.toolbar-host) { pointer-events: none; }
+  .banner { position: fixed; z-index: 20; bottom: 80px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 8px 8px 8px 18px; border-radius: 999px; background: #143d33; color: #e6f1ec; font-family: inherit; font-size: 14px; line-height: 1.4; box-shadow: 0 8px 24px #0a1f1a55; animation: banner-in 180ms ease-out both; }
   .banner p { margin: 0; }
   .banner kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; background: #ffffff1f; color: inherit; }
   .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 8px 14px; border: 0; border-radius: 999px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; }
   .banner button kbd { background: #143d3320; }
   .banner button:hover { background: #b9f0dc; }
   .banner button:focus-visible { outline: 2px solid #a3e9d1; outline-offset: 2px; }
-  @keyframes banner-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @keyframes banner-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
   @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
-  @media (max-width: 640px) { .banner { top: 12px; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 16px; border-radius: 18px; text-align: center; } .banner .undo { display: none; } }
+  @media (max-width: 640px) { .banner { bottom: 76px; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 16px; border-radius: 18px; text-align: center; } .banner .undo { display: none; } }
 </style>
