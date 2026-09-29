@@ -80,8 +80,8 @@ for size in (16, 32):
 render(avatar, 256).save(BRAND / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
 
 # Ship the same generated artwork in native bundles and the browser preview.
-native_icons = ROOT / "src-tauri" / "icons"
-public = ROOT / "public"
+native_icons = ROOT / "apps" / "desktop" / "src-tauri" / "icons"
+public = ROOT / "apps" / "desktop" / "public"
 native_icons.mkdir(parents=True, exist_ok=True)
 public.mkdir(parents=True, exist_ok=True)
 for extension in ("png", "icns", "ico"):
