@@ -94,10 +94,11 @@
 </div>
 
 <style>
-  .showcase { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+  /* border-radius does not inherit through the island wrapper, so the window passes its radius as a variable. */
+  .showcase { position: absolute; inset: 0; border-radius: calc(var(--radius, 14px) - 1px); pointer-events: none; }
   canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   /* The app's annotation-mode glow, scaled to the small window. */
-  .glow { position: absolute; inset: 0; border-radius: inherit; opacity: 0; transition: opacity .25s ease; box-shadow: inset 0 0 0 2px rgb(77 202 160 / .85), inset 0 0 8px 2px rgb(77 202 160 / .5), inset 0 0 22px 5px rgb(77 202 160 / .3); }
+  .glow { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; opacity: 0; transition: opacity .25s ease; box-shadow: inset 0 0 0 2px rgb(77 202 160 / .85), inset 0 0 8px 2px rgb(77 202 160 / .5), inset 0 0 22px 5px rgb(77 202 160 / .3); }
   .glow.on { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { .glow { transition: none; } }
 </style>

@@ -52,7 +52,7 @@ h1, p, ul { margin: 0; }
 .hero .actions { display: flex; align-items: center; margin-top: 28px; }
 
 /* The mock window the showcase annotates. Everything inside is decorative. */
-.screen { position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 16 / 10; border-radius: 14px; background: var(--screen); border: 1px solid var(--line); box-shadow: 0 24px 60px -28px #00000059; overflow: hidden; }
+.screen { --radius: 14px; position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 16 / 10; border-radius: var(--radius); background: var(--screen); border: 1px solid var(--line); box-shadow: 0 24px 60px -28px #00000059; overflow: hidden; }
 .screen .bar { display: flex; gap: 6px; padding: 12px 14px; }
 .screen .bar span { width: 9px; height: 9px; border-radius: 50%; background: var(--screen-line); }
 .screen .body { position: absolute; inset: 34px 0 0 0; }
