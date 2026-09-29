@@ -89,7 +89,7 @@ The tests cover undo/redo branches, undoable clear, immutable stroke history, co
 ## Structure
 
 - `apps/desktop`: the Tauri + Svelte desktop app. Native paths below are relative to it.
-- `apps/web`: the Astro landing page for glassboard.dev, with a live "try it" overlay.
+- `apps/web`: the single-screen Astro landing page for glassboard.dev, with a live "try it" overlay.
 - `packages/ui`: the drawing engine, session adapter, shortcuts, and the Overlay, Toolbar, and Logo components. Frontend paths below are relative to it.
 - `assets/brand`: logo master and exports shared by both apps.
 

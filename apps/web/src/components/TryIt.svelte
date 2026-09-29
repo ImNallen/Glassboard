@@ -48,7 +48,7 @@
 <style>
   /* One stacking context above all page content, so the canvas always wins. */
   .glassboard-layer { position: relative; z-index: 50; }
-  .banner { position: fixed; z-index: 20; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 8px 8px 8px 18px; border-radius: 999px; background: #143d33; color: #e6f1ec; font-size: 14px; line-height: 1.4; box-shadow: 0 8px 24px #143d3340; animation: banner-in 180ms ease-out both; }
+  .banner { position: fixed; z-index: 20; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 8px 8px 8px 18px; border-radius: 999px; background: #143d33; color: #e6f1ec; font-family: inherit; font-size: 14px; line-height: 1.4; box-shadow: 0 8px 24px #0a1f1a55; animation: banner-in 180ms ease-out both; }
   .banner p { margin: 0; }
   .banner kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; background: #ffffff1f; color: inherit; }
   .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 8px 14px; border: 0; border-radius: 999px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; }
