@@ -1,6 +1,8 @@
 pub(crate) mod settings;
 mod setup;
 pub(crate) mod toolbar;
+#[cfg(target_os = "windows")]
+mod z_order;
 pub(crate) use setup::create_windows;
 
 use crate::{
@@ -84,13 +86,8 @@ pub(crate) fn focus_drawing(app: &tauri::AppHandle) {
     raise_toolbar(app);
 }
 pub(crate) fn raise_toolbar(app: &tauri::AppHandle) {
-    // Windows places a newly focused overlay above its sibling topmost windows.
     #[cfg(target_os = "windows")]
-    for label in ["toolbar", "tutorial"] {
-        if let Some(window) = app.get_webview_window(label) {
-            let _ = window.set_always_on_top(true);
-        }
-    }
+    z_order::raise_controls(app);
     #[cfg(not(target_os = "windows"))]
     let _ = app;
 }

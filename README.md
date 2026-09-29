@@ -83,7 +83,7 @@ The tests cover undo/redo branches, undoable clear, immutable stroke history, co
 - Drawings are attached to screen positions; they do not follow a window when it moves or content when it scrolls.
 - Drawings remain in memory until leaving annotation mode or quitting; tool, color, color mode, shortcut, and tutorial completion preferences are saved to `preferences.json` in Tauri's app configuration directory.
 - Whole-display sharing is the intended way to include annotations. Sharing only another application's window may omit them. The toolbar and its collapsed pill may be captured.
-- macOS window flags support all Spaces and fullscreen auxiliary windows. Fullscreen applications, Stage Manager, mixed-DPI displays, and receiving-end Zoom/Teams/Meet captures still need hands-on compatibility testing. Windows runtime behavior is not yet verified.
+- macOS window flags support all Spaces and fullscreen auxiliary windows. Fullscreen applications, Stage Manager, mixed-DPI displays, and receiving-end Zoom/Teams/Meet captures still need hands-on compatibility testing. Initial Windows testing found most behavior working, but toolbar mouse input failed. A window-order fix is in place and still needs a Windows runtime retest.
 - Protected system surfaces and exclusive fullscreen applications are outside this first version's scope.
 
 ## Structure
