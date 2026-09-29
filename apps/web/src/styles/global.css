@@ -43,10 +43,6 @@ h1, p, ul { margin: 0; }
 .hero h1 { font-size: clamp(40px, 6.4vw, 84px); font-weight: 600; letter-spacing: -0.04em; line-height: .98; text-wrap: balance; }
 .hero .lede { max-width: 52ch; margin-top: 24px; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.5; color: var(--muted); }
 .hero .actions { display: flex; align-items: center; margin-top: 32px; }
-.hero .try { position: relative; display: inline-flex; }
-/* One annotation, drawn the way the app draws: a rainbow arrow pointing at the button. */
-.hero .arrow { position: absolute; left: calc(100% + 14px); top: -60px; width: 220px; height: 120px; pointer-events: none; }
-@media (max-width: 700px) { .hero .arrow { display: none; } }
 
 .button { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .12s ease, transform .12s ease; }
 .button:active { transform: translateY(1px); }
@@ -57,7 +53,6 @@ h1, p, ul { margin: 0; }
 /* Sits beside the toolbar preview at the bottom; hidden while the live toolbar is up. */
 .toolbar-note { position: fixed; z-index: 1; left: calc(50% + 350px); bottom: 78px; width: 230px; margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
 .toolbar-note p { margin: 0; }
-.toolbar-note svg { position: absolute; left: -84px; bottom: -14px; width: 80px; height: 70px; }
 html.annotating .toolbar-note { display: none; }
 @media (max-width: 1180px), (max-height: 640px) { .toolbar-note { display: none; } }
 
