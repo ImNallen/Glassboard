@@ -1,10 +1,30 @@
-export type Tool = 'arrow' | 'rectangle' | 'ellipse' | 'highlighter';
+export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'highlighter' | 'text' | 'eraser';
+/** Tools that create shapes; the eraser only removes them. */
+export const DRAWING_TOOLS: readonly Tool[] = ['pen', 'arrow', 'rectangle', 'ellipse', 'highlighter', 'text'];
+/** Freehand tools append points as the pointer moves instead of anchoring a start and end. */
+export const FREEHAND_TOOLS: readonly Tool[] = ['pen', 'highlighter'];
 export type ColorMode = 'solid' | 'rainbow' | 'cycle';
 export type AutoFadeSeconds = 0 | 3 | 5 | 10;
 export const AUTO_FADE_OPTIONS: readonly AutoFadeSeconds[] = [0, 3, 5, 10];
 const FADE_MS = 500;
 export type Point = { x: number; y: number };
-export type Shape = { id: string; tool: Tool; color: string; width: number; points: Point[]; colorMode?: ColorMode; hue?: number; fadeSeconds?: AutoFadeSeconds; expiresAt?: number };
+export type Shape = { id: string; tool: Tool; color: string; width: number; points: Point[]; colorMode?: ColorMode; hue?: number; fadeSeconds?: AutoFadeSeconds; expiresAt?: number; text?: string };
+
+export const TEXT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const TEXT_LINE_HEIGHT = 1.25;
+/** Text size follows the line-width setting: Thin, Regular, and Bold map to 18, 24, and 33 px. */
+export function textFontSize(width: number): number { return Math.round(12 + width * 3); }
+export function textLineHeight(width: number): number { return Math.round(textFontSize(width) * TEXT_LINE_HEIGHT); }
+export function textFont(width: number): string { return `600 ${textFontSize(width)}px ${TEXT_FONT_FAMILY}`; }
+/** Measure multi-line text the way `render` lays it out. */
+export function measureText(ctx: CanvasRenderingContext2D, text: string, width: number): { width: number; height: number } {
+  const lines = text.split('\n');
+  ctx.save();
+  ctx.font = textFont(width);
+  const widest = Math.max(0, ...lines.map(line => ctx.measureText(line).width));
+  ctx.restore();
+  return { width: Math.ceil(widest), height: lines.length * textLineHeight(width) };
+}
 export function shapeOpacity(shape: Shape, now: number): number {
   return shape.expiresAt === undefined ? 1 : Math.max(0, Math.min(1, (shape.expiresAt - now) / FADE_MS));
 }
@@ -68,7 +88,7 @@ function strokeColor(ctx: CanvasRenderingContext2D, shape: Shape): string | Canv
 }
 
 export function constrainEnd(start: Point, end: Point, tool: Tool, shift: boolean): Point {
-  if (!shift || tool === 'highlighter') return end;
+  if (!shift || FREEHAND_TOOLS.includes(tool)) return end;
   const dx = end.x - start.x, dy = end.y - start.y;
   if (tool === 'arrow') {
     const length = Math.hypot(dx, dy);
@@ -125,8 +145,11 @@ export class DrawingHistory {
     return Number.isFinite(next) ? next : undefined;
   }
   clear() { if (this.shapes.length) this.commit([]); }
-  remove(id: string): boolean {
-    const next = this.shapes.filter(shape => shape.id !== id);
+  remove(id: string): boolean { return this.removeAll([id]); }
+  /** Remove several shapes as a single undo step. */
+  removeAll(ids: Iterable<string>): boolean {
+    const gone = new Set(ids);
+    const next = this.shapes.filter(shape => !gone.has(shape.id));
     if (next.length === this.shapes.length) return false;
     this.commit(next);
     return true;
@@ -145,6 +168,8 @@ function path(ctx: CanvasRenderingContext2D, shape: Shape) {
     ctx.roundRect(Math.min(start.x, end.x), Math.min(start.y, end.y), width, height, radius);
   } else if (shape.tool === 'ellipse') {
     ctx.ellipse((start.x + end.x) / 2, (start.y + end.y) / 2, Math.abs(end.x - start.x) / 2, Math.abs(end.y - start.y) / 2, 0, 0, Math.PI * 2);
+  } else if (shape.tool === 'text') {
+    ctx.rect(Math.min(start.x, end.x), Math.min(start.y, end.y), Math.abs(end.x - start.x), Math.abs(end.y - start.y));
   } else if (shape.tool === 'arrow') {
     const angle = Math.atan2(end.y - start.y, end.x - start.x);
     const length = Math.hypot(end.x - start.x, end.y - start.y);
@@ -194,7 +219,8 @@ export function shapeAtPoint(ctx: CanvasRenderingContext2D, shapes: Shape[], poi
       if (!shape.points.length || shapeOpacity(shape, now) === 0) continue;
       path(ctx, shape);
       ctx.lineWidth = (shape.tool === 'arrow' ? 0 : shape.width * (shape.tool === 'highlighter' ? 5 : 1)) + 12;
-      if ((shape.tool === 'arrow' && ctx.isPointInPath(point.x, point.y)) || ctx.isPointInStroke(point.x, point.y)) return shape;
+      const filled = shape.tool === 'arrow' || shape.tool === 'text';
+      if ((filled && ctx.isPointInPath(point.x, point.y)) || ctx.isPointInStroke(point.x, point.y)) return shape;
     }
   } finally { ctx.restore(); }
 }
@@ -209,7 +235,24 @@ export function render(ctx: CanvasRenderingContext2D, shapes: Shape[], draft: Sh
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
     path(ctx, shape);
     const color = strokeColor(ctx, shape);
-    if (shape.tool === 'highlighter') {
+    if (shape.tool === 'text') {
+      const origin = shape.points[0], size = textFontSize(shape.width), lineHeight = textLineHeight(shape.width);
+      const lines = (shape.text ?? '').split('\n');
+      // Center each line in its line box so the canvas matches the inline editor.
+      const lineY = (i: number) => origin.y + i * lineHeight + (lineHeight - size) / 2;
+      ctx.font = textFont(shape.width); ctx.textBaseline = 'top';
+      ctx.strokeStyle = color; ctx.globalAlpha = .055 * opacity;
+      for (let spread = 6; spread >= 1; spread--) {
+        ctx.lineWidth = spread;
+        lines.forEach((line, i) => ctx.strokeText(line, origin.x, lineY(i)));
+      }
+      ctx.globalAlpha = opacity;
+      ctx.shadowColor = 'rgba(25, 30, 40, .18)';
+      ctx.shadowBlur = 3 * scale;
+      ctx.shadowOffsetY = scale;
+      ctx.fillStyle = color;
+      lines.forEach((line, i) => ctx.fillText(line, origin.x, lineY(i)));
+    } else if (shape.tool === 'highlighter') {
       ctx.globalAlpha = .35 * opacity; ctx.lineWidth = shape.width * 5; ctx.strokeStyle = color; ctx.stroke();
     } else {
       // Feather the same stroke color up to 3 px outward, including every rainbow segment.
