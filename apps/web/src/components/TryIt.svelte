@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import Overlay from '@glassboard/ui/Overlay.svelte';
   import Toolbar from '@glassboard/ui/Toolbar.svelte';
-  import { action, defaults, savePreferences, shortcutLabel, subscribe, type Session } from '@glassboard/ui/session';
+  import { action, defaults, savePreferences, subscribe, type Session } from '@glassboard/ui/session';
   import { drawingKeydown } from '@glassboard/ui/keys';
   import '@glassboard/ui/toolbar.css';
 
@@ -46,8 +46,8 @@
   <Toolbar {session} {error} {onerror} pinned />
   {#if drawing}
     <div class="banner" role="status">
-      <p>This is the real Glassboard toolbar. Pick a tool and draw. <span class="undo"><kbd>{shortcutLabel('CommandOrControl+Z')}</kbd> undoes.</span></p>
-      <button type="button" onclick={() => run('hide')}>Back to the page <kbd>Esc</kbd></button>
+      <p>This is the real toolbar. Pick a tool and draw over the page.</p>
+      <button type="button" onclick={() => run('hide')}>Done <kbd>Esc</kbd></button>
     </div>
   {/if}
 </div>
@@ -56,15 +56,17 @@
   /* One stacking context above all page content, so the canvas always wins. */
   .glassboard-layer { position: relative; z-index: 50; }
   .toolbar-preview :global(.toolbar-host) { pointer-events: none; }
-  /* Below the toolbar host (z-index 10) so its tooltips can rise over the banner. */
-  .banner { position: fixed; z-index: 5; bottom: 124px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 32px); padding: 8px 8px 8px 18px; border-radius: 999px; background: #143d33; color: #e6f1ec; font-family: inherit; font-size: 14px; line-height: 1.4; box-shadow: 0 8px 24px #0a1f1a55; animation: banner-in 180ms ease-out both; }
-  .banner p { margin: 0; }
-  .banner kbd { font: inherit; font-size: 12px; padding: 1px 6px; border-radius: 5px; background: #ffffff1f; color: inherit; }
-  .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 8px 14px; border: 0; border-radius: 999px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; }
-  .banner button kbd { background: #143d3320; }
+  /* Styled as a sibling of the toolbar (same surface variables), placed below the toolbar's
+     stacking layer so tooltips can rise over it. */
+  .banner { position: fixed; z-index: 5; bottom: 124px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; width: max-content; max-width: calc(100vw - 24px); padding: 8px 8px 8px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.4; box-shadow: 0 4px 10px var(--shadow); color-scheme: light dark; animation: banner-in 180ms ease-out both; }
+  .banner p { margin: 0; min-width: 0; }
+  .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 34px; padding: 0 12px 0 14px; border: 0; border-radius: 9px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; }
   .banner button:hover { background: #b9f0dc; }
-  .banner button:focus-visible { outline: 2px solid #a3e9d1; outline-offset: 2px; }
-  @keyframes banner-in { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  .banner button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .banner kbd { font: inherit; font-size: 11px; line-height: 1; padding: 3px 5px; border-radius: 4px; background: #143d331f; }
+  @keyframes banner-in { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
-  @media (max-width: 640px) { .banner { bottom: 120px; flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 16px; border-radius: 18px; text-align: center; } .banner .undo { display: none; } }
+  /* No keyboard to speak of: drop the Esc hint and sit closer to the toolbar. */
+  @media (hover: none) { .banner { bottom: 76px; } .banner kbd { display: none; } }
+  @media (max-width: 640px) { .banner { left: 12px; right: 12px; width: auto; max-width: none; transform: none; padding: 8px 8px 8px 14px; font-size: 13px; } .banner button { padding: 0 12px; } .banner kbd { display: none; } }
 </style>
