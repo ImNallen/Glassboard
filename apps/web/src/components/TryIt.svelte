@@ -7,14 +7,16 @@
   import '@glassboard/ui/toolbar.css';
 
   // The real overlay and toolbar, driven by the same browser adapter the desktop
-  // app uses for its preview. Anything with data-glassboard-try starts a session.
+  // app uses for its preview. Anything with data-glassboard-try starts a session;
+  // the banner button (or Escape) ends it. The app's global shortcut is not
+  // mirrored here, so page keyboard shortcuts stay predictable.
   let session = $state<Session>(structuredClone(defaults));
   let error = $state('');
   let errorTimer: ReturnType<typeof setTimeout>;
   function onerror(e: unknown) { error = String(e); if (e) console.error(e); clearTimeout(errorTimer); errorTimer = setTimeout(() => error = '', 8000); }
   const run = (name: string) => action(name).catch(onerror);
   function keydown(event: KeyboardEvent) {
-    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror) });
+    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror), toggleShortcut: false });
   }
   function click(event: MouseEvent) {
     if (!(event.target as Element | null)?.closest('[data-glassboard-try]')) return;

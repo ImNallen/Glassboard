@@ -60,9 +60,6 @@ kbd { display: inline-block; font: inherit; font-size: .85em; line-height: 1; pa
 .hero h1 { font-size: clamp(46px, 7.4vw, 92px); letter-spacing: -0.04em; line-height: .96; max-width: 11ch; }
 .hero .lede { max-width: 50ch; margin-top: 24px; font-size: clamp(18px, 1.6vw, 21px); line-height: 1.5; color: var(--ink-soft); }
 .hero .actions { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-top: 32px; }
-.hero .actions .or { color: var(--ink-soft); }
-.hero .actions .win { display: block; margin-top: 4px; font-size: 14px; }
-.hero .actions kbd { border-color: #143d3340; background: #ffffff66; color: var(--ink); }
 /* One annotation, drawn the way the app draws: a rainbow arrow pointing at the button. */
 .hero .arrow { position: absolute; left: 120px; top: 56px; width: 240px; height: 120px; pointer-events: none; }
 @media (max-width: 760px) { .hero .arrow { display: none; } }
