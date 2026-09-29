@@ -1,30 +1,28 @@
-/* The app icon at page scale: a mint tile with ink on it. Dark appearance inverts it. */
+/* White or black by system preference; mint is the highlight, as on the app icon. */
 :root {
-  --bg: #a3e9d1;
-  --fg: #143d33;
-  --muted: #2a5a4c;
-  --line: #143d3340;
-  --button-bg: #143d33;
-  --button-fg: #a3e9d1;
-  --button-hover: #235345;
-  --focus: #143d33;
+  --bg: #ffffff;
+  --fg: #101413;
+  --muted: #55605c;
+  --line: #10141318;
+  --accent: #a3e9d1;
+  --accent-hover: #b9f0dc;
+  --on-accent: #143d33;
+  --focus: #1f6b56;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12332b;
-    --fg: #e6f1ec;
-    --muted: #b6d3c8;
-    --line: #a3e9d140;
-    --button-bg: #a3e9d1;
-    --button-fg: #143d33;
-    --button-hover: #b9f0dc;
+    --bg: #0e0e0e;
+    --fg: #f2f4f3;
+    --muted: #a3aca8;
+    --line: #ffffff1f;
     --focus: #a3e9d1;
     color-scheme: dark;
   }
 }
 
 * { box-sizing: border-box; }
+::selection { background: var(--accent); color: var(--on-accent); }
 html { background: var(--bg); color: var(--fg); font-family: 'Familjen Grotesk Variable', 'Helvetica Neue', Arial, sans-serif; font-size: 17px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; scrollbar-gutter: stable; }
 html.annotating { overflow: hidden; }
 body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
@@ -36,7 +34,7 @@ h1, p, ul { margin: 0; }
 
 .top { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 20px 0; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 19px; letter-spacing: -0.01em; text-decoration: none; }
-.mark { width: 28px; height: 28px; background: currentColor; -webkit-mask: var(--mark) center / contain no-repeat; mask: var(--mark) center / contain no-repeat; }
+.brand img { width: 28px; height: 28px; border-radius: 7px; }
 .top nav { display: flex; align-items: center; gap: 22px; font-weight: 500; }
 .top nav a { text-decoration: none; }
 .top nav a:hover { text-decoration: underline; }
@@ -52,12 +50,12 @@ h1, p, ul { margin: 0; }
 
 .button { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .12s ease, transform .12s ease; }
 .button:active { transform: translateY(1px); }
-.button.primary { background: var(--button-bg); color: var(--button-fg); }
-.button.primary:hover { background: var(--button-hover); }
+.button.primary { background: var(--accent); color: var(--on-accent); }
+.button.primary:hover { background: var(--accent-hover); }
 @media (prefers-reduced-motion: reduce) { .button { transition: none; } }
 
 footer { padding: 0 0 28px; }
-.facts { list-style: none; padding: 24px 0 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; font-size: 15px; line-height: 1.5; color: var(--muted); }
+.facts { list-style: none; padding: 24px 0 0; border-top: 2px solid var(--accent); display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; font-size: 15px; line-height: 1.5; color: var(--muted); }
 .facts strong { display: block; color: var(--fg); font-weight: 600; }
 .fine { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 32px; margin-top: 28px; font-size: 13.5px; color: var(--muted); }
 @media (max-height: 720px) and (min-width: 761px) {

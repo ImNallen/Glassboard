@@ -2,7 +2,7 @@
 import '@fontsource-variable/familjen-grotesk';
 import '../styles/global.css';
 import TryIt from '../components/TryIt.svelte';
-import mark from '../../../../assets/brand/mark.svg';
+import appIcon from '../../../../assets/brand/app-icon.svg';
 
 const title = 'Glassboard';
 const tagline = 'Draw on your screen. Then get back to work.';
@@ -16,8 +16,8 @@ const repo = 'https://github.com/ImNallen/Glassboard';
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#a3e9d1" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#143d33" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)" />
     <meta property="og:title" content={`${title}: ${tagline}`} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
@@ -29,7 +29,7 @@ const repo = 'https://github.com/ImNallen/Glassboard';
   </head>
   <body>
     <header class="wrap top">
-      <a class="brand" href="/"><span class="mark" style={`--mark: url(${JSON.stringify(mark.src)})`}></span>Glassboard</a>
+      <a class="brand" href="/"><img src={appIcon.src} width="28" height="28" alt="" />Glassboard</a>
       <nav aria-label="Site">
         <a href={repo}>GitHub</a>
         <a href={`${repo}#run-locally`}>Build it from source</a>
