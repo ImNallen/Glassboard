@@ -1,24 +1,24 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { DrawingHistory, FREEHAND_TOOLS, CYCLE_COLORS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, render, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { DrawingHistory, REGULAR_WIDTH, FREEHAND_TOOLS, CYCLE_COLORS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, render, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror }: { session: Session; onerror: (error: unknown) => void } = $props();
   let canvas: HTMLCanvasElement;
   let textarea = $state<HTMLTextAreaElement | undefined>();
   const history = new DrawingHistory();
+  let annotationSession = -1;
   let draft: Shape | null = null;
   let pointer: number | null = null;
   let lastPointer: Point | null = null;
-  let hover: Point | null = null;
   // Shapes swept by the eraser during the current drag; committed as one undo step on release.
   let erasing: Set<string> | null = null;
   let frame = 0;
   let fadeTimer: ReturnType<typeof setTimeout> | undefined;
   // The text tool edits inline; the canvas only draws the text once it is committed.
   let editor = $state<{ origin: Point; hue: number; text: string } | null>(null);
-  let editorWidth = $derived(session.preferences.width);
-  let editorFontSize = $derived(textFontSize(editorWidth));
-  let editorLineHeight = $derived(textLineHeight(editorWidth));
+  const editorWidth = REGULAR_WIDTH;
+  const editorFontSize = textFontSize(editorWidth);
+  const editorLineHeight = textLineHeight(editorWidth);
   let editorColor = $derived(session.preferences.colorMode === 'cycle' ? cycleColor(session.cycleIndex) : session.preferences.color);
   let editorSize = $derived.by(() => {
     const ctx = editor && canvas?.getContext('2d');
@@ -32,7 +32,8 @@
     return `linear-gradient(90deg, ${CYCLE_COLORS.map((_, i) => cycleColor(start + i)).join(', ')})`;
   });
   function syncHistory(advanceCycle = false) {
-    reportHistory({ canUndo: history.canUndo, canRedo: history.canRedo }, advanceCycle).catch(onerror);
+    if (annotationSession < 0) return;
+    reportHistory({ canUndo: history.canUndo, canRedo: history.canRedo }, annotationSession, advanceCycle).catch(onerror);
   }
   function paint() {
     clearTimeout(fadeTimer);
@@ -61,8 +62,7 @@
     if (pointer !== null && canvas?.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
     pointer = null; draft = null; lastPointer = null; erasing = null; paint();
   }
-  function leave() { hover = null; }
-  function blur() { commitText(); leave(); cancel(); }
+  function blur() { commitText(); cancel(); }
   $effect(() => { if (session.mode !== 'draw') blur(); });
   $effect(() => { if (session.preferences.tool !== 'text') commitText(); });
   function eraseAt(point: Point) {
@@ -105,7 +105,6 @@
     if (session.mode !== 'draw' || event.button !== 0 || pointer !== null) return;
     event.preventDefault();
     const point = { x: event.clientX, y: event.clientY };
-    hover = point;
     activateOverlay().catch(onerror);
     const tool = session.preferences.tool;
     if (tool === 'text') { openText(point); return; }
@@ -117,7 +116,6 @@
     paint();
   }
   function move(event: PointerEvent) {
-    hover = { x: event.clientX, y: event.clientY };
     if (event.pointerId !== pointer) return;
     const current = { x: event.clientX, y: event.clientY };
     if (erasing) {
@@ -153,22 +151,25 @@
     }
     cancel();
   }
+  // Pre-effects run during component initialization; all drawing state must exist first.
+  // The generation travels with the session snapshot, so late-loading displays also reset.
+  $effect.pre(() => {
+    if (annotationSession === session.annotationSession) return;
+    annotationSession = session.annotationSession;
+    editor = null;
+    cancel();
+    history.reset();
+    // Hidden webviews can pause animation frames. Clear the backing bitmap now,
+    // before it can be presented again when the native overlay is shown.
+    cancelAnimationFrame(frame);
+    frame = 0;
+    clearTimeout(fadeTimer);
+    canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    syncHistory();
+  });
   onMount(() => {
     let disposed = false, stop = () => {};
     drawingEvents(command => {
-      if (command === 'erase') {
-        if (session.mode !== 'draw' || !hover || draft || erasing || editor) return;
-        const now = Date.now();
-        const expired = history.expire(now);
-        const ctx = canvas?.getContext('2d');
-        const target = ctx && shapeAtPoint(ctx, history.shapes, hover, now);
-        if (target && history.remove(target.id)) {
-          activateOverlay().catch(onerror);
-          syncHistory();
-        } else if (expired) syncHistory();
-        paint();
-        return;
-      }
       commitText();
       cancel();
       history.expire(Date.now());
@@ -184,7 +185,10 @@
   });
 </script>
 <svelte:window onresize={paint} onblur={blur} />
-<canvas bind:this={canvas} class:passthrough={session.mode !== 'draw'} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerleave={leave} onpointerup={up} onpointercancel={cancel} onlostpointercapture={cancel} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Hover over a drawing and press X to erase it."></canvas>
+{#if session.mode === 'draw'}
+  <div class="annotation-glow" aria-hidden="true"></div>
+{/if}
+<canvas bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={cancel} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Choose the eraser tool to remove drawings."></canvas>
 {#if editor}
   <textarea bind:this={textarea} bind:value={editor.text} class="text-editor" class:rainbow={Boolean(editorGradient)} class:concealed={session.mode === 'hidden'}
     style:left={`${editor.origin.x}px`} style:top={`${editor.origin.y}px`} style:width={`${editorSize.width}px`} style:height={`${editorSize.height}px`}
@@ -193,10 +197,22 @@
     onkeydown={editorKeydown} onblur={event => { if (event.target === textarea) commitText(); }} onpointerdown={event => event.stopPropagation()}></textarea>
 {/if}
 <style>
+  .annotation-glow {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    box-shadow:
+      inset 0 0 0 2px rgb(77 202 160 / .85),
+      inset 0 0 12px 3px rgb(77 202 160 / .5),
+      inset 0 0 32px 6px rgb(77 202 160 / .3);
+    animation: annotation-glow-in 180ms ease-out both;
+  }
+  @keyframes annotation-glow-in { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .annotation-glow { animation: none; } }
   canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; -webkit-user-select: none; user-select: none; }
   canvas.text-tool { cursor: text; }
   canvas.eraser-tool { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%23000' stroke-width='3'/%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E") 11 11, cell; }
-  .passthrough { pointer-events: none; }
   .concealed { visibility: hidden; }
   .text-editor { position: fixed; z-index: 2; margin: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 600; white-space: pre; caret-color: #3564c5; text-shadow: 0 1px 3px rgba(25, 30, 40, .18); -webkit-user-select: text; user-select: text; }
   .text-editor.rainbow { -webkit-background-clip: text; background-clip: text; text-shadow: none; }
