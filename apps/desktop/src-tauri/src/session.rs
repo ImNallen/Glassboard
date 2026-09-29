@@ -30,6 +30,13 @@ pub(crate) struct Session {
     pub(crate) history_by_overlay: HashMap<String, HistoryAvailability>,
     pub(crate) preferences: Preferences,
     pub(crate) error: Option<String>,
+    pub(crate) capture: Option<CaptureSession>,
+}
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CaptureSession {
+    pub(crate) id: u32,
+    pub(crate) ready: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,7 +60,24 @@ impl Session {
             history_by_overlay: HashMap::new(),
             preferences,
             error: None,
+            capture: None,
         }
+    }
+    pub(crate) fn begin_capture(&mut self) {
+        // Captures own a fresh history, independent of live screen annotations.
+        self.annotation_session = self.annotation_session.wrapping_add(1);
+        self.history_by_overlay.clear();
+        self.mode = Mode::Hidden;
+        self.settings_open = false;
+        if matches!(self.tutorial, Some(TutorialStep::Draw | TutorialStep::Hide)) {
+            self.tutorial = Some(TutorialStep::Welcome);
+        }
+        self.active_overlay = "capture".into();
+        self.error = None;
+        self.capture = Some(CaptureSession {
+            id: self.annotation_session,
+            ready: false,
+        });
     }
     pub(crate) fn record_history(
         &mut self,
@@ -75,9 +99,20 @@ impl Session {
     }
     pub(crate) fn transition(&mut self, action: &str) -> Result<()> {
         let previous_mode = self.mode;
+        let leaving_capture = self.capture.is_some()
+            && matches!(
+                action,
+                "toggle"
+                    | "show"
+                    | "hide"
+                    | "cancel-capture"
+                    | "tutorial-start"
+                    | "replay-tutorial"
+                    | "settings"
+            );
         match action {
             "toggle" => {
-                self.mode = if self.mode == Mode::Hidden {
+                self.mode = if self.mode == Mode::Hidden && self.capture.is_none() {
                     Mode::Draw
                 } else {
                     Mode::Hidden
@@ -85,6 +120,7 @@ impl Session {
             }
             "show" => self.mode = Mode::Draw,
             "hide" => self.mode = Mode::Hidden,
+            "cancel-capture" => self.mode = Mode::Hidden,
             "tutorial-start" => {
                 self.mode = Mode::Draw;
                 self.tutorial = Some(TutorialStep::Draw);
@@ -99,8 +135,11 @@ impl Session {
             "dismiss-error" => self.error = None,
             _ => return Err("Unknown action".into()),
         }
-        if previous_mode == Mode::Draw && self.mode == Mode::Hidden {
-            self.annotation_session += 1;
+        if leaving_capture {
+            self.capture = None;
+        }
+        if leaving_capture || (previous_mode == Mode::Draw && self.mode == Mode::Hidden) {
+            self.annotation_session = self.annotation_session.wrapping_add(1);
             self.history_by_overlay.clear();
         }
         if previous_mode == Mode::Hidden
@@ -118,7 +157,7 @@ impl Session {
         }
         if matches!(
             action,
-            "toggle" | "show" | "hide" | "tutorial-start" | "replay-tutorial"
+            "toggle" | "show" | "hide" | "cancel-capture" | "tutorial-start" | "replay-tutorial"
         ) {
             self.settings_open = false;
         }
@@ -131,6 +170,63 @@ mod tests {
     use super::*;
     fn session() -> Session {
         Session::new(Preferences::default())
+    }
+    #[test]
+    fn captures_have_separate_history_and_cancel_without_starting_annotation_mode() {
+        for exit in ["cancel-capture", "hide", "toggle", "settings"] {
+            let mut s = session();
+            s.transition("show").unwrap();
+            let old_generation = s.annotation_session;
+            s.begin_capture();
+            assert_eq!(s.mode, Mode::Hidden);
+            assert_eq!(s.active_overlay, "capture");
+            assert!(s.capture.is_some());
+            assert_eq!(s.annotation_session, old_generation + 1);
+            s.record_history(
+                "overlay-0",
+                HistoryAvailability {
+                    can_undo: true,
+                    can_redo: true,
+                },
+                old_generation,
+                false,
+            );
+            assert!(s.history_by_overlay.is_empty());
+            let capture_generation = s.annotation_session;
+            s.record_history(
+                "capture",
+                HistoryAvailability {
+                    can_undo: true,
+                    can_redo: false,
+                },
+                capture_generation,
+                false,
+            );
+            s.transition(exit).unwrap();
+            assert!(s.capture.is_none());
+            assert_eq!(s.mode, Mode::Hidden);
+            assert!(s.history_by_overlay.is_empty());
+            s.record_history(
+                "capture",
+                HistoryAvailability {
+                    can_undo: true,
+                    can_redo: false,
+                },
+                capture_generation,
+                false,
+            );
+            assert!(s.history_by_overlay.is_empty());
+        }
+    }
+    #[test]
+    fn annotation_mode_replaces_capture_and_resets_history() {
+        let mut s = session();
+        s.begin_capture();
+        let capture_id = s.capture.unwrap().id;
+        s.transition("show").unwrap();
+        assert!(s.capture.is_none());
+        assert_eq!(s.mode, Mode::Draw);
+        assert_ne!(s.annotation_session, capture_id);
     }
     #[test]
     fn hide_and_restore_resets_input_mode() {

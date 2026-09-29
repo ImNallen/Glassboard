@@ -14,6 +14,20 @@ use tauri::{Manager, PhysicalPosition, PhysicalSize};
 
 pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
+    if state.capture.is_none() {
+        *app.state::<crate::capture::CaptureImage>()
+            .0
+            .lock()
+            .unwrap() = None;
+    }
+    if let Some(capture) = app.get_webview_window("capture") {
+        if state.capture.is_some_and(|capture| capture.ready) {
+            capture.show()
+        } else {
+            capture.hide()
+        }
+        .map_err(|e| e.to_string())?;
+    }
     for (label, window) in app.webview_windows() {
         if label.starts_with("overlay-") {
             window
@@ -38,7 +52,7 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
         }
         .map_err(|e| e.to_string())?;
     }
-    if !state.settings_open {
+    if !state.settings_open || state.capture.is_some() {
         if let Some(settings) = app.get_webview_window("settings") {
             settings.hide().map_err(|e| e.to_string())?;
         }
@@ -50,7 +64,7 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
 pub(crate) fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
     if let Some(window) = app.get_webview_window("tutorial") {
-        if state.tutorial.is_none() {
+        if state.tutorial.is_none() || state.capture.is_some() {
             return window.hide().map_err(|e| e.to_string());
         }
         if let Some(overlay) = app.get_webview_window(&state.active_overlay) {

@@ -2,7 +2,7 @@
 
 # Glassboard
 
-A small desktop annotation tool for macOS and Windows. Switch from work to annotation with a shortcut, draw over your screen, then switch back. Every annotation session starts clear.
+A small desktop annotation tool for macOS and Windows. Switch from work to annotation with a shortcut, draw over your screen, then switch back. Every annotation session starts clear. Capture a screenshot region, annotate it, and copy it straight into a chat.
 
 Built with Rust, Tauri 2, Svelte 5, TypeScript, and Canvas 2D. Everything runs locally. There is no account, server, screen recording, or network service in the built app.
 
@@ -32,6 +32,9 @@ A mint-green glow along each display’s edges indicates annotation mode, includ
 | Action | macOS | Windows |
 | --- | --- | --- |
 | Annotate / work (global, configurable) | Cmd+Shift+A | Ctrl+Shift+A |
+| Select screenshot area | Screenshot tool in toolbar | Screenshot tool in toolbar |
+| Copy & close a capture | Cmd+C or Cmd+S | Ctrl+C or Ctrl+S |
+| Cancel capture | Escape | Escape |
 | Hide while drawing | Escape | Escape |
 | Arrow / Pen / Square / Circle | Cmd+1 / 2 / 3 / 4 | Ctrl+1 / 2 / 3 / 4 |
 | Eraser / Text / Highlighter | Cmd+E / T / H | Ctrl+E / T / H |
@@ -43,6 +46,20 @@ Tools, left to right: **Arrow** (⌘1), **Pen** (⌘2), **Square** (⌘3), **Cir
 Hold **Shift** while dragging to constrain arrows to 45-degree increments or draw squares and circles. Text uses the same color, color mode, and auto-fade as other shapes. Colors sit directly on the toolbar in this order: **Rainbow**, **Shifting**, **Black**, **White**, **Green**, **Yellow**, **Red**, and **Blue**, selected with **1–8** in that order (no modifier). Number keys type normally while editing text. Rainbow is the default for new preferences; an explicitly saved mode is remembered. Rainbow gives every tool a gradient blending coral red, warm yellow, mint green, aqua, sky blue, violet, and pink, with a random starting color for each new shape. Its hues shift with your drag and freeze on release. Shifting steps through the same seven colors with each completed shape, across displays. Cancelled strokes, undo, redo, and clear do not advance the cycle. Line width is fixed at Regular for all drawing tools. The auto-fade button cycles **∞ → 3s → 5s → 10s → ∞** and remembers your selection. New shapes use the duration selected when drawing starts; their timer begins on release, with a soft fade during the final half-second. ∞ keeps drawings for the current annotation session unless cleared manually. Changing the duration leaves existing drawings unchanged, and expired drawings stay removed through undo/redo. Click the menu bar / system tray icon to open a separate settings window beside the icon. The window opens below a top menu bar or above a bottom taskbar, stays within the display, and dismisses on Escape or when it loses focus. It contains the annotate/work shortcut, toolbar position, clear-all, and quit controls. To change the global annotate/work shortcut, click the shortcut field and press the new combination; it saves immediately. Escape cancels recording, and the reset button restores the default. The shortcut must include Command/Control, Control, Super, or Alt. Conflicting registrations show an error without replacing the working shortcut.
 
 Leaving annotation mode hides the overlay and immediately clears drawings and undo/redo history on **every display**; previous sessions cannot be restored with Undo. Repeated show commands while already drawing do not clear the current session. Manual Clear remains undoable within the current session. Undo/redo/clear act on the display you most recently drew on (or the display under the cursor when summoned). **Clear all drawings** is in settings; **Clear screen** in the right-click menu clears the active annotation display. Summoning the overlay positions it on the display under the cursor.
+
+## Screenshot capture
+
+Open Glassboard with the usual **Cmd+Shift+A** on macOS or **Ctrl+Shift+A** on Windows, then choose **Screenshot** in the drawing toolbar. Glassboard hides its windows, freezes the display under the cursor, and lets you drag a region to capture. While Screenshot is selected, each new drag replaces the selected area. Choose a drawing tool to add arrows, text, shapes, or highlighting. The toolbar stays on your preferred dock edge. **Copy & close** puts the annotated region on the image clipboard and returns you to work; paste it into a chat, a coding agent, or any app that accepts images. **Cmd+C / Ctrl+C** and **Cmd+S / Ctrl+S** both copy and close, including a selection with no annotations. There is no save dialog or file written to disk.
+
+Copying selected annotation text still works normally while the text editor is focused. Press **Enter** to finish the text before copying the image, or use **Cmd+S / Ctrl+S** to finish and copy in one step. **Escape** discards pending text first; press it outside the text editor to cancel the capture. Choose **Screenshot** again to select a different region of the same frozen display; this discards the previous annotations. Choosing a drawing tool before selecting an area returns to live annotation. A failed clipboard write keeps the capture open so you can retry.
+
+Capture annotations remain visible until copied or cancelled, regardless of your normal auto-fade preference. Captures have their own drawing history, start fresh, and retain the source screenshot's pixel density. Starting a capture ends the live screen-annotation session. The annotate/work shortcut remains the only global shortcut; screenshot capture is a tool within that session.
+
+On macOS, screenshot capture needs the system's **Screen Recording** permission (called **Screen & System Audio Recording** on some releases). Glassboard requests it on first capture. If access is denied, settings explains how to enable it; macOS may require restarting the app after granting access. Captures stay in memory and on your local clipboard. The app does not record video or send screenshots anywhere.
+
+When testing locally rebuilt macOS apps, an enabled permission can still reference an older build's code signature. If restarting does not help, remove Glassboard from the Screen Recording list, add the current `.app` bundle again, enable it, and restart. Avoid rebuilding that bundle during the permission test.
+
+The desktop browser preview uses a clearly labeled sample screenshot to exercise selection, annotation, and image clipboard copy. Capturing other apps requires the native desktop app.
 
 ## Local builds
 
@@ -77,6 +94,8 @@ the same browser adapter the desktop preview uses, so visitors can draw on the p
 
 The tests cover undo/redo branches, undoable clear, immutable stroke history, constrained geometry, mode transitions, and shortcut validation. Native behavior must also be checked on each OS.
 
+Screenshot startup transfers a binary RGBA frame directly into the editor canvas; only the selected, annotated region is encoded to PNG when copying. Debug builds also optimize XCap's full-display pixel conversion. To compare frame preparation with the previous fast PNG encoder on a 3840×2160 fixture, run `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml benchmark_capture_preparation -- --ignored --nocapture`. The manual benchmark reports median preparation time and size, and verifies that every pixel matches the source. It stays out of normal test runs because wall-clock timings depend on the machine and build profile.
+
 ## Current boundaries
 
 - Annotation windows are created for displays connected at launch. Restart after connecting, disconnecting, rearranging, or changing the scaling of displays. Strokes use logical coordinates; canvases render at the display's pixel density.
@@ -98,6 +117,9 @@ Run `python3 scripts/generate-brand-assets.py` after editing the master to refre
 the native app/tray icons and browser favicons. Generated assets are checked in;
 normal builds do not need the asset-generation tools.
 
+- `src-tauri/src/capture.rs`: native display capture, permission handling, ephemeral screenshot storage, and image clipboard writing.
+- `apps/desktop/src/Capture.svelte`: region selection and the clipboard-first screenshot editor, using the shared drawing tools.
+- `src/lib/capture.ts`: selection geometry, pixel-density-aware image composition, and capture shortcuts.
 - `src-tauri/src/main.rs`: application startup, command registration, and native event wiring.
 - `src-tauri/src/session.rs`: authoritative mode and tutorial transitions, with their tests.
 - `src-tauri/src/preferences.rs`: preference defaults, validation, migration, and persistence.

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod capture;
 mod commands;
 mod preferences;
 mod session;
@@ -9,6 +10,7 @@ mod toolbar_position;
 mod tray;
 mod windows;
 
+use capture::{copy_capture, get_capture_image, CaptureImage};
 use commands::{
     action, activate_overlay, expand_toolbar, get_session, perform, register_toggle,
     report_history, set_preferences,
@@ -55,6 +57,8 @@ fn main() {
                     window.app_handle(),
                     if settings {
                         "close-settings"
+                    } else if window.label() == "capture" {
+                        "cancel-capture"
                     } else if window.label() == "tutorial" {
                         "dismiss-tutorial"
                     } else {
@@ -71,7 +75,9 @@ fn main() {
             activate_overlay,
             report_history,
             set_preferences,
-            expand_toolbar
+            expand_toolbar,
+            get_capture_image,
+            copy_capture
         ])
         .setup(|app| {
             let preferences = Preferences::load(app.handle());
@@ -96,6 +102,7 @@ fn main() {
                 }
                 app.set_menu(menu)?;
             }
+            app.manage(CaptureImage(Mutex::new(None)));
             app.manage(TrayAnchor(Mutex::new(None)));
             app.manage(ToolbarExpanded(Mutex::new(false)));
             app.manage(ToolbarLayout(Mutex::new(None)));
@@ -121,11 +128,21 @@ fn main() {
         .run(|app, event| {
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
-                if let Err(error) = perform(app, "show") {
-                    report(app, error);
-                }
-                if let Some(toolbar) = app.get_webview_window("toolbar") {
-                    let _ = toolbar.set_focus();
+                let session = snapshot(app);
+                // Activating the app must preserve an unfinished capture or its
+                // permission/error explanation, rather than switch to live drawing.
+                let target = if session.capture.is_some() {
+                    "capture"
+                } else if session.settings_open {
+                    "settings"
+                } else {
+                    if let Err(error) = perform(app, "show") {
+                        report(app, error);
+                    }
+                    "toolbar"
+                };
+                if let Some(window) = app.get_webview_window(target) {
+                    let _ = window.set_focus();
                 }
             }
             #[cfg(not(target_os = "macos"))]

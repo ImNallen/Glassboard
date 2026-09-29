@@ -13,7 +13,8 @@
     "./Overlay.svelte": "./src/Overlay.svelte",
     "./Toolbar.svelte": "./src/Toolbar.svelte",
     "./Logo.svelte": "./src/Logo.svelte",
-    "./toolbar.css": "./src/toolbar.css"
+    "./toolbar.css": "./src/toolbar.css",
+    "./capture": "./src/lib/capture.ts"
   },
   "scripts": {
     "check": "svelte-check --tsconfig ./tsconfig.json",
