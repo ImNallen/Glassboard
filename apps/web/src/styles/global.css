@@ -8,6 +8,9 @@
   --accent-hover: #b9f0dc;
   --on-accent: #143d33;
   --focus: #1f6b56;
+  --screen: #f6f7f6;
+  --screen-line: #d5dad7;
+  --screen-card: #ffffff;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -17,6 +20,9 @@
     --muted: #a3aca8;
     --line: #ffffff1f;
     --focus: #a3e9d1;
+    --screen: #161817;
+    --screen-line: #2d3230;
+    --screen-card: #1e2220;
     color-scheme: dark;
   }
 }
@@ -39,11 +45,35 @@ h1, p, ul { margin: 0; }
 .top nav a { text-decoration: none; white-space: nowrap; }
 .top nav a:hover { text-decoration: underline; }
 
-.hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 24px 0 140px; }
-.hero h1 { font-size: clamp(40px, 6.4vw, 84px); font-weight: 600; letter-spacing: -0.04em; line-height: .98; text-wrap: balance; }
-.hero .lede { max-width: 52ch; margin-top: 24px; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.5; color: var(--muted); }
-.hero .actions { display: flex; align-items: center; margin-top: 32px; }
+.hero { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 32px; padding: 16px 0 104px; }
+.hero h1 { font-size: clamp(36px, 5.2vw, 72px); font-weight: 600; letter-spacing: -0.04em; line-height: .98; text-wrap: balance; }
+.hero .row { display: grid; grid-template-columns: minmax(260px, 5fr) 7fr; gap: 48px; align-items: center; }
+.hero .lede { max-width: 44ch; font-size: clamp(17px, 1.4vw, 19px); line-height: 1.5; color: var(--muted); }
+.hero .actions { display: flex; align-items: center; margin-top: 28px; }
 
+/* The mock window the showcase annotates. Everything inside is decorative. */
+.screen { position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 16 / 10; border-radius: 14px; background: var(--screen); border: 1px solid var(--line); box-shadow: 0 24px 60px -28px #00000059; overflow: hidden; }
+.screen .bar { display: flex; gap: 6px; padding: 12px 14px; }
+.screen .bar span { width: 9px; height: 9px; border-radius: 50%; background: var(--screen-line); }
+.screen .body { position: absolute; inset: 34px 0 0 0; }
+.screen i { display: block; position: absolute; border-radius: 999px; background: var(--screen-line); }
+.screen .rail { position: absolute; top: 0; bottom: 0; left: 0; width: 8%; border-right: 1px solid var(--line); }
+.screen .rail i { position: static; width: 38%; aspect-ratio: 1; margin: 14px auto 0; border-radius: 30%; }
+.screen .title { left: 13%; top: 14%; width: 30%; height: 5%; }
+.screen .l1 { left: 13%; top: 28%; width: 34%; height: 3.2%; }
+.screen .l2 { left: 13%; top: 36%; width: 26%; height: 3.2%; }
+.screen .l3 { left: 13%; top: 66%; width: 33%; height: 3.2%; }
+.screen .l4 { left: 13%; top: 74%; width: 20%; height: 3.2%; }
+.screen .card { position: absolute; left: 60%; top: 30%; width: 29%; height: 32%; border-radius: 10px; background: var(--screen-card); border: 1px solid var(--line); }
+.screen .card i { position: static; height: 9%; margin: 14% 14% 0; }
+.screen .card i:first-child { width: 42%; height: 11%; background: var(--accent); }
+.screen .card i + i { width: 72%; }
+.screen .card i + i + i { width: 56%; }
+
+@media (max-width: 860px) {
+  .hero .row { grid-template-columns: 1fr; gap: 32px; }
+  .screen { justify-self: stretch; max-width: none; }
+}
 .button { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .12s ease, transform .12s ease; }
 .button:active { transform: translateY(1px); }
 .button.primary { background: var(--accent); color: var(--on-accent); }
@@ -52,9 +82,9 @@ h1, p, ul { margin: 0; }
 
 @media (max-height: 720px) and (min-width: 761px) {
   .top { padding: 14px 0; }
-  .hero { padding: 12px 0; }
-  .hero .lede { margin-top: 16px; }
-  .hero .actions { margin-top: 24px; }
+  .hero { gap: 22px; padding: 8px 0 92px; }
+  .hero .actions { margin-top: 22px; }
+  .screen { max-width: 460px; }
 }
 @media (max-width: 760px) {
   .top nav { gap: 16px; }

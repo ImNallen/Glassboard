@@ -2,6 +2,7 @@
 import '@fontsource-variable/familjen-grotesk';
 import '../styles/global.css';
 import TryIt from '../components/TryIt.svelte';
+import Showcase from '../components/Showcase.svelte';
 import appIcon from '../../../../assets/brand/app-icon.svg';
 
 const title = 'Glassboard';
@@ -38,9 +39,26 @@ const repo = 'https://github.com/ImNallen/Glassboard';
 
     <main class="wrap hero">
       <h1>Draw on your screen.<br />Then get back to work.</h1>
-      <p class="lede">{description}</p>
-      <div class="actions">
-        <button class="button primary" type="button" data-glassboard-try>Try it on this page</button>
+      <div class="row">
+        <div class="intro">
+          <p class="lede">{description}</p>
+          <div class="actions">
+            <button class="button primary" type="button" data-glassboard-try>Try it on this page</button>
+          </div>
+        </div>
+        <div class="screen" aria-hidden="true">
+          <div class="bar"><span></span><span></span><span></span></div>
+          <div class="body">
+            <div class="rail"><i></i><i></i><i></i><i></i></div>
+            <i class="line title"></i>
+            <i class="line l1"></i>
+            <i class="line l2"></i>
+            <div class="card"><i></i><i></i><i></i></div>
+            <i class="line l3"></i>
+            <i class="line l4"></i>
+          </div>
+          <Showcase client:only="svelte" />
+        </div>
       </div>
     </main>
 
