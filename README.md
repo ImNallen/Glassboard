@@ -76,12 +76,18 @@ The tests cover undo/redo branches, undoable clear, immutable stroke history, co
 
 ## Structure
 
-- `src-tauri/src/main.rs`: native windows, menu-bar/tray controls, the global shortcut, preferences, cursor proximity for the toolbar, and authoritative interaction state.
+- `src-tauri/src/main.rs`: application startup, command registration, and native event wiring.
+- `src-tauri/src/session.rs`: authoritative mode and tutorial transitions, with their tests.
+- `src-tauri/src/preferences.rs`: preference defaults, validation, migration, and persistence.
+- `src-tauri/src/commands.rs`: native commands and global shortcut handling; `state.rs` manages session snapshots and broadcasts.
+- `src-tauri/src/windows/`: shared window creation, visibility, positioning, and toolbar cursor tracking. Pure placement calculations live in `settings_position.rs` and `toolbar_position.rs`.
+- `src-tauri/src/tray.rs`: menu-bar/system-tray icon and menu actions.
 - `src/Toolbar.svelte`: floating drawing controls that collapse to a pill when the cursor is away.
+- `src/lib/toolbar-hints.svelte.ts`: tooltip timing, placement, accessibility, and hover/focus state.
 - `src/Tutorial.svelte`: first-launch practice guide, also available from settings.
 - `src/Settings.svelte`: separate settings window.
 - `src/Overlay.svelte`: pointer capture, stroke lifecycle, and demand-driven canvas rendering.
-- `src/lib/drawing.ts`: framework-independent shape rendering and per-display history.
+- `src/lib/drawing.ts`: public drawing API, backed by `drawing/shapes.ts` (shape data and geometry), `drawing/history.ts` (undo/redo and expiry), and `drawing/canvas.ts` (rendering and hit testing).
 - `src/lib/session.ts`: typed native bridge and browser preview adapter.
 
 Pointer movements and rendering stay in the webview. Only settings, mode changes, and discrete drawing commands cross the Rust bridge. Each display owns its annotation history. A shared annotation-session counter resets all displays on exit, including late-loading overlays; their canvas bitmaps are cleared immediately without waiting for an animation frame; stale history reports from previous sessions are ignored.
