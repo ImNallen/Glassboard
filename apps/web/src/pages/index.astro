@@ -1,9 +1,14 @@
 ---
-import mark from '../../../../assets/brand/mark-dark.svg';
+import '@fontsource-variable/familjen-grotesk';
+import '../styles/global.css';
+import TryIt from '../components/TryIt.svelte';
+import Showcase from '../components/Showcase.svelte';
+import appIcon from '../../../../assets/brand/app-icon.svg';
 
 const title = 'Glassboard';
-const description =
-  'A small desktop annotation tool for macOS and Windows. Switch from work to annotation with a shortcut, draw over your screen, then switch back.';
+const tagline = 'Draw on your screen. Then get back to work.';
+const description = 'Glassboard is a small annotation tool for macOS and Windows. One shortcut turns your whole screen into a drawing surface. Press it again and the drawings are gone.';
+const repo = 'https://github.com/ImNallen/Glassboard';
 ---
 
 <html lang="en">
@@ -12,16 +17,51 @@ const description =
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)" />
+    <meta property="og:title" content={`${title}: ${tagline}`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={Astro.site} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="canonical" href={Astro.site} />
-    <title>{title}</title>
+    <title>{title}: {tagline}</title>
   </head>
   <body>
-    <main>
-      <img src={mark.src} width="96" height="96" alt="" />
-      <h1>{title}</h1>
-      <p>{description}</p>
+    <header class="wrap top">
+      <a class="brand" href="/"><img src={appIcon.src} width="28" height="28" alt="" />Glassboard</a>
+      <nav aria-label="Site">
+        <a href={repo}>GitHub</a>
+        <a href={`${repo}#run-locally`}>Build it from source</a>
+      </nav>
+    </header>
+
+    <main class="wrap hero">
+      <div class="row">
+        <div class="intro">
+          <h1>Draw on your screen. Then get back to work.</h1>
+          <p class="lede">{description}</p>
+          <div class="actions">
+            <button class="button primary" type="button" data-glassboard-try>Try it on this page</button>
+          </div>
+        </div>
+        <div class="screen" aria-hidden="true">
+          <div class="bar"><span></span><span></span><span></span></div>
+          <div class="body">
+            <div class="rail"><i></i><i></i><i></i><i></i></div>
+            <i class="line title"></i>
+            <i class="line l1"></i>
+            <i class="line l2"></i>
+            <div class="card"><i></i><i></i><i></i></div>
+            <i class="line l3"></i>
+            <i class="line l4"></i>
+          </div>
+          <Showcase client:only="svelte" />
+        </div>
+      </div>
     </main>
+
+    <TryIt client:only="svelte" />
   </body>
 </html>

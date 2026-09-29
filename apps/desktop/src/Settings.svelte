@@ -1,8 +1,8 @@
 <script lang="ts">
   import { X, Trash2, Power, RotateCcw } from '@lucide/svelte';
-  import Logo from './Logo.svelte';
-  import { action, mac, native, savePreferences, shortcutLabel, type ToolbarPosition, type Session } from './lib/session';
-  import { DEFAULT_SHORTCUT, heldModifiers, MODIFIER_KEYS, recordShortcut } from './lib/shortcuts';
+  import Logo from '@glassboard/ui/Logo.svelte';
+  import { action, mac, native, savePreferences, shortcutLabel, type ToolbarPosition, type Session } from '@glassboard/ui/session';
+  import { DEFAULT_SHORTCUT, heldModifiers, MODIFIER_KEYS, recordShortcut } from '@glassboard/ui/shortcuts';
   let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
   let recording = $state(false);
   let pending = $state<string[]>([]);

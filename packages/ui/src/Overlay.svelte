@@ -62,7 +62,23 @@
     if (pointer !== null && canvas?.hasPointerCapture(pointer)) canvas.releasePointerCapture(pointer);
     pointer = null; draft = null; lastPointer = null; erasing = null; paint();
   }
-  function blur() { commitText(); cancel(); }
+  /** Commit the stroke or erase in progress, as a pointer release would. */
+  function finish() {
+    if (erasing) {
+      if (erasing.size && history.removeAll(erasing)) syncHistory();
+      cancel();
+      return;
+    }
+    if (draft) {
+      const start = draft.points[0], end = draft.points[draft.points.length - 1];
+      if (FREEHAND_TOOLS.includes(draft.tool) || Math.hypot(end.x - start.x, end.y - start.y) >= 3) {
+        history.add(draft);
+        syncHistory(draft.colorMode === 'cycle');
+      }
+    }
+    cancel();
+  }
+  function blur() { commitText(); finish(); }
   $effect(() => { if (session.mode !== 'draw') blur(); });
   $effect(() => { if (session.preferences.tool !== 'text') commitText(); });
   function eraseAt(point: Point) {
@@ -117,6 +133,10 @@
   }
   function move(event: PointerEvent) {
     if (event.pointerId !== pointer) return;
+    // No button is held: the release happened where this page could not see it (outside
+    // the window, or over another view). Keep what was drawn instead of waiting for a
+    // pointerup that will not arrive, and leave the re-entry point out of the stroke.
+    if (event.type === 'pointermove' && event.buttons === 0) { finish(); return; }
     const current = { x: event.clientX, y: event.clientY };
     if (erasing) {
       for (const sample of event.getCoalescedEvents?.() || [event]) eraseAt({ x: sample.clientX, y: sample.clientY });
@@ -138,18 +158,7 @@
   function up(event: PointerEvent) {
     if (event.pointerId !== pointer) return;
     move(event);
-    if (erasing) {
-      if (erasing.size && history.removeAll(erasing)) syncHistory();
-      cancel();
-      return;
-    }
-    if (!draft) return;
-    const start = draft.points[0], end = draft.points[draft.points.length - 1];
-    if (FREEHAND_TOOLS.includes(draft.tool) || Math.hypot(end.x - start.x, end.y - start.y) >= 3) {
-      history.add(draft);
-      syncHistory(draft.colorMode === 'cycle');
-    }
-    cancel();
+    finish();
   }
   // Pre-effects run during component initialization; all drawing state must exist first.
   // The generation travels with the session snapshot, so late-loading displays also reset.
@@ -188,7 +197,7 @@
 {#if session.mode === 'draw'}
   <div class="annotation-glow" aria-hidden="true"></div>
 {/if}
-<canvas bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={cancel} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Choose the eraser tool to remove drawings."></canvas>
+<canvas bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={finish} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Choose the eraser tool to remove drawings."></canvas>
 {#if editor}
   <textarea bind:this={textarea} bind:value={editor.text} class="text-editor" class:rainbow={Boolean(editorGradient)} class:concealed={session.mode === 'hidden'}
     style:left={`${editor.origin.x}px`} style:top={`${editor.origin.y}px`} style:width={`${editorSize.width}px`} style:height={`${editorSize.height}px`}

@@ -137,3 +137,15 @@ it('shows and updates unfocused tooltips from native cursor samples without a cl
   expect(document.querySelector('[role="tooltip"]')).toBeNull();
   expect(document.querySelector('.toolbar-host')?.classList.contains('collapsed')).toBe(true);
 });
+
+it('stays open when pinned, even after the tutorial and with the cursor away', async () => {
+  const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: null });
+  const current = fromStore(store);
+  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, error: '', onerror: vi.fn(), pinned: true } });
+  await tick();
+  await vi.advanceTimersByTimeAsync(300);
+  expect(document.querySelector('.toolbar-host')?.classList.contains('collapsed')).toBe(false);
+  window.dispatchEvent(new MouseEvent('mouseout'));
+  await vi.advanceTimersByTimeAsync(300);
+  expect(document.querySelector('.toolbar-host')?.classList.contains('collapsed')).toBe(false);
+});

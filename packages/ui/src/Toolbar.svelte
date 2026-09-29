@@ -5,7 +5,8 @@
   import { COLOR_SHORTCUTS, TOOL_SHORTCUTS } from './lib/shortcuts';
   import { action, expandToolbar, native, savePreferences, shortcutLabel, toolbarPointer, type Preferences, type Session } from './lib/session';
   import { AUTO_FADE_OPTIONS, cycleColor, RAINBOW_PREVIEW, type Tool } from './lib/drawing';
-  let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
+  /** `pinned` keeps the toolbar open instead of collapsing to the pill when the cursor is away; hosts without a native window use it. */
+  let { session, error, onerror, pinned = false }: { session: Session; error: string; onerror: (error: unknown) => void; pinned?: boolean } = $props();
   let placement = $derived(session.preferences.toolbarPosition);
   let vertical = $derived(placement !== 'bottom');
   // Reveal within this distance of the visible toolbar (the native side applies the same margin to its window).
@@ -25,7 +26,7 @@
     get tooltip() { return tooltip; },
   });
   const { hint } = hints;
-  let holdOpen = $derived(near || focused || Boolean(hints.tip) || session.tutorial === 'draw' || session.tutorial === 'hide' || Boolean(error || session.error));
+  let holdOpen = $derived(pinned || near || focused || Boolean(hints.tip) || session.tutorial === 'draw' || session.tutorial === 'hide' || Boolean(error || session.error));
   $effect(() => {
     if (holdOpen) { expanded = true; return; }
     const timer = setTimeout(() => expanded = false, COLLAPSE_DELAY);

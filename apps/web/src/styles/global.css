@@ -1,0 +1,92 @@
+/* White or black by system preference; mint is the highlight, as on the app icon. */
+:root {
+  --bg: #ffffff;
+  --fg: #101413;
+  --muted: #55605c;
+  --line: #10141318;
+  --accent: #a3e9d1;
+  --accent-hover: #b9f0dc;
+  --on-accent: #143d33;
+  --focus: #1f6b56;
+  --screen: #f6f7f6;
+  --screen-line: #d5dad7;
+  --screen-card: #ffffff;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e0e0e;
+    --fg: #f2f4f3;
+    --muted: #a3aca8;
+    --line: #ffffff1f;
+    --focus: #a3e9d1;
+    --screen: #161817;
+    --screen-line: #2d3230;
+    --screen-card: #1e2220;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+::selection { background: var(--accent); color: var(--on-accent); }
+html { background: var(--bg); color: var(--fg); font-family: 'Familjen Grotesk Variable', 'Helvetica Neue', Arial, sans-serif; font-size: 17px; line-height: 1.5; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; scrollbar-gutter: stable; }
+html.annotating { overflow: hidden; }
+body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+a { color: inherit; text-decoration-thickness: 1px; text-underline-offset: .15em; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 2px; }
+h1, p, ul { margin: 0; }
+.wrap { width: min(1040px, 100% - 48px); margin-inline: auto; }
+
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 20px 0; }
+.brand { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; font-size: 19px; letter-spacing: -0.01em; text-decoration: none; }
+.brand img { width: 28px; height: 28px; border-radius: 7px; }
+.top nav { display: flex; align-items: center; gap: 22px; font-weight: 500; }
+.top nav a { text-decoration: none; white-space: nowrap; }
+.top nav a:hover { text-decoration: underline; }
+
+.hero { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 16px 0 104px; }
+.hero .row { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+.hero h1 { font-size: clamp(34px, 3.9vw, 50px); font-weight: 600; letter-spacing: -0.035em; line-height: 1.02; text-wrap: balance; }
+.hero .lede { max-width: 44ch; margin-top: 22px; font-size: clamp(17px, 1.4vw, 19px); line-height: 1.5; color: var(--muted); }
+.hero .actions { display: flex; align-items: center; margin-top: 28px; }
+
+/* The mock window the showcase annotates. Everything inside is decorative. */
+.screen { --radius: 14px; position: relative; width: 100%; max-width: 560px; justify-self: end; aspect-ratio: 16 / 10; border-radius: var(--radius); background: var(--screen); border: 1px solid var(--line); box-shadow: 0 24px 60px -28px #00000059; overflow: hidden; }
+.screen .bar { display: flex; gap: 6px; padding: 12px 14px; }
+.screen .bar span { width: 9px; height: 9px; border-radius: 50%; background: var(--screen-line); }
+.screen .body { position: absolute; inset: 34px 0 0 0; }
+.screen i { display: block; position: absolute; border-radius: 999px; background: var(--screen-line); }
+.screen .rail { position: absolute; top: 0; bottom: 0; left: 0; width: 8%; border-right: 1px solid var(--line); }
+.screen .rail i { position: static; width: 38%; aspect-ratio: 1; margin: 14px auto 0; border-radius: 30%; }
+.screen .title { left: 13%; top: 14%; width: 30%; height: 5%; }
+.screen .l1 { left: 13%; top: 28%; width: 34%; height: 3.2%; }
+.screen .l2 { left: 13%; top: 36%; width: 26%; height: 3.2%; }
+.screen .l3 { left: 13%; top: 66%; width: 33%; height: 3.2%; }
+.screen .l4 { left: 13%; top: 74%; width: 20%; height: 3.2%; }
+.screen .card { position: absolute; left: 60%; top: 30%; width: 29%; height: 32%; border-radius: 10px; background: var(--screen-card); border: 1px solid var(--line); }
+.screen .card i { position: static; height: 9%; margin: 14% 14% 0; }
+.screen .card i:first-child { width: 42%; height: 11%; background: var(--accent); }
+.screen .card i + i { width: 72%; }
+.screen .card i + i + i { width: 56%; }
+
+@media (max-width: 860px) {
+  .hero .row { grid-template-columns: 1fr; gap: 32px; }
+  .screen { justify-self: stretch; max-width: none; }
+}
+.button { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; transition: background .12s ease, transform .12s ease; }
+.button:active { transform: translateY(1px); }
+.button.primary { background: var(--accent); color: var(--on-accent); }
+.button.primary:hover { background: var(--accent-hover); }
+@media (prefers-reduced-motion: reduce) { .button { transition: none; } }
+
+@media (max-height: 720px) and (min-width: 761px) {
+  .top { padding: 14px 0; }
+  .hero { padding: 8px 0 92px; }
+  .hero .lede { margin-top: 16px; }
+  .hero .actions { margin-top: 22px; }
+  .screen { max-width: 460px; }
+}
+@media (max-width: 760px) {
+  .top nav { gap: 16px; }
+}

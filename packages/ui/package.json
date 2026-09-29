@@ -1,0 +1,35 @@
+{
+  "name": "@glassboard/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Drawing engine, session adapter, and Svelte components shared by the Glassboard desktop app and website.",
+  "exports": {
+    "./session": "./src/lib/session.ts",
+    "./drawing": "./src/lib/drawing.ts",
+    "./shortcuts": "./src/lib/shortcuts.ts",
+    "./selection": "./src/lib/selection.ts",
+    "./keys": "./src/lib/keys.ts",
+    "./Overlay.svelte": "./src/Overlay.svelte",
+    "./Toolbar.svelte": "./src/Toolbar.svelte",
+    "./Logo.svelte": "./src/Logo.svelte",
+    "./toolbar.css": "./src/toolbar.css"
+  },
+  "scripts": {
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@lucide/svelte": "^1.48.0",
+    "@tauri-apps/api": "^2.12.0",
+    "svelte": "^5.57.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "jsdom": "^26.1.0",
+    "svelte-check": "^4.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.1",
+    "vitest": "^4.0.0"
+  }
+}
