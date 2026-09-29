@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ArrowUpRight, Check, X } from '@lucide/svelte';
+  import Logo from './Logo.svelte';
   import { action, native, shortcutLabel, type Session } from './lib/session';
   let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
   let busy = $state(false);
@@ -14,7 +15,7 @@
 {#if session.tutorial}
   <aside class="tutorial" class:preview={!native} aria-label="Glassboard tutorial">
     <header>
-      <span class="brand"><ArrowUpRight size={17}/> Glassboard</span>
+      <span class="brand"><Logo size={20}/> Glassboard</span>
       <button class="icon-button" aria-label="Dismiss tutorial" title="Dismiss tutorial" disabled={busy} onclick={() => run('dismiss-tutorial')}><X size={16}/></button>
     </header>
     <div aria-live="polite" aria-atomic="true">

@@ -1,3 +1,5 @@
+<img src="assets/brand/app-icon.png" alt="Glassboard marked-pane logo" width="96" height="96" />
+
 # Glassboard
 
 A small desktop annotation tool for macOS and Windows. Switch from work to annotation with a shortcut, draw over your screen, then switch back. Every annotation session starts clear.
@@ -75,6 +77,11 @@ The tests cover undo/redo branches, undoable clear, immutable stroke history, co
 - Protected system surfaces and exclusive fullscreen applications are outside this first version's scope.
 
 ## Structure
+
+The logo master and reusable exports live in [`assets/brand`](assets/brand/README.md).
+Run `python3 scripts/generate-brand-assets.py` after editing the master to refresh
+the native app/tray icons and browser favicons. Generated assets are checked in;
+normal builds do not need the asset-generation tools.
 
 - `src-tauri/src/main.rs`: application startup, command registration, and native event wiring.
 - `src-tauri/src/session.rs`: authoritative mode and tutorial transitions, with their tests.
