@@ -10,7 +10,7 @@ pub enum ToolbarPosition {
     Bottom,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Layout {
     pub x: i32,
     pub y: i32,
@@ -18,11 +18,21 @@ pub struct Layout {
     pub height: u32,
 }
 
+impl Layout {
+    /// Whether a physical cursor position is inside the toolbar window or within `margin` of it.
+    pub fn is_near(&self, x: f64, y: f64, margin: f64) -> bool {
+        x >= self.x as f64 - margin
+            && y >= self.y as f64 - margin
+            && x < self.x as f64 + self.width as f64 + margin
+            && y < self.y as f64 + self.height as f64 + margin
+    }
+}
+
 pub fn dock_layout(position: ToolbarPosition, work: Bounds, scale: f64, expanded: bool) -> Layout {
     // Include 12 logical pixels around the toolbar for its shadow.
     let (width, height) = match position {
-        ToolbarPosition::Bottom => (638.0, if expanded { 176.0 } else { 76.0 }),
-        _ => (if expanded { 386.0 } else { 76.0 }, 618.0),
+        ToolbarPosition::Bottom => (744.0, if expanded { 176.0 } else { 76.0 }),
+        _ => (if expanded { 386.0 } else { 76.0 }, 744.0),
     };
     let margin = 8.0 * scale;
     let width = (width * scale).min((work.width - 2.0 * margin).max(1.0));
@@ -58,9 +68,9 @@ mod tests {
         assert_eq!(
             dock_layout(ToolbarPosition::Bottom, work, 1.0, false),
             Layout {
-                x: 401,
+                x: 348,
                 y: 776,
-                width: 638,
+                width: 744,
                 height: 76
             }
         );
@@ -68,18 +78,18 @@ mod tests {
             dock_layout(ToolbarPosition::Left, work, 1.0, false),
             Layout {
                 x: 8,
-                y: 133,
+                y: 70,
                 width: 76,
-                height: 618
+                height: 744
             }
         );
         assert_eq!(
             dock_layout(ToolbarPosition::Right, work, 1.0, false),
             Layout {
                 x: 1356,
-                y: 133,
+                y: 70,
                 width: 76,
-                height: 618
+                height: 744
             }
         );
     }
@@ -122,9 +132,9 @@ mod tests {
         assert_eq!(
             dock_layout(ToolbarPosition::Bottom, work, 2.0, false),
             Layout {
-                x: -2078,
+                x: -2184,
                 y: 1552,
-                width: 1276,
+                width: 1488,
                 height: 152
             }
         );
@@ -138,5 +148,22 @@ mod tests {
         assert_eq!((side.y, side.height), (8, 434));
         let bottom = dock_layout(ToolbarPosition::Bottom, small, 1.0, false);
         assert_eq!((bottom.x, bottom.width), (8, 484));
+    }
+    #[test]
+    fn proximity_includes_a_margin_around_the_window() {
+        let layout = Layout {
+            x: 100,
+            y: 200,
+            width: 638,
+            height: 76,
+        };
+        assert!(layout.is_near(100.0, 200.0, 0.0));
+        assert!(layout.is_near(737.0, 275.0, 0.0));
+        assert!(!layout.is_near(738.0, 275.0, 0.0));
+        assert!(!layout.is_near(99.0, 200.0, 0.0));
+        assert!(layout.is_near(80.0, 180.0, 20.0));
+        assert!(layout.is_near(757.0, 295.0, 20.0));
+        assert!(!layout.is_near(758.0, 295.0, 20.0));
+        assert!(!layout.is_near(400.0, 150.0, 20.0));
     }
 }

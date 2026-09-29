@@ -8,15 +8,15 @@ use settings_position::{anchored_position, Bounds};
 use std::{collections::HashMap, sync::Mutex};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use toolbar_position::{dock_layout, ToolbarPosition};
+use toolbar_position::{dock_layout, Layout, ToolbarPosition};
 
 const SETTINGS_WIDTH: f64 = 360.0;
 const SETTINGS_HEIGHT: f64 = 560.0;
 const TRAY_ID: &str = "glassboard-tray";
+/// Logical distance from the toolbar window within which the collapsed toolbar expands.
+const TOOLBAR_REVEAL_MARGIN: f64 = 20.0;
 
 const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+A";
-const INTERACT_SHORTCUT: &str = "CommandOrControl+Shift+I";
-const TOOLBAR_SHORTCUT: &str = "CommandOrControl+Shift+H";
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -30,7 +30,6 @@ enum ColorMode {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Preferences {
-    #[serde(deserialize_with = "deserialize_tool")]
     tool: String,
     #[serde(deserialize_with = "deserialize_color")]
     color: String,
@@ -56,13 +55,6 @@ impl Default for Preferences {
         }
     }
 }
-// Keep the remaining preferences when upgrading from the removed pencil tool.
-fn deserialize_tool<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> std::result::Result<String, D::Error> {
-    let tool = String::deserialize(deserializer)?;
-    Ok(if tool == "pen" { "arrow".into() } else { tool })
-}
 // Upgrade saved palette colors while retaining all other preferences.
 fn deserialize_color<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
@@ -81,7 +73,16 @@ fn deserialize_color<'de, D: serde::Deserializer<'de>>(
 }
 impl Preferences {
     fn validate(&self) -> Result<Shortcut> {
-        if !["arrow", "rectangle", "ellipse", "highlighter"].contains(&self.tool.as_str())
+        if ![
+            "pen",
+            "arrow",
+            "rectangle",
+            "ellipse",
+            "highlighter",
+            "text",
+            "eraser",
+        ]
+        .contains(&self.tool.as_str())
             || ![0, 3, 5, 10].contains(&self.auto_fade_seconds)
             || ![2.0, 4.0, 7.0].contains(&self.width)
             || self.color.len() != 7
@@ -100,11 +101,6 @@ impl Preferences {
         {
             return Err("Include CommandOrControl, Control, Super, or Alt in the shortcut.".into());
         }
-        if shortcut == INTERACT_SHORTCUT.parse::<Shortcut>().unwrap()
-            || shortcut == TOOLBAR_SHORTCUT.parse::<Shortcut>().unwrap()
-        {
-            return Err("That shortcut is used by Interact or Hide Toolbar.".into());
-        }
         Ok(shortcut)
     }
 }
@@ -112,7 +108,6 @@ impl Preferences {
 #[serde(rename_all = "camelCase")]
 struct Session {
     mode: String,
-    toolbar_visible: bool,
     settings_open: bool,
     active_overlay: String,
     cycle_index: u32,
@@ -129,14 +124,10 @@ struct HistoryAvailability {
 struct AppState(Mutex<Session>);
 struct TrayAnchor(Mutex<Option<tauri::Rect>>);
 struct ToolbarExpanded(Mutex<bool>);
+/// Physical toolbar window bounds and display scale, refreshed whenever the toolbar is docked.
+struct ToolbarLayout(Mutex<Option<(Layout, f64)>>);
 
 impl Session {
-    fn transition_from_settings(&mut self, action: &str) -> Result<()> {
-        let was_open = self.settings_open;
-        self.transition(action)?;
-        self.settings_open = was_open;
-        Ok(())
-    }
     fn transition(&mut self, action: &str) -> Result<()> {
         match action {
             "toggle" => {
@@ -146,12 +137,8 @@ impl Session {
                     "hidden"
                 }
                 .into();
-                self.toolbar_visible = true;
             }
-            "show" => {
-                self.mode = "draw".into();
-                self.toolbar_visible = true;
-            }
+            "show" => self.mode = "draw".into(),
             "hide" => self.mode = "hidden".into(),
             "interact" if self.mode != "hidden" => {
                 self.mode = if self.mode == "draw" {
@@ -161,14 +148,13 @@ impl Session {
                 }
                 .into()
             }
-            "toolbar" if self.mode != "hidden" => self.toolbar_visible = !self.toolbar_visible,
-            "interact" | "toolbar" => {}
+            "interact" => {}
             "settings" => self.settings_open = true,
             "close-settings" => self.settings_open = false,
             "dismiss-error" => self.error = None,
             _ => return Err("Unknown action".into()),
         }
-        if matches!(action, "toggle" | "show" | "hide" | "toolbar") {
+        if matches!(action, "toggle" | "show" | "hide") {
             self.settings_open = false;
         }
         Ok(())
@@ -207,7 +193,7 @@ fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
         }
     }
     if let Some(toolbar) = app.get_webview_window("toolbar") {
-        if state.mode != "hidden" && state.toolbar_visible {
+        if state.mode != "hidden" {
             toolbar.show()
         } else {
             toolbar.hide()
@@ -266,9 +252,37 @@ fn position_toolbar(app: &tauri::AppHandle) -> Result<()> {
             toolbar
                 .set_size(PhysicalSize::new(layout.width, layout.height))
                 .map_err(|e| e.to_string())?;
+            *app.state::<ToolbarLayout>().0.lock().unwrap() =
+                Some((layout, monitor.scale_factor()));
         }
     }
     Ok(())
+}
+/// Whether the cursor is close enough to the docked toolbar to reveal it.
+fn toolbar_is_near(app: &tauri::AppHandle) -> bool {
+    if snapshot(app).mode == "hidden" {
+        return false;
+    }
+    let Some((layout, scale)) = *app.state::<ToolbarLayout>().0.lock().unwrap() else {
+        return false;
+    };
+    app.cursor_position()
+        .map(|cursor| layout.is_near(cursor.x, cursor.y, TOOLBAR_REVEAL_MARGIN * scale))
+        .unwrap_or(false)
+}
+/// Poll the cursor so the toolbar can expand even while overlays ignore pointer events.
+fn watch_toolbar_proximity(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        let mut near = false;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(80));
+            let next = toolbar_is_near(&app);
+            if next != near {
+                near = next;
+                let _ = app.emit_to("toolbar", "toolbar-proximity", near);
+            }
+        }
+    });
 }
 fn position_settings(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<()> {
     let rect = app
@@ -348,9 +362,6 @@ fn select_cursor_monitor(app: &tauri::AppHandle) {
     }
 }
 fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
-    perform_action(app, action, false)
-}
-fn perform_action(app: &tauri::AppHandle, action: &str, keep_settings_open: bool) -> Result<()> {
     if action == "quit" {
         app.exit(0);
         return Ok(());
@@ -400,21 +411,13 @@ fn perform_action(app: &tauri::AppHandle, action: &str, keep_settings_open: bool
         select_cursor_monitor(app);
         position_toolbar(app)?;
     }
-    {
-        let state = app.state::<AppState>();
-        let mut s = state.0.lock().unwrap();
-        if keep_settings_open {
-            s.transition_from_settings(action)?;
-        } else {
-            s.transition(action)?;
-        }
-    }
+    app.state::<AppState>()
+        .0
+        .lock()
+        .unwrap()
+        .transition(action)?;
     apply_windows(app)?;
-    if keep_settings_open {
-        if let Some(settings) = app.get_webview_window("settings") {
-            settings.set_focus().map_err(|e| e.to_string())?;
-        }
-    } else if matches!(action, "toggle" | "show" | "interact") {
+    if matches!(action, "toggle" | "show" | "interact") {
         focus_drawing(app);
     }
     Ok(())
@@ -424,13 +427,8 @@ fn get_session(app: tauri::AppHandle) -> Session {
     snapshot(&app)
 }
 #[tauri::command]
-fn action(app: tauri::AppHandle, window: tauri::WebviewWindow, action: String) -> Result<()> {
-    let keep_settings_open = window.label() == "settings"
-        && matches!(
-            action.as_str(),
-            "toggle" | "show" | "hide" | "interact" | "toolbar"
-        );
-    perform_action(&app, &action, keep_settings_open)
+fn action(app: tauri::AppHandle, action: String) -> Result<()> {
+    perform(&app, &action)
 }
 #[tauri::command]
 fn activate_overlay(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<()> {
@@ -599,7 +597,6 @@ fn main() {
                 .unwrap_or_default();
             app.manage(AppState(Mutex::new(Session {
                 mode: "draw".into(),
-                toolbar_visible: true,
                 settings_open: false,
                 active_overlay: "overlay-0".into(),
                 cycle_index: 0,
@@ -611,6 +608,7 @@ fn main() {
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             app.manage(TrayAnchor(Mutex::new(None)));
             app.manage(ToolbarExpanded(Mutex::new(false)));
+            app.manage(ToolbarLayout(Mutex::new(None)));
             let monitors = app.available_monitors()?;
             for (i, monitor) in monitors.iter().enumerate() {
                 let window = WebviewWindowBuilder::new(
@@ -645,7 +643,7 @@ fn main() {
             .title("Glassboard")
             // Tool selection should also work on the first click from the canvas.
             .accept_first_mouse(true)
-            .inner_size(638.0, 76.0)
+            .inner_size(744.0, 76.0)
             .transparent(true)
             .decorations(false)
             .shadow(false)
@@ -726,28 +724,11 @@ fn main() {
             if let Err(e) = register_toggle(handle, &snapshot(handle).preferences.shortcut) {
                 report(handle, e);
             }
-            for (shortcut, action) in [
-                (INTERACT_SHORTCUT, "interact"),
-                (TOOLBAR_SHORTCUT, "toolbar"),
-            ] {
-                if let Err(e) =
-                    handle
-                        .global_shortcut()
-                        .on_shortcut(shortcut, move |app, _, event| {
-                            if event.state() == ShortcutState::Pressed {
-                                if let Err(e) = perform(app, action) {
-                                    report(app, e);
-                                }
-                            }
-                        })
-                {
-                    report(handle, e.to_string());
-                }
-            }
             select_cursor_monitor(handle);
             position_toolbar(handle).map_err(std::io::Error::other)?;
             apply_windows(handle).map_err(std::io::Error::other)?;
             toolbar.set_focus()?;
+            watch_toolbar_proximity(handle.clone());
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -773,7 +754,6 @@ mod tests {
     fn session() -> Session {
         Session {
             mode: "draw".into(),
-            toolbar_visible: true,
             settings_open: false,
             active_overlay: "overlay-0".into(),
             cycle_index: 0,
@@ -783,23 +763,23 @@ mod tests {
         }
     }
     #[test]
-    fn hide_and_restore_resets_input_mode_and_restores_toolbar() {
+    fn hide_and_restore_resets_input_mode() {
         let mut s = session();
         s.transition("interact").unwrap();
-        s.transition("toolbar").unwrap();
         s.transition("hide").unwrap();
         s.transition("toggle").unwrap();
         assert_eq!(s.mode, "draw");
-        assert!(s.toolbar_visible);
+    }
+    #[test]
+    fn removed_toolbar_action_is_rejected() {
+        assert!(session().transition("toolbar").is_err());
     }
     #[test]
     fn settings_can_open_while_annotations_stay_hidden() {
         let mut s = session();
         s.transition("hide").unwrap();
-        s.toolbar_visible = false;
         s.transition("settings").unwrap();
         assert!(s.settings_open);
-        assert!(!s.toolbar_visible);
         assert_eq!(s.mode, "hidden");
         s.transition("close-settings").unwrap();
         assert!(!s.settings_open);
@@ -810,46 +790,31 @@ mod tests {
         assert_eq!(s.mode, "draw");
     }
     #[test]
-    fn settings_controls_change_modes_without_dismissing_settings() {
-        let mut s = session();
-        s.transition("settings").unwrap();
-        s.transition_from_settings("toggle").unwrap();
-        assert_eq!(s.mode, "hidden");
-        assert!(s.settings_open);
-        s.transition_from_settings("toggle").unwrap();
-        assert_eq!(s.mode, "draw");
-        s.transition_from_settings("interact").unwrap();
-        assert_eq!(s.mode, "interact");
-        assert!(s.settings_open);
-        s.transition_from_settings("toolbar").unwrap();
-        assert!(!s.toolbar_visible);
-        assert!(s.settings_open);
-        s.transition("close-settings").unwrap();
-        assert!(!s.settings_open);
-        assert_eq!(s.mode, "interact");
-        assert!(!s.toolbar_visible);
-    }
-    #[test]
-    fn secondary_shortcuts_do_not_reveal_hidden_annotations() {
+    fn interact_does_not_reveal_hidden_annotations() {
         let mut s = session();
         s.transition("hide").unwrap();
         s.transition("interact").unwrap();
-        s.transition("toolbar").unwrap();
         assert_eq!(s.mode, "hidden");
     }
     #[test]
-    fn shortcut_validation_rejects_reserved_and_unmodified_keys() {
+    fn shortcut_validation_rejects_unmodified_and_malformed_keys() {
         let mut p = Preferences::default();
         assert!(p.validate().is_ok());
-        for shortcut in [
-            "A",
-            "Shift+A",
-            INTERACT_SHORTCUT,
-            TOOLBAR_SHORTCUT,
-            "not a shortcut",
-        ] {
+        for shortcut in ["A", "Shift+A", "not a shortcut", "CommandOrControl+Shift+"] {
             p.shortcut = shortcut.into();
             assert!(p.validate().is_err(), "{shortcut}");
+        }
+        // Recorded shortcuts use browser key codes, which the native parser accepts.
+        for shortcut in [
+            "CommandOrControl+Shift+KeyA",
+            "Alt+Digit1",
+            "Control+Space",
+            "CommandOrControl+F5",
+            "Alt+Shift+ArrowUp",
+            "Super+Comma",
+        ] {
+            p.shortcut = shortcut.into();
+            assert!(p.validate().is_ok(), "{shortcut}");
         }
     }
     #[test]
@@ -871,6 +836,29 @@ mod tests {
         assert!(invalid.validate().is_err());
     }
     #[test]
+    fn every_tool_is_accepted_and_unknown_tools_are_rejected() {
+        for tool in [
+            "pen",
+            "arrow",
+            "rectangle",
+            "ellipse",
+            "highlighter",
+            "text",
+            "eraser",
+        ] {
+            let preferences = Preferences {
+                tool: tool.into(),
+                ..Preferences::default()
+            };
+            assert!(preferences.validate().is_ok(), "{tool}");
+        }
+        let invalid = Preferences {
+            tool: "pencil".into(),
+            ..Preferences::default()
+        };
+        assert!(invalid.validate().is_err());
+    }
+    #[test]
     fn older_preferences_default_to_rainbow_and_keep_color_and_shortcut() {
         let preferences: Preferences = serde_json::from_str(
             r##"{"tool":"pen","color":"#68aaff","width":7,"shortcut":"CommandOrControl+Shift+B"}"##,
@@ -878,7 +866,7 @@ mod tests {
         .unwrap();
         assert_eq!(preferences.color_mode, ColorMode::Rainbow);
         assert_eq!(preferences.toolbar_position, ToolbarPosition::Bottom);
-        assert_eq!(preferences.tool, "arrow");
+        assert_eq!(preferences.tool, "pen");
         assert_eq!(preferences.auto_fade_seconds, 0);
         assert_eq!(preferences.color, "#68aaff");
         assert_eq!(preferences.shortcut, "CommandOrControl+Shift+B");

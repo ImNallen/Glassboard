@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, shiftRainbow, render, shapeOpacity, type Shape, type Tool } from './drawing';
+import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
 const arrow = (): Shape => ({ id: 'one', tool: 'arrow', color: '#ff6259', width: 4, points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] });
 describe('auto-fade', () => {
   it.each([3, 5, 10] as const)('starts the %ss timer on completion and fades only at the end', seconds => {
@@ -192,5 +192,49 @@ describe('shift constraints', () => {
   it('snaps arrows to 45 degrees while retaining length', () => {
     const p = constrainEnd({ x: 0, y: 0 }, { x: 100, y: 80 }, 'arrow', true);
     expect(p.x).toBeCloseTo(p.y); expect(Math.hypot(p.x, p.y)).toBeCloseTo(Math.hypot(100, 80));
+  });
+});
+
+describe('eraser tool', () => {
+  it('removes every swept shape as a single undo step and ignores unknown ids', () => {
+    const history = new DrawingHistory();
+    for (const id of ['a', 'b', 'c']) history.add({ ...arrow(), id }, 0);
+    expect(history.removeAll(['a', 'c', 'missing'])).toBe(true);
+    expect(history.shapes.map(shape => shape.id)).toEqual(['b']);
+    history.undo();
+    expect(history.shapes.map(shape => shape.id)).toEqual(['a', 'b', 'c']);
+    expect(history.removeAll(['missing'])).toBe(false);
+    expect(history.canRedo).toBe(true);
+  });
+});
+
+describe('pen and text tools', () => {
+  it('lets the pen draw freehand without shift constraints', () => {
+    expect(constrainEnd({ x: 0, y: 0 }, { x: 30, y: 7 }, 'pen', true)).toEqual({ x: 30, y: 7 });
+    expect(constrainEnd({ x: 0, y: 0 }, { x: 30, y: 7 }, 'rectangle', true)).toEqual({ x: 30, y: 30 });
+  });
+  it('sizes text from the line width and keeps the text on the committed shape', () => {
+    expect([2, 4, 7].map(textFontSize)).toEqual([18, 24, 33]);
+    expect([2, 4, 7].map(textLineHeight)).toEqual([23, 30, 41]);
+    const history = new DrawingHistory();
+    const shape = createShape({ tool: 'text', color: '#000000', width: 4, colorMode: 'solid' }, 0, { x: 10, y: 20 });
+    shape.text = 'Hello'; shape.points.push({ x: 90, y: 50 });
+    history.add(shape, 0);
+    expect(history.shapes[0].text).toBe('Hello');
+    expect(history.shapes[0].points).toEqual([{ x: 10, y: 20 }, { x: 90, y: 50 }]);
+    expect(rainbowAxis(history.shapes[0])).toEqual([{ x: 10, y: 20 }, { x: 90, y: 50 }]);
+  });
+  it('renders text with fill and glow instead of a stroked path', () => {
+    const calls: string[] = [];
+    const ctx = {
+      setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(),
+      strokeText: () => calls.push('strokeText'), fillText: () => calls.push('fillText'), stroke: () => calls.push('stroke'), fill: () => calls.push('fill'),
+    };
+    render(ctx as unknown as CanvasRenderingContext2D,
+      [{ ...arrow(), tool: 'text', text: 'Hi\nthere', points: [{ x: 0, y: 0 }, { x: 60, y: 60 }] }], null, 100, 100, 1, 0);
+    expect(calls.filter(call => call === 'strokeText')).toHaveLength(12);
+    expect(calls.filter(call => call === 'fillText')).toHaveLength(2);
+    expect(calls).not.toContain('stroke');
+    expect(calls).not.toContain('fill');
   });
 });
