@@ -26,8 +26,8 @@
   }
   let drawing = $derived(session.mode === 'draw');
   // A non-interactive copy of the toolbar shows where the real one will appear.
-  // It is held open by the tutorial state and replaced by the live toolbar while drawing.
-  const previewSession: Session = { ...structuredClone(defaults), mode: 'draw', tutorial: 'draw' };
+  // It is replaced by the live toolbar while drawing.
+  const previewSession: Session = { ...structuredClone(defaults), mode: 'draw' };
   $effect(() => { document.documentElement.classList.toggle('annotating', drawing); });
   onMount(() => {
     let disposed = false, stop = () => {};
@@ -39,10 +39,11 @@
 <svelte:window onkeydown={keydown} onclick={click} />
 <div class="glassboard-layer">
   {#if !drawing}
-    <div class="toolbar-preview" inert aria-hidden="true"><Toolbar session={previewSession} error="" onerror={() => {}} /></div>
+    <div class="toolbar-preview" inert aria-hidden="true"><Toolbar session={previewSession} error="" onerror={() => {}} pinned /></div>
   {/if}
   <Overlay {session} {onerror} />
-  <Toolbar {session} {error} {onerror} />
+  <!-- Pinned: on a web page there is no screen edge to tuck into, so the toolbar stays open. -->
+  <Toolbar {session} {error} {onerror} pinned />
   {#if drawing}
     <div class="banner" role="status">
       <p>This is the real Glassboard toolbar. Pick a tool and draw. <span class="undo"><kbd>{shortcutLabel('CommandOrControl+Z')}</kbd> undoes.</span></p>
