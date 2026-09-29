@@ -128,6 +128,7 @@ mod tests {
             "CommandOrControl+F5",
             "Alt+Shift+ArrowUp",
             "Super+Comma",
+            "CommandOrControl+Shift+S",
         ] {
             p.shortcut = shortcut.into();
             assert!(p.validate().is_ok(), "{shortcut}");

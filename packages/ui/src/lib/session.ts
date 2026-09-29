@@ -5,9 +5,9 @@ import { DEFAULT_SHORTCUT, formatShortcut } from './shortcuts';
 export type ToolbarPosition = 'left' | 'right' | 'bottom';
 export type Preferences = { tool: Tool; color: string; colorMode: ColorMode; shortcut: string; toolbarPosition: ToolbarPosition; autoFadeSeconds: AutoFadeSeconds; tutorialCompleted: boolean };
 export type HistoryAvailability = { canUndo: boolean; canRedo: boolean };
-export type Session = { mode: 'hidden' | 'draw'; annotationSession: number; tutorial: 'welcome' | 'draw' | 'hide' | 'done' | null; settingsOpen: boolean; activeOverlay: string; cycleIndex: number; historyByOverlay: Record<string, HistoryAvailability>; preferences: Preferences; error: string | null };
+export type Session = { mode: 'hidden' | 'draw'; annotationSession: number; tutorial: 'welcome' | 'draw' | 'hide' | 'done' | null; settingsOpen: boolean; activeOverlay: string; cycleIndex: number; historyByOverlay: Record<string, HistoryAvailability>; preferences: Preferences; error: string | null; capture: { id: number; ready: boolean } | null };
 export const native = isTauri();
-export const defaults: Session = { mode: 'hidden', annotationSession: 0, tutorial: 'welcome', settingsOpen: false, activeOverlay: 'overlay-0', cycleIndex: 0, historyByOverlay: {}, preferences: { tool: 'arrow', color: CYCLE_COLORS[0], colorMode: 'rainbow', shortcut: DEFAULT_SHORTCUT, toolbarPosition: 'bottom', autoFadeSeconds: 0, tutorialCompleted: false }, error: null };
+export const defaults: Session = { mode: 'hidden', annotationSession: 0, tutorial: 'welcome', settingsOpen: false, activeOverlay: 'overlay-0', cycleIndex: 0, historyByOverlay: {}, capture: null, preferences: { tool: 'arrow', color: CYCLE_COLORS[0], colorMode: 'rainbow', shortcut: DEFAULT_SHORTCUT, toolbarPosition: 'bottom', autoFadeSeconds: 0, tutorialCompleted: false }, error: null };
 let preview = structuredClone(defaults);
 try {
   if (localStorage.getItem('glassboard-tutorial-completed') === 'true') {
@@ -37,8 +37,21 @@ export async function drawingEvents(fn: (action: string) => void) {
 export async function action(action: string) {
   if (native) return invoke<void>('action', { action });
   if (['undo', 'redo', 'clear', 'clear-all'].includes(action)) { drawingSubscribers.forEach(fn => fn(action === 'clear-all' ? 'clear' : action)); return; }
-  if (!['toggle', 'show', 'hide', 'tutorial-start', 'replay-tutorial', 'dismiss-tutorial', 'settings', 'close-settings', 'dismiss-error'].includes(action)) throw new Error('Unknown action');
+  if (action === 'capture') {
+    if (preview.capture) return;
+    preview.annotationSession++;
+    preview.mode = 'hidden';
+    preview.settingsOpen = false;
+    preview.activeOverlay = 'capture';
+    preview.historyByOverlay = {};
+    preview.error = null;
+    if (preview.tutorial === 'draw' || preview.tutorial === 'hide') preview.tutorial = 'welcome';
+    preview.capture = { id: preview.annotationSession, ready: true };
+    publish(); return;
+  }
+  if (!['cancel-capture', 'toggle', 'show', 'hide', 'tutorial-start', 'replay-tutorial', 'dismiss-tutorial', 'settings', 'close-settings', 'dismiss-error'].includes(action)) throw new Error('Unknown action');
   const previousMode = preview.mode;
+  const leavingCapture = Boolean(preview.capture) && ['toggle', 'show', 'hide', 'cancel-capture', 'tutorial-start', 'replay-tutorial', 'settings'].includes(action);
   if (action === 'dismiss-tutorial') {
     try { localStorage.setItem('glassboard-tutorial-completed', 'true'); } catch { /* Preview only. */ }
     preview.preferences.tutorialCompleted = true;
@@ -46,10 +59,11 @@ export async function action(action: string) {
   }
   if (action === 'replay-tutorial') { preview.mode = 'hidden'; preview.tutorial = 'welcome'; preview.settingsOpen = false; }
   if (action === 'tutorial-start') { preview.mode = 'draw'; preview.tutorial = 'draw'; }
-  if (action === 'toggle') preview.mode = preview.mode === 'hidden' ? 'draw' : 'hidden';
+  if (action === 'toggle') preview.mode = preview.mode === 'hidden' && !preview.capture ? 'draw' : 'hidden';
   if (action === 'show') preview.mode = 'draw';
-  if (action === 'hide') preview.mode = 'hidden';
-  if (previousMode === 'draw' && preview.mode === 'hidden') {
+  if (action === 'hide' || action === 'cancel-capture') preview.mode = 'hidden';
+  if (leavingCapture) preview.capture = null;
+  if (leavingCapture || (previousMode === 'draw' && preview.mode === 'hidden')) {
     preview.annotationSession++;
     preview.historyByOverlay = {};
   }
@@ -65,7 +79,7 @@ export async function action(action: string) {
     else if (preview.tutorial === 'draw') preview.tutorial = 'welcome';
   }
   if (action === 'settings') preview.settingsOpen = true;
-  if (['toggle', 'show', 'hide', 'tutorial-start', 'close-settings'].includes(action)) preview.settingsOpen = false;
+  if (['toggle', 'show', 'hide', 'tutorial-start', 'cancel-capture', 'close-settings'].includes(action)) preview.settingsOpen = false;
   if (action === 'dismiss-error') preview.error = null;
   publish();
 }
@@ -85,7 +99,7 @@ export async function reportHistory(availability: HistoryAvailability, annotatio
   if (annotationSession !== preview.annotationSession) return;
   if (preview.tutorial === 'draw' && availability.canUndo) preview.tutorial = 'hide';
   if (advanceCycle) preview.cycleIndex++;
-  preview.historyByOverlay['overlay-0'] = availability;
+  preview.historyByOverlay[preview.activeOverlay] = availability;
   publish();
 }
 export async function expandToolbar(expanded: boolean) { if (native) await invoke('expand_toolbar', { expanded }); }

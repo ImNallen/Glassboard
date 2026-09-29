@@ -32,6 +32,7 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
         configure_overlay(&window, false)?;
     }
     for (label, title, width, height) in [
+        ("capture", "Glassboard Capture", 800.0, 600.0),
         ("toolbar", "Glassboard", 744.0, 76.0),
         (
             "settings",

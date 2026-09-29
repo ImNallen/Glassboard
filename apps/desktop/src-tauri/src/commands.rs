@@ -14,6 +14,14 @@ use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 pub(crate) fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
+    if action == "capture" {
+        return crate::capture::start(app).inspect_err(|error| {
+            let _ = perform(app, "settings");
+            // The caller can be a hidden toolbar webview; surface the error in
+            // the shared session so the visible settings window explains it.
+            report(app, error.clone());
+        });
+    }
     if action == "dismiss-tutorial" {
         let mut preferences = snapshot(app).preferences;
         preferences.tutorial_completed = true;
@@ -46,7 +54,7 @@ pub(crate) fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
             .lock()
             .unwrap()
             .transition(action)?;
-        publish(app)?;
+        apply_windows(app)?;
         if action == "settings" {
             settings.show().map_err(|e| e.to_string())?;
             settings.set_focus().map_err(|e| e.to_string())?;
@@ -125,8 +133,8 @@ pub(crate) fn report_history(
     advance_cycle: bool,
     annotation_session: u32,
 ) -> Result<()> {
-    if !window.label().starts_with("overlay-") {
-        return Err("Only annotation windows can report drawing history".into());
+    if !window.label().starts_with("overlay-") && window.label() != "capture" {
+        return Err("Only drawing windows can report history".into());
     }
     app.state::<AppState>().0.lock().unwrap().record_history(
         window.label(),

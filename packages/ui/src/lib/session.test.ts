@@ -20,6 +20,25 @@ async function preview() {
 }
 
 describe('annotation sessions and first launch', () => {
+  it.each(['cancel-capture', 'hide', 'toggle', 'settings'])('isolates capture history and leaves work mode on %s', async exit => {
+    const app = await preview();
+    await app.action('show');
+    const old = app.state().annotationSession;
+    await app.action('capture');
+    expect(app.state()).toMatchObject({ mode: 'hidden', activeOverlay: 'capture', capture: { id: old + 1, ready: true } });
+    const generation = app.state().annotationSession;
+    await app.action('capture');
+    expect(app.state().annotationSession).toBe(generation);
+    await app.reportHistory({ canUndo: true, canRedo: true }, old);
+    expect(app.state().historyByOverlay).toEqual({});
+    await app.reportHistory({ canUndo: true, canRedo: false }, generation);
+    expect(app.state().historyByOverlay.capture.canUndo).toBe(true);
+    await app.action(exit);
+    expect(app.state()).toMatchObject({ mode: 'hidden', capture: null, historyByOverlay: {} });
+    await app.reportHistory({ canUndo: true, canRedo: false }, generation);
+    expect(app.state().historyByOverlay).toEqual({});
+  });
+
   it('teaches drawing and returning to work, and remembers completion after reload', async () => {
     const app = await preview();
     expect(app.state().mode).toBe('hidden');

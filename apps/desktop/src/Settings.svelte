@@ -78,7 +78,7 @@
       <button onclick={() => run('quit')}><Power size={14}/>Quit Glassboard</button>
     </footer>
     <div class="feedback" aria-live="polite">
-      {#if error}<p class="error" role="alert">{error}</p>{:else if saved}<p>Shortcut saved.</p>{/if}
+      {#if error || session.error}<p class="error" role="alert">{error || session.error}</p>{:else if saved}<p>Shortcut saved.</p>{/if}
     </div>
   </section>
 </main>

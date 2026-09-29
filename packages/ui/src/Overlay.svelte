@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte';
   import { DrawingHistory, REGULAR_WIDTH, FREEHAND_TOOLS, CYCLE_COLORS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, render, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
-  let { session, onerror }: { session: Session; onerror: (error: unknown) => void } = $props();
+  let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
   let canvas: HTMLCanvasElement;
   let textarea = $state<HTMLTextAreaElement | undefined>();
   const history = new DrawingHistory();
@@ -78,6 +78,11 @@
     }
     cancel();
   }
+  /** Finish pending text/strokes before exporting, without copying editor or control pixels. */
+  export function exportShapes(): Shape[] {
+    commitText(); finish();
+    return structuredClone(history.shapes);
+  }
   function blur() { commitText(); finish(); }
   $effect(() => { if (session.mode !== 'draw') blur(); });
   $effect(() => { if (session.preferences.tool !== 'text') commitText(); });
@@ -121,6 +126,7 @@
     if (session.mode !== 'draw' || event.button !== 0 || pointer !== null) return;
     event.preventDefault();
     const point = { x: event.clientX, y: event.clientY };
+    if (bounds && (point.x < bounds.x || point.y < bounds.y || point.x > bounds.x + bounds.width || point.y > bounds.y + bounds.height)) return;
     activateOverlay().catch(onerror);
     const tool = session.preferences.tool;
     if (tool === 'text') { openText(point); return; }
@@ -194,12 +200,12 @@
   });
 </script>
 <svelte:window onresize={paint} onblur={blur} />
-{#if session.mode === 'draw'}
+{#if session.mode === 'draw' && showGlow}
   <div class="annotation-glow" aria-hidden="true"></div>
 {/if}
-<canvas bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={finish} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Choose the eraser tool to remove drawings."></canvas>
+<canvas style:clip-path={bounds ? `inset(${bounds.y}px calc(100% - ${bounds.x + bounds.width}px) calc(100% - ${bounds.y + bounds.height}px) ${bounds.x}px)` : undefined} bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={finish} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Choose the eraser tool to remove drawings."></canvas>
 {#if editor}
-  <textarea bind:this={textarea} bind:value={editor.text} class="text-editor" class:rainbow={Boolean(editorGradient)} class:concealed={session.mode === 'hidden'}
+  <textarea bind:this={textarea} bind:value={() => editor?.text ?? '', value => { if (editor) editor.text = value; }} class="text-editor" class:rainbow={Boolean(editorGradient)} class:concealed={session.mode === 'hidden'}
     style:left={`${editor.origin.x}px`} style:top={`${editor.origin.y}px`} style:width={`${editorSize.width}px`} style:height={`${editorSize.height}px`}
     style:font-size={`${editorFontSize}px`} style:line-height={`${editorLineHeight}px`} style:color={editorGradient ? 'transparent' : editorColor} style:background-image={editorGradient || 'none'}
     rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Annotation text. Enter commits, Shift+Enter adds a line, Escape cancels."

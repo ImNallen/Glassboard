@@ -9,6 +9,7 @@ let stop = () => {};
 
 afterEach(async () => {
   if (app) await unmount(app);
+  await action('hide');
   stop();
   document.body.replaceChildren();
   vi.restoreAllMocks();
@@ -33,6 +34,10 @@ it('routes tool and color shortcuts without consuming text entry, X, or work-mod
   stop = await subscribe(value => session = value);
   app = mount(App, { target: document.body });
   await tick();
+
+  expect(press('s', { metaKey: true, shiftKey: true }).defaultPrevented).toBe(false);
+  expect(session.capture).toBeNull();
+  expect(document.querySelector('button[aria-label="Screenshot"]')).not.toBeNull();
 
   expect(press('1', { metaKey: true }).defaultPrevented).toBe(true);
   expect(session.preferences.tool).toBe('arrow');
@@ -59,4 +64,11 @@ it('routes tool and color shortcuts without consuming text entry, X, or work-mod
   await tick();
   expect(press('5').defaultPrevented).toBe(false);
   expect(session.preferences.color).toBe('#669df0');
+
+  press('a', { metaKey: true, shiftKey: true });
+  await tick();
+  (document.querySelector('button[aria-label="Screenshot"]') as HTMLButtonElement).click();
+  await tick(); await tick();
+  expect(session.capture?.ready).toBe(true);
+  expect(document.querySelector('.selection-surface')).not.toBeNull();
 });
