@@ -30,6 +30,14 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .on_window_event(|window, event| {
+            // Native activation (including clicking another display) can raise a
+            // transparent drawing window above the toolbar before a drawing command.
+            #[cfg(target_os = "windows")]
+            if window.label().starts_with("overlay-")
+                && matches!(event, tauri::WindowEvent::Focused(true))
+            {
+                windows::raise_toolbar(window.app_handle());
+            }
             let settings = window.label() == "settings";
             let should_close = match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
