@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import Overlay from './Overlay.svelte';
-  import Toolbar from './Toolbar.svelte';
+  import Overlay from '@glassboard/ui/Overlay.svelte';
+  import Toolbar from '@glassboard/ui/Toolbar.svelte';
   import Settings from './Settings.svelte';
   import Tutorial from './Tutorial.svelte';
-  import { action, defaults, native, savePreferences, shortcutLabel, subscribe, type Session } from './lib/session';
-  import { colorShortcut, toolShortcut } from './lib/shortcuts';
-  import { protectSelection } from './lib/selection';
+  import { action, defaults, native, savePreferences, shortcutLabel, subscribe, type Session } from '@glassboard/ui/session';
+  import { drawingKeydown } from '@glassboard/ui/keys';
+  import { protectSelection } from '@glassboard/ui/selection';
   const surface = new URLSearchParams(location.search).get('surface');
   let session = $state<Session>(structuredClone(defaults));
   let error = $state('');
@@ -19,23 +19,7 @@
       if (event.key === 'Escape') { event.preventDefault(); run('close-settings'); }
       return;
     }
-    if ((event.target as HTMLElement)?.closest('input, textarea, select, [contenteditable="true"]')) return;
-    const key = event.key.toLowerCase();
-    const command = event.metaKey || event.ctrlKey;
-    // Browser preview mirrors the default show/hide binding; the native binding lives in Rust.
-    if (!native && command && event.shiftKey && key === 'a') { event.preventDefault(); run('toggle'); return; }
-    if (session.mode === 'hidden') return;
-    if (key === 'escape') { event.preventDefault(); run('hide'); return; }
-    if (command && key === 'z') { event.preventDefault(); run(event.shiftKey ? 'redo' : 'undo'); return; }
-    const color = colorShortcut(event);
-    if (color) {
-      event.preventDefault(); savePreferences({ ...session.preferences, ...color }).catch(onerror);
-      return;
-    }
-    const tool = toolShortcut(event);
-    if (tool) {
-      event.preventDefault(); savePreferences({ ...session.preferences, tool }).catch(onerror);
-    }
+    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror) });
   }
   onMount(() => {
     const stopSelectionGuard = protectSelection();

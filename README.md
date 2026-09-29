@@ -15,10 +15,11 @@ npm ci
 npm run desktop tauri dev
 ```
 
-The repository is an npm workspace. The desktop app lives in `apps/desktop` and the
-[glassboard.dev](https://glassboard.dev) landing page in `apps/web`. Root scripts
-forward to each workspace: `npm run desktop <script>` and `npm run web <script>`.
-Use `npm run desktop dev` (or `npm run web dev`) for browser previews.
+The repository is an npm workspace. The desktop app lives in `apps/desktop`, the
+[glassboard.dev](https://glassboard.dev) landing page in `apps/web`, and the drawing
+engine, session adapter, and toolbar they share in `packages/ui`. Root scripts forward
+to each workspace: `npm run desktop <script>`, `npm run web <script>`, and
+`npm run ui <script>`. Use `npm run desktop dev` (or `npm run web dev`) for browser previews.
 
 The app starts in work mode with the desktop usable. On first launch, a short tutorial invites you to draw a mark and use the global shortcut to return to work. The toolbar stays open during practice. Completing or skipping the tutorial is remembered; choose **Show tutorial** in settings to replay it. After the tutorial, the drawing toolbar tucks away as a thin pill at the edge of the display. Move the cursor near the pill to open the toolbar; it collapses again shortly after the cursor leaves. It stays open while an error is showing or a control has keyboard focus. Hover over a tool or color (or focus it with Tab) to see its name and shortcut. Tooltips open toward the screen interior, outside the scrolling toolbar, so they remain visible in every dock position. The toolbar and settings follow the system light/dark appearance and update when it changes. The toolbar is docked: choose **Left**, **Right**, or **Bottom** under **Toolbar position** in settings. It stays centered along the selected edge of the active display’s usable area. Side toolbars are vertical; the bottom toolbar is horizontal. The selection saves automatically. Click the menu-bar/system-tray icon to open settings. Right-click it for **Clear screen** and **Quit Glassboard**.
 
@@ -63,14 +64,16 @@ Use `--debug` for a faster development build. The app uses Tauri's macOS private
 
 ```sh
 npm run check   # svelte-check and astro check across workspaces
-npm test        # vitest for the desktop app
-npm run build   # both workspaces
+npm test        # vitest for the shared UI package and the desktop app
+npm run build   # both apps
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
 cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 ```
 
 The landing page builds to static HTML with `npm run web build`; preview it with `npm run web dev`.
+It mounts the real overlay and toolbar from `packages/ui` as a client-only Svelte island, driven by
+the same browser adapter the desktop preview uses, so visitors can draw on the page.
 
 The tests cover undo/redo branches, undoable clear, immutable stroke history, constrained geometry, mode transitions, and shortcut validation. Native behavior must also be checked on each OS.
 
@@ -85,8 +88,9 @@ The tests cover undo/redo branches, undoable clear, immutable stroke history, co
 
 ## Structure
 
-- `apps/desktop`: the Tauri + Svelte desktop app. Paths below are relative to it.
-- `apps/web`: the Astro landing page for glassboard.dev.
+- `apps/desktop`: the Tauri + Svelte desktop app. Native paths below are relative to it.
+- `apps/web`: the Astro landing page for glassboard.dev, with a live "try it" overlay.
+- `packages/ui`: the drawing engine, session adapter, shortcuts, and the Overlay, Toolbar, and Logo components. Frontend paths below are relative to it.
 - `assets/brand`: logo master and exports shared by both apps.
 
 The logo master and reusable exports live in [`assets/brand`](assets/brand/README.md).
@@ -102,10 +106,12 @@ normal builds do not need the asset-generation tools.
 - `src-tauri/src/tray.rs`: menu-bar/system-tray icon and menu actions.
 - `src/Toolbar.svelte`: floating drawing controls that collapse to a pill when the cursor is away.
 - `src/lib/toolbar-hints.svelte.ts`: tooltip timing, placement, accessibility, and hover/focus state.
-- `src/Tutorial.svelte`: first-launch practice guide, also available from settings.
-- `src/Settings.svelte`: separate settings window.
 - `src/Overlay.svelte`: pointer capture, stroke lifecycle, and demand-driven canvas rendering.
 - `src/lib/drawing.ts`: public drawing API, backed by `drawing/shapes.ts` (shape data and geometry), `drawing/history.ts` (undo/redo and expiry), and `drawing/canvas.ts` (rendering and hit testing).
 - `src/lib/session.ts`: typed native bridge and browser preview adapter.
+- `src/lib/keys.ts`: keyboard routing for show/hide, undo/redo, tool, and color shortcuts.
+- `src/toolbar.css`: toolbar and overlay styles plus the light/dark color variables, scoped so they can sit on any host page.
+- `apps/desktop/src/App.svelte`, `Tutorial.svelte`, `Settings.svelte`: the window shells, first-launch practice guide, and settings window.
+- `apps/web/src/components/TryIt.svelte`: mounts the overlay and toolbar on the landing page; any element with `data-glassboard-try` starts a session.
 
 Pointer movements and rendering stay in the webview. Only settings, mode changes, and discrete drawing commands cross the Rust bridge. Each display owns its annotation history. A shared annotation-session counter resets all displays on exit, including late-loading overlays; their canvas bitmaps are cleared immediately without waiting for an animation frame; stale history reports from previous sessions are ignored.

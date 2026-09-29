@@ -3,14 +3,16 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "desktop": "npm --workspace apps/desktop run --",
     "web": "npm --workspace apps/web run --",
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "ui": "npm --workspace packages/ui run --"
   },
   "engines": {
     "node": ">=22.12"

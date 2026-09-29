@@ -1,9 +1,14 @@
 ---
-import mark from '../../../../assets/brand/mark-dark.svg';
+import '@fontsource-variable/familjen-grotesk';
+import '../styles/global.css';
+import TryIt from '../components/TryIt.svelte';
+import markDark from '../../../../assets/brand/mark-dark.svg';
+import markMint from '../../../../assets/brand/mark-mint.svg';
 
 const title = 'Glassboard';
-const description =
-  'A small desktop annotation tool for macOS and Windows. Switch from work to annotation with a shortcut, draw over your screen, then switch back.';
+const tagline = 'Draw on your screen. Then get back to work.';
+const description = 'Glassboard is a small annotation tool for macOS and Windows. One shortcut turns your whole screen into a drawing surface. Press it again and the drawings are gone.';
+const repo = 'https://github.com/ImNallen/Glassboard';
 ---
 
 <html lang="en">
@@ -12,16 +17,134 @@ const description =
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#a3e9d1" />
+    <meta property="og:title" content={`${title}: ${tagline}`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={Astro.site} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" sizes="any" />
     <link rel="canonical" href={Astro.site} />
-    <title>{title}</title>
+    <title>{title}: {tagline}</title>
   </head>
   <body>
+    <header class="hero">
+      <div class="wrap">
+        <div class="top">
+          <a class="brand" href="/"><img src={markDark.src} width="30" height="30" alt="" />Glassboard</a>
+          <nav aria-label="Site">
+            <a href={repo}>GitHub</a>
+            <a href="#get">Download</a>
+          </nav>
+        </div>
+      </div>
+      <div class="wrap" style="margin-top: clamp(40px, 6vw, 80px)">
+        <h1>{tagline}</h1>
+        <p class="lede">{description}</p>
+        <div class="actions">
+          <button class="button primary" type="button" data-glassboard-try>Try it on this page</button>
+          <span class="or">or press <kbd>⌘</kbd> <kbd>⇧</kbd> <kbd>A</kbd> <span class="win">(Ctrl Shift A on Windows)</span></span>
+          <svg class="arrow" viewBox="0 0 300 150" fill="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="stroke" x1="290" y1="140" x2="40" y2="8" gradientUnits="userSpaceOnUse">
+                <stop offset="0" stop-color="#f46b78" /><stop offset=".2" stop-color="#f2c85b" /><stop offset=".4" stop-color="#4dcaa0" /><stop offset=".6" stop-color="#4fc5d5" /><stop offset=".8" stop-color="#669df0" /><stop offset="1" stop-color="#a184e8" />
+              </linearGradient>
+            </defs>
+            <path d="M290 140 C 250 60, 170 20, 40 8" stroke="url(#stroke)" stroke-width="5" stroke-linecap="round" />
+            <path d="M76 2 L40 8 L64 38" stroke="url(#stroke)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+      </div>
+    </header>
+
     <main>
-      <img src={mark.src} width="96" height="96" alt="" />
-      <h1>{title}</h1>
-      <p>{description}</p>
+      <section id="how">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Three keystrokes, start to finish</h2>
+            <p>Glassboard lives in the menu bar or system tray and stays out of the way until you need it.</p>
+          </div>
+          <ol class="steps">
+            <li>
+              <h3>Press the shortcut</h3>
+              <p>A mint glow along the edges of every display shows you're annotating. Your windows stay exactly where they were.</p>
+            </li>
+            <li>
+              <h3>Draw over anything</h3>
+              <p>Arrows, pen strokes, squares, circles, a highlighter, and text, on every screen at once. Hold Shift for straight arrows and equal-sided shapes.</p>
+            </li>
+            <li>
+              <h3>Press it again</h3>
+              <p>Glassboard hides and clears every display. The next session starts clean, so there's nothing to tidy up.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="tools">
+        <div class="wrap">
+          <div class="section-head">
+            <h2>Every tool has a key</h2>
+            <p>The toolbar tucks into a thin pill at the edge of the screen. Move the cursor near it to open it, or skip it entirely and use the shortcuts.</p>
+          </div>
+          <table class="tools">
+            <thead>
+              <tr><th scope="col">Tool</th><th scope="col">What it does</th><th scope="col">Mac (Windows uses Ctrl)</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Arrow</td><td><p>Point at the thing you mean.</p></td><td><kbd>⌘</kbd><kbd>1</kbd></td></tr>
+              <tr><td>Pen</td><td><p>Freehand strokes that follow your hand.</p></td><td><kbd>⌘</kbd><kbd>2</kbd></td></tr>
+              <tr><td>Square</td><td><p>Frame a region. Shift keeps it square.</p></td><td><kbd>⌘</kbd><kbd>3</kbd></td></tr>
+              <tr><td>Circle</td><td><p>Ring something. Shift keeps it round.</p></td><td><kbd>⌘</kbd><kbd>4</kbd></td></tr>
+              <tr><td>Highlighter</td><td><p>A translucent stroke for text and rows.</p></td><td><kbd>⌘</kbd><kbd>H</kbd></td></tr>
+              <tr><td>Text</td><td><p>Click, type, press Enter.</p></td><td><kbd>⌘</kbd><kbd>T</kbd></td></tr>
+              <tr><td>Eraser</td><td><p>Drag across marks to remove them as one undo step.</p></td><td><kbd>⌘</kbd><kbd>E</kbd></td></tr>
+              <tr><td>Undo, redo</td><td><p>Within the current session.</p></td><td><kbd>⌘</kbd><kbd>Z</kbd> <kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd></td></tr>
+            </tbody>
+          </table>
+          <ul class="palette" aria-label="Colors">
+            <li><span class="dot rainbow"></span>Rainbow shifts hue as you drag</li>
+            <li><span class="dot" style="background: conic-gradient(#f46b78 0 120deg, #4dcaa0 120deg 240deg, #669df0 240deg 360deg)"></span>Shifting picks a new color per shape</li>
+            <li><span class="dot" style="background: #000"></span>Black</li>
+            <li><span class="dot" style="background: #fff"></span>White</li>
+            <li><span class="dot" style="background: #4dcaa0"></span>Green</li>
+            <li><span class="dot" style="background: #f2c85b"></span>Yellow</li>
+            <li><span class="dot" style="background: #f46b78"></span>Red</li>
+            <li><span class="dot" style="background: #669df0"></span>Blue</li>
+          </ul>
+          <p class="extras">Colors are the number keys 1 to 8. Marks can fade on their own after 3, 5, or 10 seconds, or stay until you return to work. The toolbar docks to the left, right, or bottom edge.</p>
+        </div>
+      </section>
+
+      <section id="local">
+        <div class="wrap two-col">
+          <h2>Runs on your machine, and only there</h2>
+          <div class="prose">
+            <p><strong>There is no account, no server, and no screen recording.</strong> The built app never touches the network. Your preferences are a small JSON file in the app's configuration folder, and drawings live in memory until you hide the overlay.</p>
+            <p>Glassboard is written in Rust and Svelte on Tauri 2, so the whole thing is a few megabytes and starts instantly. The source is public, and every feature on this page was built in the open.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="get" class="get">
+        <div class="wrap">
+          <h2>Get Glassboard</h2>
+          <p>Glassboard runs on macOS and Windows. Signed installers aren't published yet, so for now, build it from source. With Node.js and Rust installed it's two commands: <code>npm ci</code> and <code>npm run desktop tauri build</code>.</p>
+          <div class="actions">
+            <a class="button primary" href={`${repo}#run-locally`}>Build it from source</a>
+            <a class="button quiet" href={repo}>Star the repository</a>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <footer>
+      <div class="wrap">
+        <span>Glassboard is open source. <a href={repo}>Source on GitHub</a>.</span>
+        <span>Everything on this page runs locally in your browser.</span>
+      </div>
+    </footer>
+
+    <TryIt client:only="svelte" />
   </body>
 </html>

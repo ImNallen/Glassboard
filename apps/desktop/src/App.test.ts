@@ -2,7 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import App from './App.svelte';
-import { action, defaults, savePreferences, subscribe, type Session } from './lib/session';
+import { action, defaults, savePreferences, subscribe, type Session } from '@glassboard/ui/session';
 
 let app: ReturnType<typeof mount> | undefined;
 let stop = () => {};

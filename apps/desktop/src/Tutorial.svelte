@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ArrowUpRight, Check, X } from '@lucide/svelte';
-  import Logo from './Logo.svelte';
-  import { action, native, shortcutLabel, type Session } from './lib/session';
+  import Logo from '@glassboard/ui/Logo.svelte';
+  import { action, native, shortcutLabel, type Session } from '@glassboard/ui/session';
   let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
   let busy = $state(false);
   let shortcut = $derived(shortcutLabel(session.preferences.shortcut));
