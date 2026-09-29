@@ -1,5 +1,6 @@
 <script lang="ts">
   import { X, Trash2, Power, RotateCcw } from '@lucide/svelte';
+  import Logo from './Logo.svelte';
   import { action, mac, native, savePreferences, shortcutLabel, type ToolbarPosition, type Session } from './lib/session';
   import { DEFAULT_SHORTCUT, heldModifiers, MODIFIER_KEYS, recordShortcut } from './lib/shortcuts';
   let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
@@ -49,7 +50,7 @@
 <main class="settings-window">
   <section class="settings-card" aria-label="Glassboard settings">
     <header>
-      <div><h1>Settings</h1><p>Glassboard</p></div>
+      <div><h1>Settings</h1><p class="brand"><Logo size={16}/>Glassboard</p></div>
       <button class="icon-button" title="Close settings" aria-label="Close settings" onclick={() => action('close-settings').catch(onerror)}><X size={17}/></button>
     </header>
     <div class="shortcut-setting">
@@ -88,6 +89,7 @@
   header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 22px; }
   h1 { font-size: 17px; line-height: 1.2; letter-spacing: -.3px; font-weight: 600; margin: 0; }
   header p { margin: 4px 0 0; font-size: 11px; color: var(--muted); }
+  .brand { display: flex; align-items: center; gap: 4px; }
   header .icon-button { width: 26px; height: 26px; margin: -5px -5px 0 0; }
   .placement { margin-bottom: 20px; }
   .placement-label { font-size: 12px; font-weight: 500; margin-bottom: 9px; }

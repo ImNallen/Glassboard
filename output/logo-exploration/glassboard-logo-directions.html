@@ -1,0 +1,63 @@
+<div id="glassboard-logo-directions">
+  <style>
+    #glassboard-logo-directions .concept { min-width: 0; }
+    #glassboard-logo-directions .hero { display: flex; align-items: center; justify-content: center; height: 160px; }
+    #glassboard-logo-directions .hero svg { width: 96px; height: 96px; }
+    #glassboard-logo-directions .samples { display: flex; gap: 22px; align-items: center; min-height: 48px; }
+    #glassboard-logo-directions .sample { display: flex; align-items: center; gap: 8px; }
+    #glassboard-logo-directions .inverse { background: var(--foreground); color: var(--background); padding: 10px 14px; border-radius: 8px; }
+    #glassboard-logo-directions .wordmark { display: flex; gap: 10px; align-items: center; margin: 22px 0; font-weight: 500; }
+    #glassboard-logo-directions .wordmark svg { width: 28px; height: 28px; }
+    #glassboard-logo-directions .label { margin-bottom: 8px; }
+    #glassboard-logo-directions svg { flex-shrink: 0; overflow: visible; }
+    #glassboard-logo-directions .definitions { position: absolute; width: 0; height: 0; overflow: hidden; }
+  </style>
+  <svg class="definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <symbol id="gb-drawn-g" viewBox="0 0 24 24">
+        <path d="M18.5 6.2C15.7 3.3 10.3 3.3 7.1 6.3C3.7 9.5 3.4 15 6.6 18.2C9.7 21.3 15.3 20.8 18.2 17.9C19.8 16.3 20.1 14.6 19.7 12.3H13.2" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="gb-marked-pane" viewBox="0 0 24 24">
+        <path d="M12 4H7A3 3 0 0 0 4 7V17A3 3 0 0 0 7 20H17A3 3 0 0 0 20 17V12" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="M10 14L20 4" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="gb-overlay" viewBox="0 0 24 24">
+        <path d="M7 6V4.8A1.8 1.8 0 0 1 8.8 3H19.2A1.8 1.8 0 0 1 21 4.8V15.2A1.8 1.8 0 0 1 19.2 17H18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <rect x="3" y="7" width="14" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="2.2"/>
+        <path d="M7 17L13 11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+      </symbol>
+    </defs>
+  </svg>
+  <div class="viz-grid">
+    <section class="concept" aria-label="Drawn G concept">
+      <div class="label">01 · Drawn G</div>
+      <div class="hero"><svg role="img" aria-label="An open, rounded G drawn with one continuous stroke"><use href="#gb-drawn-g"/></svg></div>
+      <div class="samples">
+        <span class="sample"><svg width="16" height="16" aria-hidden="true"><use href="#gb-drawn-g"/></svg><span class="text-small">16</span></span>
+        <span class="sample"><svg width="22" height="22" aria-hidden="true"><use href="#gb-drawn-g"/></svg><span class="text-small">22</span></span>
+        <span class="sample inverse"><svg width="22" height="22" role="img" aria-label="Drawn G reversed"><use href="#gb-drawn-g"/></svg></span>
+      </div>
+      <div class="wordmark"><svg aria-hidden="true"><use href="#gb-drawn-g"/></svg><span>Glassboard</span></div>
+    </section>
+    <section class="concept" aria-label="Marked pane concept">
+      <div class="label">02 · Marked pane</div>
+      <div class="hero"><svg role="img" aria-label="A rounded glass pane with a diagonal drawing stroke through its open corner"><use href="#gb-marked-pane"/></svg></div>
+      <div class="samples">
+        <span class="sample"><svg width="16" height="16" aria-hidden="true"><use href="#gb-marked-pane"/></svg><span class="text-small">16</span></span>
+        <span class="sample"><svg width="22" height="22" aria-hidden="true"><use href="#gb-marked-pane"/></svg><span class="text-small">22</span></span>
+        <span class="sample inverse"><svg width="22" height="22" role="img" aria-label="Marked pane reversed"><use href="#gb-marked-pane"/></svg></span>
+      </div>
+      <div class="wordmark"><svg aria-hidden="true"><use href="#gb-marked-pane"/></svg><span>Glassboard</span></div>
+    </section>
+    <section class="concept" aria-label="Overlay concept">
+      <div class="label">03 · Overlay</div>
+      <div class="hero"><svg role="img" aria-label="Two offset panes with a drawing stroke on the front pane"><use href="#gb-overlay"/></svg></div>
+      <div class="samples">
+        <span class="sample"><svg width="16" height="16" aria-hidden="true"><use href="#gb-overlay"/></svg><span class="text-small">16</span></span>
+        <span class="sample"><svg width="22" height="22" aria-hidden="true"><use href="#gb-overlay"/></svg><span class="text-small">22</span></span>
+        <span class="sample inverse"><svg width="22" height="22" role="img" aria-label="Overlay reversed"><use href="#gb-overlay"/></svg></span>
+      </div>
+      <div class="wordmark"><svg aria-hidden="true"><use href="#gb-overlay"/></svg><span>Glassboard</span></div>
+    </section>
+  </div>
+</div>

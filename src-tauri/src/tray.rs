@@ -10,18 +10,14 @@ pub(crate) fn create_tray(app: &tauri::App) -> tauri::Result<()> {
     let clear = MenuItem::with_id(app, "clear", "Clear screen", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Glassboard", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&clear, &quit])?;
-    let mut pixels = vec![0u8; 22 * 22 * 4];
-    for y in 3..19 {
-        for x in 3..19 {
-            if x == y || x == y + 1 || (y == 3 && x > 9) || (x == 18 && y < 12) {
-                let i = (y * 22 + x) * 4;
-                pixels[i..i + 4].copy_from_slice(&[220, 220, 220, 255]);
-            }
-        }
-    }
+    // macOS colors the template's alpha mask for the current menu bar appearance.
+    #[cfg(target_os = "macos")]
+    let icon = tauri::include_image!("icons/tray-template.png");
+    #[cfg(not(target_os = "macos"))]
+    let icon = tauri::include_image!("icons/tray.png");
     tauri::tray::TrayIconBuilder::with_id(TRAY_ID)
-        .icon(tauri::image::Image::new_owned(pixels, 22, 22))
-        .icon_as_template(true)
+        .icon(icon)
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Glassboard")
         .menu(&menu)
         .show_menu_on_left_click(false)
