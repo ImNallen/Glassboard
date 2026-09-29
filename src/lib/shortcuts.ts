@@ -1,15 +1,39 @@
-import type { Tool } from './drawing';
+import { CYCLE_COLORS, type ColorMode, type Tool } from './drawing';
 
 export const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+A';
 type KeyEvent = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>;
 
-export function eraseShortcut(event: KeyEvent & Pick<KeyboardEvent, 'repeat'>): boolean {
-  return event.key.toLowerCase() === 'x' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.repeat;
+export const TOOL_SHORTCUTS: readonly { id: Tool; name: string; key: string }[] = [
+  { id: 'arrow', name: 'Arrow', key: '1' },
+  { id: 'pen', name: 'Pen', key: '2' },
+  { id: 'rectangle', name: 'Square', key: '3' },
+  { id: 'ellipse', name: 'Circle', key: '4' },
+  { id: 'eraser', name: 'Eraser', key: 'E' },
+  { id: 'text', name: 'Text', key: 'T' },
+  { id: 'highlighter', name: 'Highlighter', key: 'H' },
+];
+
+export const COLOR_SHORTCUTS: readonly { key: string; name: string; colorMode: ColorMode; color?: string }[] = [
+  { key: '1', name: 'Rainbow', colorMode: 'rainbow' },
+  { key: '2', name: 'Shifting', colorMode: 'cycle' },
+  { key: '3', name: 'Black', colorMode: 'solid', color: '#000000' },
+  { key: '4', name: 'White', colorMode: 'solid', color: '#ffffff' },
+  { key: '5', name: 'Green', colorMode: 'solid', color: CYCLE_COLORS[2] },
+  { key: '6', name: 'Yellow', colorMode: 'solid', color: CYCLE_COLORS[1] },
+  { key: '7', name: 'Red', colorMode: 'solid', color: CYCLE_COLORS[0] },
+  { key: '8', name: 'Blue', colorMode: 'solid', color: CYCLE_COLORS[4] },
+];
+
+export function colorShortcut(event: KeyEvent): { colorMode: ColorMode; color?: string } | undefined {
+  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+  const choice = COLOR_SHORTCUTS.find(choice => choice.key === event.key);
+  if (!choice) return;
+  return choice.color ? { colorMode: choice.colorMode, color: choice.color } : { colorMode: choice.colorMode };
 }
 
 export function toolShortcut(event: KeyEvent): Tool | undefined {
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-  return ({ '1': 'pen', '2': 'arrow', '3': 'rectangle', '4': 'ellipse', '5': 'highlighter', '6': 'text', '7': 'eraser' } as Record<string, Tool>)[event.key];
+  return TOOL_SHORTCUTS.find(tool => tool.key.toLowerCase() === event.key.toLowerCase())?.id;
 }
 
 // Key codes the native shortcut parser accepts verbatim. Escape cancels recording instead.

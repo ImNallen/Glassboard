@@ -62,6 +62,21 @@ describe('auto-fade', () => {
   });
 });
 describe('annotation history', () => {
+  it('starts a fresh session with no drawings, fading timers, or recoverable history', () => {
+    const h = new DrawingHistory();
+    h.add({ ...arrow(), fadeSeconds: 3 }, 0);
+    h.add({ ...arrow(), id: 'two' }, 0);
+    h.undo();
+    expect([h.canUndo, h.canRedo]).toEqual([true, true]);
+    h.reset();
+    h.undo(); h.redo();
+    expect(h.shapes).toEqual([]);
+    expect([h.canUndo, h.canRedo]).toEqual([false, false]);
+    expect(h.nextFadeUpdate(0)).toBeUndefined();
+    h.add({ ...arrow(), id: 'new' });
+    h.undo(); h.redo();
+    expect(h.shapes.map(shape => shape.id)).toEqual(['new']);
+  });
   it('restores drawings after clear, undo, and redo', () => {
     const h = new DrawingHistory();
     expect([h.canUndo, h.canRedo]).toEqual([false, false]);
@@ -111,7 +126,7 @@ describe('annotation history', () => {
 });
 
 describe('rainbow and cycling colors', () => {
-  const style = { tool: 'arrow' as const, color: '#ffffff', width: 4 };
+  const style = { tool: 'arrow' as const, color: '#ffffff' };
 
   it('cycles through the palette without changing existing shapes', () => {
     const shapes = Array.from({ length: CYCLE_COLORS.length + 1 }, (_, i) => createShape({ ...style, colorMode: 'cycle' }, i, { x: 0, y: 0 }));
@@ -213,11 +228,12 @@ describe('pen and text tools', () => {
     expect(constrainEnd({ x: 0, y: 0 }, { x: 30, y: 7 }, 'pen', true)).toEqual({ x: 30, y: 7 });
     expect(constrainEnd({ x: 0, y: 0 }, { x: 30, y: 7 }, 'rectangle', true)).toEqual({ x: 30, y: 30 });
   });
-  it('sizes text from the line width and keeps the text on the committed shape', () => {
-    expect([2, 4, 7].map(textFontSize)).toEqual([18, 24, 33]);
-    expect([2, 4, 7].map(textLineHeight)).toEqual([23, 30, 41]);
+  it('uses Regular text size and keeps the text on the committed shape', () => {
     const history = new DrawingHistory();
-    const shape = createShape({ tool: 'text', color: '#000000', width: 4, colorMode: 'solid' }, 0, { x: 10, y: 20 });
+    const shape = createShape({ tool: 'text', color: '#000000', colorMode: 'solid' }, 0, { x: 10, y: 20 });
+    expect(shape.width).toBe(4);
+    expect(textFontSize(shape.width)).toBe(24);
+    expect(textLineHeight(shape.width)).toBe(30);
     shape.text = 'Hello'; shape.points.push({ x: 90, y: 50 });
     history.add(shape, 0);
     expect(history.shapes[0].text).toBe('Hello');

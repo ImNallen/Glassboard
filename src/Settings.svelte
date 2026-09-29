@@ -53,7 +53,7 @@
       <button class="icon-button" title="Close settings" aria-label="Close settings" onclick={() => action('close-settings').catch(onerror)}><X size={17}/></button>
     </header>
     <div class="shortcut-setting">
-      <div class="placement-label" id="shortcut-label">Show / hide shortcut</div>
+      <div class="placement-label" id="shortcut-label">Annotate / work shortcut</div>
       <div class="shortcut-editor">
         <button class="recorder" class:recording aria-labelledby="shortcut-label" aria-describedby="shortcut-hint" disabled={saving}
           onclick={() => recording ? stopRecording() : startRecording()} onkeydown={recordKey} onkeyup={releaseKey} onblur={stopRecording}>
@@ -61,7 +61,7 @@
         </button>
         <button class="icon-button" title="Reset to default" aria-label="Reset shortcut to default" disabled={saving || shortcut === DEFAULT_SHORTCUT} onclick={() => save(DEFAULT_SHORTCUT)}><RotateCcw size={15}/></button>
       </div>
-      <p id="shortcut-hint">{recording ? `Include ${mac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Escape cancels.` : 'Shows and hides annotations. Click, then press the new shortcut.'}</p>
+      <p id="shortcut-hint">{recording ? `Include ${mac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Escape cancels.` : 'Switches between annotation and work. Each annotation session starts clear.'}</p>
     </div>
     <div class="placement">
       <div class="placement-label">Toolbar position</div>
@@ -71,6 +71,7 @@
         {/each}
       </div>
     </div>
+    <button class="tutorial-link" onclick={() => run('replay-tutorial')}>Show tutorial</button>
     <footer>
       <button onclick={() => run('clear-all')}><Trash2 size={14}/>Clear all drawings</button>
       <button onclick={() => run('quit')}><Power size={14}/>Quit Glassboard</button>
@@ -103,6 +104,7 @@
   .pending { color: var(--muted); }
   .shortcut-editor .icon-button { width: 30px; height: 30px; }
   #shortcut-hint { margin: 7px 0 0; font-size: 10px; color: var(--muted); }
+  .tutorial-link { padding: 0; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
   footer { display: flex; justify-content: space-between; border-top: 1px solid var(--divider); padding-top: 15px; margin-top: 20px; }
   footer button { display: flex; align-items: center; gap: 6px; padding: 0; font-size: 11px; color: var(--secondary-text); }
   footer button:hover { color: var(--strong-text); }

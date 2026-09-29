@@ -7,12 +7,13 @@ export type ColorMode = 'solid' | 'rainbow' | 'cycle';
 export type AutoFadeSeconds = 0 | 3 | 5 | 10;
 export const AUTO_FADE_OPTIONS: readonly AutoFadeSeconds[] = [0, 3, 5, 10];
 const FADE_MS = 500;
+export const REGULAR_WIDTH = 4;
 export type Point = { x: number; y: number };
 export type Shape = { id: string; tool: Tool; color: string; width: number; points: Point[]; colorMode?: ColorMode; hue?: number; fadeSeconds?: AutoFadeSeconds; expiresAt?: number; text?: string };
 
 export const TEXT_FONT_FAMILY = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 const TEXT_LINE_HEIGHT = 1.25;
-/** Text size follows the line-width setting: Thin, Regular, and Bold map to 18, 24, and 33 px. */
+/** Match text to the shape geometry; Regular width produces 24 px text. */
 export function textFontSize(width: number): number { return Math.round(12 + width * 3); }
 export function textLineHeight(width: number): number { return Math.round(textFontSize(width) * TEXT_LINE_HEIGHT); }
 export function textFont(width: number): string { return `600 ${textFontSize(width)}px ${TEXT_FONT_FAMILY}`; }
@@ -37,9 +38,9 @@ export const CYCLE_COLORS = PALETTE.map(([color]) => color);
 export const RAINBOW_PREVIEW = `conic-gradient(${[...CYCLE_COLORS, CYCLE_COLORS[0]].join(', ')})`;
 export function cycleColor(index: number): string { return CYCLE_COLORS[index % CYCLE_COLORS.length]; }
 
-export function createShape(style: { tool: Tool; color: string; width: number; colorMode: ColorMode; autoFadeSeconds?: AutoFadeSeconds }, cycleIndex: number, start: Point): Shape {
+export function createShape(style: { tool: Tool; color: string; colorMode: ColorMode; autoFadeSeconds?: AutoFadeSeconds }, cycleIndex: number, start: Point): Shape {
   return {
-    id: crypto.randomUUID(), tool: style.tool, width: style.width,
+    id: crypto.randomUUID(), tool: style.tool, width: REGULAR_WIDTH,
     color: style.colorMode === 'cycle' ? cycleColor(cycleIndex) : style.color,
     colorMode: style.colorMode, hue: style.colorMode === 'rainbow' ? Math.random() * 360 : 0, points: [{ ...start }],
     fadeSeconds: style.autoFadeSeconds ?? 0,
@@ -144,6 +145,8 @@ export class DrawingHistory {
     }
     return Number.isFinite(next) ? next : undefined;
   }
+  /** A new annotation session discards drawings and both history branches. */
+  reset() { this.shapes = []; this.past = []; this.future = []; }
   clear() { if (this.shapes.length) this.commit([]); }
   remove(id: string): boolean { return this.removeAll([id]); }
   /** Remove several shapes as a single undo step. */

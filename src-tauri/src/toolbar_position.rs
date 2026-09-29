@@ -18,6 +18,34 @@ pub struct Layout {
     pub height: u32,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct TrackingLayout {
+    pub dock: Layout,
+    pub window: Layout,
+    pub scale: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct ToolbarPointer {
+    pub near: bool,
+    pub x: f64,
+    pub y: f64,
+}
+
+impl TrackingLayout {
+    pub fn pointer_at(&self, x: f64, y: f64, margin: f64) -> Option<ToolbarPointer> {
+        let near = self.dock.is_near(x, y, margin * self.scale);
+        if !near && !self.window.is_near(x, y, 0.0) {
+            return None;
+        }
+        Some(ToolbarPointer {
+            near,
+            x: (x - self.window.x as f64) / self.scale,
+            y: (y - self.window.y as f64) / self.scale,
+        })
+    }
+}
+
 impl Layout {
     /// Whether a physical cursor position is inside the toolbar window or within `margin` of it.
     pub fn is_near(&self, x: f64, y: f64, margin: f64) -> bool {
@@ -57,6 +85,50 @@ pub fn dock_layout(position: ToolbarPosition, work: Bounds, scale: f64, expanded
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cursor_samples_use_window_css_coordinates_in_every_dock_position() {
+        let scale = 2.0;
+        let work = Bounds {
+            x: -2880.0,
+            y: 48.0,
+            width: 2880.0,
+            height: 1672.0,
+        };
+        for position in [
+            ToolbarPosition::Bottom,
+            ToolbarPosition::Left,
+            ToolbarPosition::Right,
+        ] {
+            let dock = dock_layout(position, work, scale, false);
+            for expanded in [false, true] {
+                let window = dock_layout(position, work, scale, expanded);
+                let tracking = TrackingLayout {
+                    dock,
+                    window,
+                    scale,
+                };
+                let x = dock.x as f64 + 30.0 * scale;
+                let y = dock.y as f64 + 30.0 * scale;
+                let pointer = tracking.pointer_at(x, y, 20.0).unwrap();
+                assert!(pointer.near);
+                assert_eq!(pointer.x, (x - window.x as f64) / scale);
+                assert_eq!(pointer.y, (y - window.y as f64) / scale);
+                assert!(tracking.pointer_at(1000.0, -1000.0, 20.0).is_none());
+            }
+            let window = dock_layout(position, work, scale, true);
+            let tracking = TrackingLayout {
+                dock,
+                window,
+                scale,
+            };
+            let (x, y) = match position {
+                ToolbarPosition::Left => (window.x + window.width as i32 - 30, window.y + 30),
+                _ => (window.x + 30, window.y + 30),
+            };
+            // The tooltip stays hoverable without expanding the dock proximity area.
+            assert!(!tracking.pointer_at(x as f64, y as f64, 20.0).unwrap().near);
+        }
+    }
     #[test]
     fn centers_the_toolbar_on_each_selected_edge() {
         let work = Bounds {

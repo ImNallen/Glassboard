@@ -1,6 +1,6 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "desktop", "description": "Local annotation windows",
-  "windows": ["toolbar", "settings", "overlay-*"],
+  "windows": ["toolbar", "settings", "tutorial", "overlay-*"],
   "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
 }

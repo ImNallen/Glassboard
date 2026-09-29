@@ -1,32 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { eraseShortcut, formatShortcut, heldModifiers, recordShortcut, toolShortcut } from './shortcuts';
+import { colorShortcut, formatShortcut, heldModifiers, recordShortcut, toolShortcut } from './shortcuts';
 
-describe('erase shortcut', () => {
-  const event = { key: 'x', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, repeat: false };
-  it('accepts X, including Caps Lock', () => {
-    expect(eraseShortcut(event)).toBe(true);
-    expect(eraseShortcut({ ...event, key: 'X' })).toBe(true);
+describe('color shortcuts', () => {
+  const event = { key: '1', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
+  it('maps bare 1–8 to toolbar order', () => {
+    const choices = [
+      { colorMode: 'rainbow' }, { colorMode: 'cycle' },
+      { colorMode: 'solid', color: '#000000' }, { colorMode: 'solid', color: '#ffffff' },
+      { colorMode: 'solid', color: '#4dcaa0' }, { colorMode: 'solid', color: '#f2c85b' },
+      { colorMode: 'solid', color: '#f46b78' }, { colorMode: 'solid', color: '#669df0' },
+    ];
+    choices.forEach((choice, index) => expect(colorShortcut({ ...event, key: String(index + 1) })).toEqual(choice));
   });
-  it('ignores modifiers, key repeats, and unrelated keys', () => {
-    for (const modifier of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey', 'repeat']) {
-      expect(eraseShortcut({ ...event, [modifier]: true })).toBe(false);
+  it('leaves modified numbers and unrelated keys alone', () => {
+    for (const modifier of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey']) {
+      expect(colorShortcut({ ...event, [modifier]: true })).toBeUndefined();
     }
-    expect(eraseShortcut({ ...event, key: 'Delete' })).toBe(false);
+    for (const key of ['x', 'X', '0', '9', 'ArrowUp']) {
+      expect(colorShortcut({ ...event, key })).toBeUndefined();
+    }
   });
 });
 
 describe('tool shortcuts', () => {
   const event = { key: '1', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
-  it.each(['metaKey', 'ctrlKey'] as const)('selects the seven tools with %s and 1–7', modifier => {
-    for (const [index, tool] of ['pen', 'arrow', 'rectangle', 'ellipse', 'highlighter', 'text', 'eraser'].entries()) {
-      expect(toolShortcut({ ...event, key: String(index + 1), [modifier]: true })).toBe(tool);
+  it.each(['metaKey', 'ctrlKey'] as const)('selects tools with %s and their assigned keys', modifier => {
+    for (const [key, tool] of Object.entries({ '1': 'arrow', '2': 'pen', '3': 'rectangle', '4': 'ellipse', e: 'eraser', t: 'text', h: 'highlighter', E: 'eraser', T: 'text', H: 'highlighter' })) {
+      expect(toolShortcut({ ...event, key, [modifier]: true })).toBe(tool);
     }
   });
   it('ignores bare numbers, extra modifiers, removed bindings, and other numbers', () => {
-    expect(toolShortcut(event)).toBeUndefined();
+    for (const key of ['1', '2', '3', '4', 'e', 't', 'h']) expect(toolShortcut({ ...event, key })).toBeUndefined();
     expect(toolShortcut({ ...event, metaKey: true, shiftKey: true })).toBeUndefined();
     expect(toolShortcut({ ...event, ctrlKey: true, altKey: true })).toBeUndefined();
-    for (const key of ['a', 'r', 'o', 'p', 'h', '8', '0']) {
+    for (const key of ['a', 'r', 'o', 'p', 'x', 'X', '5', '6', '7', '8', '0']) {
       expect(toolShortcut({ ...event, key, metaKey: true })).toBeUndefined();
     }
   });

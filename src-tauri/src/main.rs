@@ -8,7 +8,7 @@ use settings_position::{anchored_position, Bounds};
 use std::{collections::HashMap, sync::Mutex};
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-use toolbar_position::{dock_layout, Layout, ToolbarPosition};
+use toolbar_position::{dock_layout, ToolbarPointer, ToolbarPosition, TrackingLayout};
 
 const SETTINGS_WIDTH: f64 = 360.0;
 const SETTINGS_HEIGHT: f64 = 560.0;
@@ -35,12 +35,13 @@ struct Preferences {
     color: String,
     #[serde(default)]
     color_mode: ColorMode,
-    width: f64,
     shortcut: String,
     #[serde(default)]
     toolbar_position: ToolbarPosition,
     #[serde(default)]
     auto_fade_seconds: u8,
+    #[serde(default)]
+    tutorial_completed: bool,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -48,10 +49,10 @@ impl Default for Preferences {
             tool: "arrow".into(),
             color: "#f46b78".into(),
             color_mode: ColorMode::Rainbow,
-            width: 4.0,
             shortcut: DEFAULT_SHORTCUT.into(),
             toolbar_position: ToolbarPosition::Bottom,
             auto_fade_seconds: 0,
+            tutorial_completed: false,
         }
     }
 }
@@ -84,7 +85,6 @@ impl Preferences {
         ]
         .contains(&self.tool.as_str())
             || ![0, 3, 5, 10].contains(&self.auto_fade_seconds)
-            || ![2.0, 4.0, 7.0].contains(&self.width)
             || self.color.len() != 7
             || !self.color.starts_with('#')
             || !self.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
@@ -104,10 +104,21 @@ impl Preferences {
         Ok(shortcut)
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "lowercase")]
+enum TutorialStep {
+    Welcome,
+    Draw,
+    Hide,
+    Done,
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Session {
     mode: String,
+    annotation_session: u32,
+    tutorial: Option<TutorialStep>,
     settings_open: bool,
     active_overlay: String,
     cycle_index: u32,
@@ -124,11 +135,47 @@ struct HistoryAvailability {
 struct AppState(Mutex<Session>);
 struct TrayAnchor(Mutex<Option<tauri::Rect>>);
 struct ToolbarExpanded(Mutex<bool>);
-/// Physical toolbar window bounds and display scale, refreshed whenever the toolbar is docked.
-struct ToolbarLayout(Mutex<Option<(Layout, f64)>>);
+/// Physical window and dock bounds for focus-independent cursor tracking.
+struct ToolbarLayout(Mutex<Option<TrackingLayout>>);
 
 impl Session {
+    fn new(preferences: Preferences) -> Self {
+        Self {
+            mode: "hidden".into(),
+            annotation_session: 0,
+            tutorial: if preferences.tutorial_completed {
+                None
+            } else {
+                Some(TutorialStep::Welcome)
+            },
+            settings_open: false,
+            active_overlay: "overlay-0".into(),
+            cycle_index: 0,
+            history_by_overlay: HashMap::new(),
+            preferences,
+            error: None,
+        }
+    }
+    fn record_history(
+        &mut self,
+        overlay: &str,
+        availability: HistoryAvailability,
+        annotation_session: u32,
+        advance_cycle: bool,
+    ) {
+        if annotation_session != self.annotation_session {
+            return;
+        }
+        if self.tutorial == Some(TutorialStep::Draw) && availability.can_undo {
+            self.tutorial = Some(TutorialStep::Hide);
+        }
+        self.history_by_overlay.insert(overlay.into(), availability);
+        if advance_cycle {
+            self.cycle_index = self.cycle_index.wrapping_add(1);
+        }
+    }
     fn transition(&mut self, action: &str) -> Result<()> {
+        let previous_mode = self.mode.clone();
         match action {
             "toggle" => {
                 self.mode = if self.mode == "hidden" {
@@ -140,21 +187,41 @@ impl Session {
             }
             "show" => self.mode = "draw".into(),
             "hide" => self.mode = "hidden".into(),
-            "interact" if self.mode != "hidden" => {
-                self.mode = if self.mode == "draw" {
-                    "interact"
-                } else {
-                    "draw"
-                }
-                .into()
+            "tutorial-start" => {
+                self.mode = "draw".into();
+                self.tutorial = Some(TutorialStep::Draw);
             }
-            "interact" => {}
+            "replay-tutorial" => {
+                self.mode = "hidden".into();
+                self.tutorial = Some(TutorialStep::Welcome);
+            }
+            "dismiss-tutorial" => self.tutorial = None,
             "settings" => self.settings_open = true,
             "close-settings" => self.settings_open = false,
             "dismiss-error" => self.error = None,
             _ => return Err("Unknown action".into()),
         }
-        if matches!(action, "toggle" | "show" | "hide") {
+        if previous_mode == "draw" && self.mode == "hidden" {
+            self.annotation_session += 1;
+            self.history_by_overlay.clear();
+        }
+        if previous_mode == "hidden"
+            && self.mode == "draw"
+            && self.tutorial == Some(TutorialStep::Welcome)
+        {
+            self.tutorial = Some(TutorialStep::Draw);
+        }
+        if previous_mode == "draw" && self.mode == "hidden" && action != "replay-tutorial" {
+            self.tutorial = match self.tutorial {
+                Some(TutorialStep::Hide) => Some(TutorialStep::Done),
+                Some(TutorialStep::Draw) => Some(TutorialStep::Welcome),
+                other => other,
+            };
+        }
+        if matches!(
+            action,
+            "toggle" | "show" | "hide" | "tutorial-start" | "replay-tutorial"
+        ) {
             self.settings_open = false;
         }
         Ok(())
@@ -205,7 +272,38 @@ fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
             settings.hide().map_err(|e| e.to_string())?;
         }
     }
+    sync_tutorial(app)?;
     publish(app)
+}
+/// Keep the small guide on the active display without covering the drawing toolbar.
+fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
+    let state = snapshot(app);
+    if let Some(window) = app.get_webview_window("tutorial") {
+        if state.tutorial.is_none() {
+            return window.hide().map_err(|e| e.to_string());
+        }
+        if let Some(overlay) = app.get_webview_window(&state.active_overlay) {
+            if let Some(monitor) = overlay.current_monitor().map_err(|e| e.to_string())? {
+                let area = monitor.work_area();
+                let scale = monitor.scale_factor();
+                let width = (400.0 * scale).min(area.size.width as f64);
+                let height = (330.0 * scale).min(area.size.height as f64);
+                window
+                    .set_size(PhysicalSize::new(width as u32, height as u32))
+                    .map_err(|e| e.to_string())?;
+                window
+                    .set_position(PhysicalPosition::new(
+                        area.position.x + ((area.size.width as f64 - width) / 2.0) as i32,
+                        area.position.y
+                            + (20.0 * scale).min((area.size.height as f64 - height).max(0.0))
+                                as i32,
+                    ))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        window.show().map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 fn focus_drawing(app: &tauri::AppHandle) {
     let state = snapshot(app);
@@ -219,8 +317,10 @@ fn focus_drawing(app: &tauri::AppHandle) {
 fn raise_toolbar(app: &tauri::AppHandle) {
     // Windows places a newly focused overlay above its sibling topmost windows.
     #[cfg(target_os = "windows")]
-    if let Some(toolbar) = app.get_webview_window("toolbar") {
-        let _ = toolbar.set_always_on_top(true);
+    for label in ["toolbar", "tutorial"] {
+        if let Some(window) = app.get_webview_window(label) {
+            let _ = window.set_always_on_top(true);
+        }
     }
     #[cfg(not(target_os = "windows"))]
     let _ = app;
@@ -252,35 +352,45 @@ fn position_toolbar(app: &tauri::AppHandle) -> Result<()> {
             toolbar
                 .set_size(PhysicalSize::new(layout.width, layout.height))
                 .map_err(|e| e.to_string())?;
-            *app.state::<ToolbarLayout>().0.lock().unwrap() =
-                Some((layout, monitor.scale_factor()));
+            // Popover space must not enlarge the cursor-proximity area: otherwise
+            // moving away into the transparent part of the window keeps it open.
+            let dock = dock_layout(
+                state.preferences.toolbar_position,
+                work,
+                monitor.scale_factor(),
+                false,
+            );
+            *app.state::<ToolbarLayout>().0.lock().unwrap() = Some(TrackingLayout {
+                dock,
+                window: layout,
+                scale: monitor.scale_factor(),
+            });
         }
     }
     Ok(())
 }
-/// Whether the cursor is close enough to the docked toolbar to reveal it.
-fn toolbar_is_near(app: &tauri::AppHandle) -> bool {
+/// Cursor position in toolbar CSS pixels, even when the canvas owns keyboard focus.
+fn toolbar_pointer(app: &tauri::AppHandle) -> Option<ToolbarPointer> {
     if snapshot(app).mode == "hidden" {
-        return false;
+        return None;
     }
-    let Some((layout, scale)) = *app.state::<ToolbarLayout>().0.lock().unwrap() else {
-        return false;
-    };
-    app.cursor_position()
-        .map(|cursor| layout.is_near(cursor.x, cursor.y, TOOLBAR_REVEAL_MARGIN * scale))
-        .unwrap_or(false)
+    let layout = (*app.state::<ToolbarLayout>().0.lock().unwrap())?;
+    let cursor = app.cursor_position().ok()?;
+    layout.pointer_at(cursor.x, cursor.y, TOOLBAR_REVEAL_MARGIN)
 }
-/// Poll the cursor so the toolbar can expand even while overlays ignore pointer events.
+/// Poll across native windows so hover does not depend on activating the webview.
 fn watch_toolbar_proximity(app: tauri::AppHandle) {
     std::thread::spawn(move || {
-        let mut near = false;
+        let mut tracked = false;
         loop {
             std::thread::sleep(std::time::Duration::from_millis(80));
-            let next = toolbar_is_near(&app);
-            if next != near {
-                near = next;
-                let _ = app.emit_to("toolbar", "toolbar-proximity", near);
+            let pointer = toolbar_pointer(&app);
+            // Repeat nearby samples: revealing/resizing the toolbar can put a
+            // button under a stationary cursor without generating pointerenter.
+            if pointer.is_some() || tracked {
+                let _ = app.emit_to("toolbar", "toolbar-pointer", pointer);
             }
+            tracked = pointer.is_some();
         }
     });
 }
@@ -362,6 +472,11 @@ fn select_cursor_monitor(app: &tauri::AppHandle) {
     }
 }
 fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
+    if action == "dismiss-tutorial" {
+        let mut preferences = snapshot(app).preferences;
+        preferences.tutorial_completed = true;
+        set_preferences(app.clone(), preferences)?;
+    }
     if action == "quit" {
         app.exit(0);
         return Ok(());
@@ -375,15 +490,6 @@ fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
     if action == "clear-all" {
         return app
             .emit("drawing-action", "clear")
-            .map_err(|e| e.to_string());
-    }
-    if action == "erase" {
-        if snapshot(app).mode != "draw" {
-            return Ok(());
-        }
-        // Only the overlay currently under the pointer handles this event.
-        return app
-            .emit("drawing-action", "erase")
             .map_err(|e| e.to_string());
     }
     if matches!(action, "settings" | "close-settings") {
@@ -407,7 +513,9 @@ fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
         }
         return Ok(());
     }
-    if (action == "toggle" && snapshot(app).mode == "hidden") || action == "show" {
+    if (action == "toggle" && snapshot(app).mode == "hidden")
+        || matches!(action, "show" | "tutorial-start" | "replay-tutorial")
+    {
         select_cursor_monitor(app);
         position_toolbar(app)?;
     }
@@ -417,8 +525,26 @@ fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
         .unwrap()
         .transition(action)?;
     apply_windows(app)?;
-    if matches!(action, "toggle" | "show" | "interact") {
+    if snapshot(app).tutorial == Some(TutorialStep::Done)
+        && !snapshot(app).preferences.tutorial_completed
+    {
+        let mut preferences = snapshot(app).preferences;
+        preferences.tutorial_completed = true;
+        // Returning to work must still succeed if saving onboarding progress fails.
+        if let Err(error) = set_preferences(app.clone(), preferences) {
+            report(app, error);
+        }
+    }
+    if matches!(action, "toggle" | "show" | "tutorial-start") {
         focus_drawing(app);
+    }
+    if matches!(
+        snapshot(app).tutorial,
+        Some(TutorialStep::Welcome | TutorialStep::Done)
+    ) {
+        if let Some(window) = app.get_webview_window("tutorial") {
+            window.set_focus().map_err(|e| e.to_string())?;
+        }
     }
     Ok(())
 }
@@ -442,6 +568,7 @@ fn activate_overlay(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Resu
         };
         if changed {
             position_toolbar(&app)?;
+            sync_tutorial(&app)?;
         }
         raise_toolbar(&app);
         publish(&app)?;
@@ -454,20 +581,17 @@ fn report_history(
     window: tauri::WebviewWindow,
     availability: HistoryAvailability,
     advance_cycle: bool,
+    annotation_session: u32,
 ) -> Result<()> {
     if !window.label().starts_with("overlay-") {
         return Err("Only annotation windows can report drawing history".into());
     }
-    {
-        let state = app.state::<AppState>();
-        let mut state = state.0.lock().unwrap();
-        state
-            .history_by_overlay
-            .insert(window.label().into(), availability);
-        if advance_cycle {
-            state.cycle_index = state.cycle_index.wrapping_add(1);
-        }
-    }
+    app.state::<AppState>().0.lock().unwrap().record_history(
+        window.label(),
+        availability,
+        annotation_session,
+        advance_cycle,
+    );
     publish(&app)
 }
 #[tauri::command]
@@ -572,7 +696,13 @@ fn main() {
             if should_close {
                 if let Err(error) = perform(
                     window.app_handle(),
-                    if settings { "close-settings" } else { "hide" },
+                    if settings {
+                        "close-settings"
+                    } else if window.label() == "tutorial" {
+                        "dismiss-tutorial"
+                    } else {
+                        "hide"
+                    },
                 ) {
                     report(window.app_handle(), error);
                 }
@@ -595,17 +725,27 @@ fn main() {
                 .and_then(|bytes| serde_json::from_slice::<Preferences>(&bytes).ok())
                 .filter(|preferences| preferences.validate().is_ok())
                 .unwrap_or_default();
-            app.manage(AppState(Mutex::new(Session {
-                mode: "draw".into(),
-                settings_open: false,
-                active_overlay: "overlay-0".into(),
-                cycle_index: 0,
-                history_by_overlay: HashMap::new(),
-                preferences,
-                error: None,
-            })));
+            app.manage(AppState(Mutex::new(Session::new(preferences))));
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                // The default Hide menu item consumes Cmd+H before the webview
+                // can select Highlighter. Keep the other standard menu actions.
+                let menu = tauri::menu::Menu::default(app.handle())?;
+                let hide_label = tauri::menu::PredefinedMenuItem::hide(app, None)?.text()?;
+                for item in menu.items()? {
+                    if let Some(submenu) = item.as_submenu() {
+                        for item in submenu.items()? {
+                            if let Some(predefined) = item.as_predefined_menuitem() {
+                                if predefined.text()? == hide_label {
+                                    submenu.remove(predefined)?;
+                                }
+                            }
+                        }
+                    }
+                }
+                app.set_menu(menu)?;
+            }
             app.manage(TrayAnchor(Mutex::new(None)));
             app.manage(ToolbarExpanded(Mutex::new(false)));
             app.manage(ToolbarLayout(Mutex::new(None)));
@@ -670,6 +810,23 @@ fn main() {
             .visible(false)
             .build()?;
             configure_overlay(&settings_window, true)?;
+            let tutorial_window = WebviewWindowBuilder::new(
+                app,
+                "tutorial",
+                WebviewUrl::App("index.html?surface=tutorial".into()),
+            )
+            .title("Welcome to Glassboard")
+            .inner_size(400.0, 330.0)
+            .accept_first_mouse(true)
+            .transparent(true)
+            .decorations(false)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false)
+            .build()?;
+            configure_overlay(&tutorial_window, true)?;
             use tauri::menu::{Menu, MenuItem};
             let clear = MenuItem::with_id(app, "clear", "Clear screen", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Glassboard", true, None::<&str>)?;
@@ -727,7 +884,9 @@ fn main() {
             select_cursor_monitor(handle);
             position_toolbar(handle).map_err(std::io::Error::other)?;
             apply_windows(handle).map_err(std::io::Error::other)?;
-            toolbar.set_focus()?;
+            if snapshot(handle).tutorial.is_some() {
+                tutorial_window.set_focus()?;
+            }
             watch_toolbar_proximity(handle.clone());
             Ok(())
         })
@@ -752,20 +911,12 @@ fn main() {
 mod tests {
     use super::*;
     fn session() -> Session {
-        Session {
-            mode: "draw".into(),
-            settings_open: false,
-            active_overlay: "overlay-0".into(),
-            cycle_index: 0,
-            history_by_overlay: HashMap::new(),
-            preferences: Preferences::default(),
-            error: None,
-        }
+        Session::new(Preferences::default())
     }
     #[test]
     fn hide_and_restore_resets_input_mode() {
         let mut s = session();
-        s.transition("interact").unwrap();
+        s.transition("show").unwrap();
         s.transition("hide").unwrap();
         s.transition("toggle").unwrap();
         assert_eq!(s.mode, "draw");
@@ -790,11 +941,110 @@ mod tests {
         assert_eq!(s.mode, "draw");
     }
     #[test]
-    fn interact_does_not_reveal_hidden_annotations() {
+    fn removed_interact_action_is_rejected() {
+        assert!(session().transition("interact").is_err());
+    }
+    #[test]
+    fn leaving_annotations_resets_every_display_before_reopening() {
+        for exit in ["hide", "toggle", "replay-tutorial"] {
+            let mut s = session();
+            s.transition("show").unwrap();
+            let generation = s.annotation_session;
+            for overlay in ["overlay-0", "overlay-1"] {
+                s.record_history(
+                    overlay,
+                    HistoryAvailability {
+                        can_undo: true,
+                        can_redo: true,
+                    },
+                    generation,
+                    false,
+                );
+            }
+            s.transition("show").unwrap();
+            assert_eq!(s.annotation_session, generation);
+            assert_eq!(s.history_by_overlay.len(), 2);
+            s.transition(exit).unwrap();
+            assert_eq!(s.mode, "hidden");
+            assert_eq!(s.annotation_session, generation + 1);
+            assert!(s.history_by_overlay.is_empty());
+            s.record_history(
+                "overlay-1",
+                HistoryAvailability {
+                    can_undo: true,
+                    can_redo: true,
+                },
+                generation,
+                true,
+            );
+            assert!(s.history_by_overlay.is_empty());
+            assert_eq!(s.cycle_index, 0);
+            s.transition("hide").unwrap();
+            s.transition("show").unwrap();
+            assert_eq!(s.annotation_session, generation + 1);
+            assert!(s.history_by_overlay.is_empty());
+        }
+    }
+    #[test]
+    fn tutorial_follows_a_completed_mark_and_return_to_work() {
         let mut s = session();
-        s.transition("hide").unwrap();
-        s.transition("interact").unwrap();
         assert_eq!(s.mode, "hidden");
+        assert_eq!(s.tutorial, Some(TutorialStep::Welcome));
+        s.transition("tutorial-start").unwrap();
+        assert_eq!(s.tutorial, Some(TutorialStep::Draw));
+        s.record_history(
+            "overlay-0",
+            HistoryAvailability {
+                can_undo: false,
+                can_redo: false,
+            },
+            s.annotation_session,
+            false,
+        );
+        assert_eq!(s.tutorial, Some(TutorialStep::Draw));
+        s.record_history(
+            "overlay-0",
+            HistoryAvailability {
+                can_undo: true,
+                can_redo: false,
+            },
+            s.annotation_session,
+            false,
+        );
+        assert_eq!(s.tutorial, Some(TutorialStep::Hide));
+        s.transition("hide").unwrap();
+        assert_eq!(s.tutorial, Some(TutorialStep::Done));
+        assert_eq!(s.mode, "hidden");
+        s.transition("dismiss-tutorial").unwrap();
+        assert_eq!(s.tutorial, None);
+        s.transition("replay-tutorial").unwrap();
+        assert_eq!(s.tutorial, Some(TutorialStep::Welcome));
+    }
+    #[test]
+    fn completed_tutorial_does_not_reappear_on_launch() {
+        let preferences = Preferences {
+            tutorial_completed: true,
+            ..Preferences::default()
+        };
+        let saved = serde_json::to_vec(&preferences).unwrap();
+        let s = Session::new(serde_json::from_slice(&saved).unwrap());
+        assert_eq!(s.mode, "hidden");
+        assert_eq!(s.tutorial, None);
+        let mut old = serde_json::to_value(Preferences::default()).unwrap();
+        old.as_object_mut().unwrap().remove("tutorialCompleted");
+        assert_eq!(
+            Session::new(serde_json::from_value(old).unwrap()).tutorial,
+            Some(TutorialStep::Welcome)
+        );
+    }
+    #[test]
+    fn leaving_before_drawing_allows_retrying_the_tutorial() {
+        let mut s = session();
+        s.transition("toggle").unwrap();
+        s.transition("hide").unwrap();
+        assert_eq!(s.tutorial, Some(TutorialStep::Welcome));
+        s.transition("toggle").unwrap();
+        assert_eq!(s.tutorial, Some(TutorialStep::Draw));
     }
     #[test]
     fn shortcut_validation_rejects_unmodified_and_malformed_keys() {
@@ -870,6 +1120,11 @@ mod tests {
         assert_eq!(preferences.auto_fade_seconds, 0);
         assert_eq!(preferences.color, "#68aaff");
         assert_eq!(preferences.shortcut, "CommandOrControl+Shift+B");
+        // Retired line-width preferences are ignored without resetting other settings.
+        assert!(serde_json::to_value(&preferences)
+            .unwrap()
+            .get("width")
+            .is_none());
         assert!(preferences.validate().is_ok());
     }
     #[test]
