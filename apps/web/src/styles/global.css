@@ -50,12 +50,6 @@ h1, p, ul { margin: 0; }
 .button.primary:hover { background: var(--accent-hover); }
 @media (prefers-reduced-motion: reduce) { .button { transition: none; } }
 
-/* Sits beside the toolbar preview at the bottom; hidden while the live toolbar is up. */
-.toolbar-note { position: fixed; z-index: 1; left: calc(50% + 350px); bottom: 78px; width: 230px; margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
-.toolbar-note p { margin: 0; }
-html.annotating .toolbar-note { display: none; }
-@media (max-width: 1180px), (max-height: 640px) { .toolbar-note { display: none; } }
-
 @media (max-height: 720px) and (min-width: 761px) {
   .top { padding: 14px 0; }
   .hero { padding: 12px 0; }
