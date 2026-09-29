@@ -12,12 +12,17 @@ Install Node.js 22.12+ (or a newer supported LTS), Rust stable, and the [Tauri p
 
 ```sh
 npm ci
-npm run tauri dev
+npm run desktop tauri dev
 ```
+
+The repository is an npm workspace. The desktop app lives in `apps/desktop` and the
+[glassboard.dev](https://glassboard.dev) landing page in `apps/web`. Root scripts
+forward to each workspace: `npm run desktop <script>` and `npm run web <script>`.
+Use `npm run desktop dev` (or `npm run web dev`) for browser previews.
 
 The app starts in work mode with the desktop usable. On first launch, a short tutorial invites you to draw a mark and use the global shortcut to return to work. The toolbar stays open during practice. Completing or skipping the tutorial is remembered; choose **Show tutorial** in settings to replay it. After the tutorial, the drawing toolbar tucks away as a thin pill at the edge of the display. Move the cursor near the pill to open the toolbar; it collapses again shortly after the cursor leaves. It stays open while an error is showing or a control has keyboard focus. Hover over a tool or color (or focus it with Tab) to see its name and shortcut. Tooltips open toward the screen interior, outside the scrolling toolbar, so they remain visible in every dock position. The toolbar and settings follow the system light/dark appearance and update when it changes. The toolbar is docked: choose **Left**, **Right**, or **Bottom** under **Toolbar position** in settings. It stays centered along the selected edge of the active display’s usable area. Side toolbars are vertical; the bottom toolbar is horizontal. The selection saves automatically. Click the menu-bar/system-tray icon to open settings. Right-click it for **Clear screen** and **Quit Glassboard**.
 
-For a browser-only UI preview, run `npm run dev` and open http://127.0.0.1:1420. The preview draws within that tab; desktop overlay behavior requires Tauri. Shortcut preferences in the preview are illustrative; its show/hide binding stays at the default.
+For a browser-only UI preview, run `npm run desktop dev` and open http://127.0.0.1:1420. The preview draws within that tab; desktop overlay behavior requires Tauri. Shortcut preferences in the preview are illustrative; its show/hide binding stays at the default.
 
 ## Controls
 
@@ -44,12 +49,12 @@ No store, installer, signing service, or distribution setup is required for pers
 
 ```sh
 # macOS: a standalone local .app
-npm run tauri build -- --bundles app
-# Open src-tauri/target/release/bundle/macos/Glassboard.app
+npm run desktop tauri build -- --bundles app
+# Open apps/desktop/src-tauri/target/release/bundle/macos/Glassboard.app
 
 # Windows: a standalone executable, using the installed WebView2 runtime
-npm run tauri build -- --no-bundle
-# Run src-tauri/target/release/glassboard.exe
+npm run desktop tauri build -- --no-bundle
+# Run apps/desktop/src-tauri/target/release/glassboard.exe
 ```
 
 Use `--debug` for a faster development build. The app uses Tauri's macOS private-API transparency feature; this configuration is not intended for the Mac App Store.
@@ -57,13 +62,15 @@ Use `--debug` for a faster development build. The app uses Tauri's macOS private
 ## Checks
 
 ```sh
-npm run check
-npm test
-npm run build
-cargo test --manifest-path src-tauri/Cargo.toml
-cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
-cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+npm run check   # svelte-check and astro check across workspaces
+npm test        # vitest for the desktop app
+npm run build   # both workspaces
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 ```
+
+The landing page builds to static HTML with `npm run web build`; preview it with `npm run web dev`.
 
 The tests cover undo/redo branches, undoable clear, immutable stroke history, constrained geometry, mode transitions, and shortcut validation. Native behavior must also be checked on each OS.
 
@@ -77,6 +84,10 @@ The tests cover undo/redo branches, undoable clear, immutable stroke history, co
 - Protected system surfaces and exclusive fullscreen applications are outside this first version's scope.
 
 ## Structure
+
+- `apps/desktop`: the Tauri + Svelte desktop app. Paths below are relative to it.
+- `apps/web`: the Astro landing page for glassboard.dev.
+- `assets/brand`: logo master and exports shared by both apps.
 
 The logo master and reusable exports live in [`assets/brand`](assets/brand/README.md).
 Run `python3 scripts/generate-brand-assets.py` after editing the master to refresh

@@ -1,0 +1,27 @@
+---
+import mark from '../../../../assets/brand/mark-dark.svg';
+
+const title = 'Glassboard';
+const description =
+  'A small desktop annotation tool for macOS and Windows. Switch from work to annotation with a shortcut, draw over your screen, then switch back.';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="canonical" href={Astro.site} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <main>
+      <img src={mark.src} width="96" height="96" alt="" />
+      <h1>{title}</h1>
+      <p>{description}</p>
+    </main>
+  </body>
+</html>
