@@ -48,4 +48,36 @@ describe('drawingKeydown', () => {
     drawingKeydown(press('z', { metaKey: true }, input), session('draw'), { run, save });
     expect(run).not.toHaveBeenCalled();
   });
+
+  it.each(['metaKey', 'ctrlKey'] as const)('starts a capture with %s+S while drawing', modifier => {
+    const capture = vi.fn(), run = vi.fn(), save = vi.fn();
+    const event = press('s', { [modifier]: true });
+    drawingKeydown(event, session('draw'), { run, save, capture });
+    expect(event.defaultPrevented).toBe(true);
+    expect(capture).toHaveBeenCalledOnce();
+    expect(run).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('leaves Save alone outside capture-enabled drawing and ignores modified or repeated presses', () => {
+    const capture = vi.fn(), handlers = { run: vi.fn(), save: vi.fn(), capture };
+    const input = document.createElement('textarea');
+    for (const event of [press('s'), press('s', { metaKey: true, shiftKey: true }), press('s', { ctrlKey: true, altKey: true }), press('s', { metaKey: true }, input)]) {
+      drawingKeydown(event, session('draw'), handlers);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    const hidden = press('s', { metaKey: true });
+    drawingKeydown(hidden, session('hidden'), handlers);
+    expect(hidden.defaultPrevented).toBe(false);
+    const unsupported = press('s', { metaKey: true });
+    drawingKeydown(unsupported, session('draw'), { run: vi.fn(), save: vi.fn() });
+    expect(unsupported.defaultPrevented).toBe(false);
+    const repeat = press('s', { metaKey: true, repeat: true });
+    drawingKeydown(repeat, session('draw'), handlers);
+    expect(repeat.defaultPrevented).toBe(true);
+    const handled = press('s', { metaKey: true });
+    handled.preventDefault();
+    drawingKeydown(handled, session('draw'), handlers);
+    expect(capture).not.toHaveBeenCalled();
+  });
 });

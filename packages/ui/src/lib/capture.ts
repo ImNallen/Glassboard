@@ -45,8 +45,8 @@ export function captureKeydown(event: KeyboardEvent, { copy, cancel }: { copy: (
   const target = event.target instanceof Element ? event.target : document.activeElement;
   const editable = target?.closest('input, textarea, select, [contenteditable="true"]');
   const key = event.key.toLowerCase();
-  // Copy remains normal text copy in an editor; Save can finish a pending text annotation.
-  if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && (key === 's' || (key === 'c' && !editable))) {
+  // Copy remains normal text copy while a text editor has focus.
+  if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && key === 'c' && !editable) {
     event.preventDefault();
     if (!event.repeat) copy();
   } else if (key === 'escape' && !editable) {

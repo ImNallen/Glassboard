@@ -15,6 +15,7 @@
     "@fontsource-variable/familjen-grotesk": "^5.3.0",
     "@glassboard/ui": "0.1.0",
     "astro": "^7.3.5",
+    "html-to-image": "^1.11.13",
     "svelte": "^5.57.1"
   },
   "devDependencies": {
