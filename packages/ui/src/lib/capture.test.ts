@@ -20,17 +20,18 @@ function key(key: string, modifiers: KeyboardEventInit, target: HTMLElement = do
 }
 
 describe('capture shortcuts', () => {
-  it.each([{ metaKey: true }, { ctrlKey: true }])('copies with C and S using %j', modifier => {
+  it.each([{ metaKey: true }, { ctrlKey: true }])('copies only with C using %j', modifier => {
     const copy = vi.fn(), cancel = vi.fn();
-    for (const value of ['c', 's']) {
-      const event = key(value, modifier);
-      captureKeydown(event, { copy, cancel });
-      expect(event.defaultPrevented).toBe(true);
-    }
-    expect(copy).toHaveBeenCalledTimes(2);
+    const event = key('c', modifier);
+    captureKeydown(event, { copy, cancel });
+    expect(event.defaultPrevented).toBe(true);
+    const save = key('s', modifier);
+    captureKeydown(save, { copy, cancel });
+    expect(save.defaultPrevented).toBe(false);
+    expect(copy).toHaveBeenCalledOnce();
     expect(cancel).not.toHaveBeenCalled();
   });
-  it('leaves text copy and Escape to the text editor, but allows S to commit and copy', () => {
+  it('leaves text copy, Save, and Escape to the text editor', () => {
     const copy = vi.fn(), cancel = vi.fn(), textarea = document.createElement('textarea');
     const textCopy = key('c', { metaKey: true }, textarea), escape = key('Escape', {}, textarea);
     captureKeydown(textCopy, { copy, cancel });
@@ -39,14 +40,14 @@ describe('capture shortcuts', () => {
     expect(escape.defaultPrevented).toBe(false);
     expect(copy).not.toHaveBeenCalled();
     captureKeydown(key('s', { metaKey: true }, textarea), { copy, cancel });
-    expect(copy).toHaveBeenCalledOnce();
+    expect(copy).not.toHaveBeenCalled();
   });
   it('cancels from the canvas and leaves capture/global/clipboard modifiers alone', () => {
     const copy = vi.fn(), cancel = vi.fn();
     captureKeydown(key('Escape', {}), { copy, cancel });
     expect(cancel).toHaveBeenCalledOnce();
     for (const modifiers of [{ metaKey: true, shiftKey: true }, { ctrlKey: true, altKey: true }, { metaKey: true, repeat: true }]) {
-      captureKeydown(key('s', modifiers), { copy, cancel });
+      captureKeydown(key('c', modifiers), { copy, cancel });
     }
     expect(copy).not.toHaveBeenCalled();
   });

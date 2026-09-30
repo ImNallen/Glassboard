@@ -81,11 +81,12 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
     } else {
         1.0
     };
-    let monitor = xcap::Monitor::from_point(
+    let capture_point = (
         (cursor.x / coordinate_scale).round() as i32,
         (cursor.y / coordinate_scale).round() as i32,
-    )
-    .map_err(|e| format!("Could not find the display under the cursor: {e}"))?;
+    );
+    let monitor = xcap::Monitor::from_point(capture_point.0, capture_point.1)
+        .map_err(|e| format!("Could not find the display under the cursor: {e}"))?;
     let position = (
         monitor.x().map_err(|e| e.to_string())?,
         monitor.y().map_err(|e| e.to_string())?,
@@ -109,6 +110,10 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
             if snapshot(&capture_app).capture.map(|capture| capture.id) != Some(id) {
                 return Err("Capture cancelled".into());
             }
+            // Windows monitor handles are not Send. Resolve the original cursor
+            // point on this worker so the handle never crosses a thread boundary.
+            let monitor = xcap::Monitor::from_point(capture_point.0, capture_point.1)
+                .map_err(|e| format!("Could not find the display under the cursor: {e}"))?;
             let image = monitor
                 .capture_image()
                 .map_err(|e| format!("Could not capture the screen: {e}"))?;

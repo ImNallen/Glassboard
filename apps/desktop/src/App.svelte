@@ -21,7 +21,7 @@
       if (event.key === 'Escape') { event.preventDefault(); run('close-settings'); }
       return;
     }
-    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror) });
+    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror), capture: () => run('capture') });
   }
   onMount(() => {
     const stopSelectionGuard = protectSelection();

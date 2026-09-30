@@ -85,6 +85,10 @@ it('uses permanent capture drawings without changing live fade or dock preferenc
   input.value = 'Explain this'; input.dispatchEvent(new Event('input', { bubbles: true }));
   flushSync();
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true, cancelable: true }));
+  expect(copyCaptureImage).not.toHaveBeenCalled();
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  await tick();
+  document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', metaKey: true, bubbles: true, cancelable: true }));
   await tick(); await tick();
   expect(annotatedCapture).toHaveBeenCalledWith(expect.anything(), { x: 100, y: 100, width: 500, height: 300 }, expect.arrayContaining([expect.objectContaining({ tool: 'text', text: 'Explain this', fadeSeconds: 0 })]));
 });
@@ -124,7 +128,10 @@ it('uses drawing shortcuts to leave selection and Screenshot to replace annotate
   }
   await tick();
   expect((document.querySelector('button[aria-label="Undo"]') as HTMLButtonElement).disabled).toBe(false);
-  (document.querySelector('button[aria-label="Screenshot"]') as HTMLButtonElement).click();
+  const captureShortcut = new KeyboardEvent('keydown', { key: 's', metaKey: true, bubbles: true, cancelable: true });
+  document.body.dispatchEvent(captureShortcut);
+  expect(captureShortcut.defaultPrevented).toBe(true);
+  expect(copyCaptureImage).not.toHaveBeenCalled();
   await tick();
   expect(document.querySelector('canvas:not(.capture-image)')).toBeNull();
   select([300, 200], [650, 450]);

@@ -91,7 +91,7 @@
   <div class="toolbar" bind:this={bar} onscroll={hints.dismiss} role="toolbar" aria-label="Annotation tools" aria-orientation={vertical ? 'vertical' : 'horizontal'}>
     <div class="tool-row">
     <div class="tool-group">{#each tools as tool}<button class="icon-button tool" class:active={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'} onclick={() => choose(tool.id)} use:hint={{ label: tool.name, key: shortcutLabel(`CommandOrControl+${tool.key}`) }} aria-label={tool.name} aria-pressed={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'}><tool.icon size={19} strokeWidth={1.8}/></button>{/each}
-      {#if oncapture}<button class="icon-button tool" class:active={selectingCapture} aria-pressed={selectingCapture} aria-label="Screenshot" onclick={oncapture} use:hint={{ label: 'Screenshot', description: 'Drag to select or replace the capture area' }}><Scan size={19} strokeWidth={1.8}/></button>{/if}
+      {#if oncapture}<button class="icon-button tool" class:active={selectingCapture} aria-pressed={selectingCapture} aria-label="Screenshot" onclick={oncapture} use:hint={{ label: 'Screenshot', key: shortcutLabel('CommandOrControl+S'), description: 'Drag to select or replace the capture area' }}><Scan size={19} strokeWidth={1.8}/></button>{/if}
     </div>
     <div class="divider"></div>
     <div class="toolbar-colors" role="group" aria-label="Drawing color">

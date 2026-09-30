@@ -67,7 +67,7 @@ it('routes tool and color shortcuts without consuming text entry, X, or work-mod
 
   press('a', { metaKey: true, shiftKey: true });
   await tick();
-  (document.querySelector('button[aria-label="Screenshot"]') as HTMLButtonElement).click();
+  expect(press('s', { metaKey: true }).defaultPrevented).toBe(true);
   await tick(); await tick();
   expect(session.capture?.ready).toBe(true);
   expect(document.querySelector('.selection-surface')).not.toBeNull();
