@@ -90,8 +90,11 @@ cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
 
 The landing page builds to static HTML with `npm run web build`; preview it with `npm run web dev`.
 It mounts the real overlay and toolbar from `packages/ui` as a client-only Svelte island, driven by
-the same browser adapter the desktop preview uses, so visitors can draw on the page. Its toolbar
-includes **Screenshot**: click it or press **Cmd+S / Ctrl+S** while drawing to freeze the visible
+the same browser adapter the desktop preview uses, so desktop visitors can draw on the page.
+The demo button, controls, and build-from-source link are hidden on viewports up to
+760 px wide; narrowing an active demo ends the session and restores page scrolling.
+The header's GitHub link stays available on mobile. The demo toolbar includes
+**Screenshot**: click it or press **Cmd+S / Ctrl+S** while drawing to freeze the visible
 landing page, select a region, annotate it, and copy it with **Cmd+C / Ctrl+C**. The capture
 excludes Glassboard’s controls and live annotation overlay. The image stays in the browser and
 is only placed on the clipboard when copied.
