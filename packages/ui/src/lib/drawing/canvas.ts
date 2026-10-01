@@ -113,9 +113,9 @@ function applyShadow(ctx: CanvasRenderingContext2D, scale: number) {
   ctx.shadowOffsetY = scale;
 }
 
-export function render(ctx: CanvasRenderingContext2D, shapes: Shape[], draft: Shape | null, width: number, height: number, scale: number, now = Date.now()) {
+export function render(ctx: CanvasRenderingContext2D, shapes: Shape[], draft: Shape | null, width: number, height: number, scale: number, now = Date.now(), clear = true) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.clearRect(0, 0, width, height);
+  if (clear) ctx.clearRect(0, 0, width, height);
   for (const shape of draft ? [...shapes, draft] : shapes) {
     const opacity = shapeOpacity(shape, now);
     if (opacity === 0) continue;

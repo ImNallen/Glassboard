@@ -6,9 +6,9 @@
   import { action, native, savePreferences, shortcutLabel, type Session, type Preferences } from '@glassboard/ui/session';
   import { drawingKeydown } from '@glassboard/ui/keys';
   import { toolShortcut } from '@glassboard/ui/shortcuts';
-  import { annotatedCapture, captureKeydown, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
+  import { annotatedCapture, captureKeydown, capturePixels, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
 
-  let { session, onerror, getImage, copyImage }: { session: Session; onerror: (error: unknown) => void; getImage: (id: number) => Promise<ImageData | HTMLImageElement | HTMLCanvasElement>; copyImage: (id: number, image: Promise<Blob>) => Promise<void> } = $props();
+  let { session, onerror, getImage, copyImage, copyRegion }: { session: Session; onerror: (error: unknown) => void; getImage: (id: number) => Promise<ImageData | HTMLImageElement | HTMLCanvasElement>; copyImage: (id: number, image: Promise<Blob>) => Promise<void>; copyRegion?: (id: number, region: CaptureRegion) => Promise<void> } = $props();
   // The parent keys this editor by capture id.
   const id = (() => session.capture!.id)();
   let image: HTMLCanvasElement;
@@ -19,22 +19,31 @@
   let busy = $state(false);
   let region = $state<CaptureRegion | null>(null);
   let selecting = $state(true);
+  let choosingRegion = $state(true);
   let dragging = $state(false);
   let start: { x: number; y: number } | null = null;
   let pointer: number | null = null;
   let overlay = $state<Overlay>();
   let disposed = false;
+  let toolbarDock = $derived(session.capture?.toolbarDock);
   let editingSession = $derived<Session>({ ...session, mode: 'draw', tutorial: null, settingsOpen: false,
     activeOverlay: 'capture', preferences: { ...session.preferences, autoFadeSeconds: 0 } });
   const run = (name: string) => action(name).catch(onerror);
   function fail(cause: unknown) { error = String(cause); }
-  function cancel() { if (!busy) run('cancel-capture'); }
+  function cancel() {
+    if (busy) return;
+    if (choosingRegion) {
+      if (dragging) abandon();
+      choosingRegion = false;
+    } else run('cancel-capture');
+  }
   function begin(event: PointerEvent) {
     if (!loaded || event.button !== 0 || pointer !== null) return;
     event.preventDefault();
     pointer = event.pointerId;
     start = { x: event.clientX, y: event.clientY };
     region = { ...start, width: 0, height: 0 };
+    choosingRegion = true;
     dragging = true;
     (event.currentTarget as HTMLElement).setPointerCapture(pointer);
   }
@@ -47,18 +56,25 @@
     move(event);
     dragging = false; start = null; pointer = null;
     if (!region || region.width < 8 || region.height < 8) region = null;
+    else choosingRegion = false;
   }
-  function abandon() { dragging = false; start = null; pointer = null; region = null; }
-  function reselect() { if (busy) return; selecting = true; error = ''; }
+  function abandon() { dragging = false; start = null; pointer = null; region = null; choosingRegion = false; }
+  function reselect() { if (busy) return; selecting = true; choosingRegion = true; error = ''; }
   function chooseDrawingTool() {
-    if (region && !dragging) selecting = false;
+    if (region && !dragging) { selecting = false; choosingRegion = false; }
     else run('show');
   }
   async function copy() {
     if (busy || dragging || !region || !image || !loaded) return;
     busy = true; error = '';
     try {
-      await copyImage(id, annotatedCapture(image, region, overlay?.exportShapes() ?? []));
+      // Finish pending text/strokes before deciding whether this is a plain crop.
+      const shapes = overlay?.exportShapes() ?? [];
+      if (!shapes.length && copyRegion) {
+        await copyRegion(id, capturePixels(region, { width: viewportWidth, height: viewportHeight }, image));
+      } else {
+        await copyImage(id, annotatedCapture(image, region, shapes));
+      }
       if (!native && !disposed && session.capture?.id === id) await action('cancel-capture');
     } catch (cause) { if (!disposed) fail(cause); }
     finally { busy = false; }
@@ -80,6 +96,7 @@
     event.preventDefault(); copy();
   }
   onMount(() => {
+    const started = import.meta.env.DEV ? performance.now() : 0;
     getImage(id).then(value => {
       if (disposed) return;
       image.width = value instanceof HTMLImageElement ? value.naturalWidth : value.width;
@@ -89,6 +106,7 @@
       if (value instanceof HTMLImageElement || value instanceof HTMLCanvasElement) context.drawImage(value, 0, 0);
       else context.putImageData(value, 0, 0);
       loaded = true;
+      if (import.meta.env.DEV) console.debug(`Screenshot editor pixels loaded in ${(performance.now() - started).toFixed(1)} ms`);
     }).catch(cause => { if (!disposed) fail(cause); });
     return () => { disposed = true; image.width = 0; image.height = 0; };
   });
@@ -106,7 +124,12 @@
     <div class="selection finished" style:left={`${region.x}px`} style:top={`${region.y}px`} style:width={`${region.width}px`} style:height={`${region.height}px`}></div>
     <Overlay bind:this={overlay} session={editingSession} onerror={fail} bounds={region} showGlow={false}/>
   {/if}
-  <div class:busy class="capture-tools"><Toolbar session={editingSession} error="" onerror={fail} onsave={save} onchoose={chooseDrawingTool} oncapture={reselect} selectingCapture={selecting} pinned embedded capture/></div>
+  <div hidden={choosingRegion && !error} class:busy class:native-dock={Boolean(toolbarDock)} class="capture-tools"
+    style:left={toolbarDock ? `${toolbarDock.x}px` : undefined} style:top={toolbarDock ? `${toolbarDock.y}px` : undefined}
+    style:width={toolbarDock ? `${toolbarDock.width}px` : undefined} style:height={toolbarDock ? `${toolbarDock.height}px` : undefined}
+    style:--toolbar-viewport-width={toolbarDock ? `${toolbarDock.width}px` : undefined} style:--toolbar-viewport-height={toolbarDock ? `${toolbarDock.height}px` : undefined}>
+    <Toolbar session={editingSession} error="" onerror={fail} onsave={save} onchoose={chooseDrawingTool} oncapture={reselect} selectingCapture={selecting} pinned embedded capture/>
+  </div>
   {#if region && !dragging}
     <div class="capture-actions" role="group" aria-label="Capture controls">
       <button class="copy" disabled={busy || !loaded} onclick={copy} title={shortcutLabel('CommandOrControl+C')}><Copy size={16}/>{busy ? 'Copying…' : 'Copy & close'}<kbd>{shortcutLabel('CommandOrControl+C')}</kbd></button>
@@ -135,7 +158,12 @@
   .selection { position: fixed; pointer-events: none; border: 1px solid #a3e9d1; box-shadow: 0 0 0 100vmax rgb(0 0 0 / .45); }
   .finished { z-index: 1; }
   .capture-tools { position: relative; z-index: 10; }
+  /* Establish the same fixed-position containing block as the native toolbar
+     window, including its shadow padding and work-area placement. */
+  .capture-tools.native-dock { position: fixed; transform: translateZ(0); pointer-events: none; }
+  .ready .native-dock :global(.toolbar-host), .unavailable .native-dock :global(.toolbar-host) { pointer-events: auto; }
   .capture-editor .capture-tools.busy { pointer-events: none; }
+  .capture-editor .capture-tools.busy :global(.toolbar-host) { pointer-events: none; }
   .capture-actions { position: fixed; z-index: 20; top: 18px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); }
   /* Keep the shared control independent of the host page's button/kbd defaults. */
   .capture-actions button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border-radius: 8px; font: 600 12px/normal -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 0 10px; appearance: none; border: 0; box-shadow: none; cursor: pointer; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }

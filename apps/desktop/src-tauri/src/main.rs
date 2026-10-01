@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod capture;
+mod capture_screen;
 mod commands;
+mod preference_saves;
 mod preferences;
 mod session;
 mod settings_position;
@@ -10,11 +12,12 @@ mod toolbar_position;
 mod tray;
 mod windows;
 
-use capture::{copy_capture, get_capture_image, CaptureImage};
+use capture::{copy_capture, copy_capture_region, get_capture_image, CaptureImage};
 use commands::{
     action, activate_overlay, expand_toolbar, get_session, perform, register_toggle,
     report_history, set_preferences,
 };
+use preference_saves::PreferenceSaves;
 use preferences::Preferences;
 use session::Session;
 use state::{report, snapshot, AppState};
@@ -23,7 +26,9 @@ use tauri::Manager;
 use tray::TrayAnchor;
 use windows::{
     apply_windows, select_cursor_monitor,
-    toolbar::{position_toolbar, watch_toolbar_proximity, ToolbarExpanded, ToolbarLayout},
+    toolbar::{
+        position_toolbar, watch_toolbar_proximity, ToolbarExpanded, ToolbarLayout, ToolbarTracking,
+    },
 };
 
 type Result<T> = std::result::Result<T, String>;
@@ -77,11 +82,13 @@ fn main() {
             set_preferences,
             expand_toolbar,
             get_capture_image,
-            copy_capture
+            copy_capture,
+            copy_capture_region
         ])
         .setup(|app| {
             let preferences = Preferences::load(app.handle());
             app.manage(AppState(Mutex::new(Session::new(preferences))));
+            app.manage(PreferenceSaves::start(app.handle().clone()));
             #[cfg(target_os = "macos")]
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -106,6 +113,7 @@ fn main() {
             app.manage(TrayAnchor(Mutex::new(None)));
             app.manage(ToolbarExpanded(Mutex::new(false)));
             app.manage(ToolbarLayout(Mutex::new(None)));
+            app.manage(ToolbarTracking::default());
             windows::create_windows(app)?;
             tray::create_tray(app)?;
             let handle = app.handle();
@@ -126,6 +134,14 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("Could not start Glassboard")
         .run(|app, event| {
+            if matches!(
+                event,
+                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+            ) {
+                if let Err(error) = app.state::<PreferenceSaves>().flush() {
+                    eprintln!("Could not save preferences on exit: {error}");
+                }
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
                 let session = snapshot(app);

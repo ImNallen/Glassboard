@@ -10,6 +10,9 @@ export class DrawingHistory {
   shapes: Shape[] = [];
   private past: Shape[][] = [];
   private future: Shape[][] = [];
+  private scheduleDirty = true;
+  private nextExpiry = Infinity;
+  private nextFade = Infinity;
 
   get canUndo() { return this.past.length > 0; }
   get canRedo() { return this.future.length > 0; }
@@ -19,6 +22,7 @@ export class DrawingHistory {
     if (this.past.length > HISTORY_LIMIT) this.past.shift();
     this.shapes = next;
     this.future = [];
+    this.scheduleDirty = true;
   }
 
   add(shape: Shape, now = Date.now()) {
@@ -31,6 +35,9 @@ export class DrawingHistory {
   }
 
   expire(now: number): boolean {
+    this.updateSchedule();
+    // Preserve the arrays (and their render cache) until an expiry is actually due.
+    if (now < this.nextExpiry) return false;
     const previousCount = this.shapes.length;
     const couldUndo = this.canUndo;
     const couldRedo = this.canRedo;
@@ -55,24 +62,34 @@ export class DrawingHistory {
     };
     this.past = prune(this.past);
     this.future = prune(this.future);
+    this.scheduleDirty = true;
     return previousCount !== this.shapes.length || couldUndo !== this.canUndo || couldRedo !== this.canRedo;
   }
 
-  nextFadeUpdate(now: number): number | undefined {
-    let next = Infinity;
+  private updateSchedule() {
+    if (!this.scheduleDirty) return;
+    this.scheduleDirty = false;
+    this.nextExpiry = Infinity;
+    this.nextFade = Infinity;
     for (const shape of this.shapes) {
       if (shape.expiresAt !== undefined) {
-        next = Math.min(next, Math.max(now, shape.expiresAt - FADE_MS));
+        this.nextFade = Math.min(this.nextFade, shape.expiresAt - FADE_MS);
+        this.nextExpiry = Math.min(this.nextExpiry, shape.expiresAt);
       }
     }
     // Invisible history only needs an update at expiry, not during the fade.
     for (const stack of [this.past, this.future]) {
       for (const shapes of stack) {
         for (const shape of shapes) {
-          if (shape.expiresAt !== undefined) next = Math.min(next, shape.expiresAt);
+          if (shape.expiresAt !== undefined) this.nextExpiry = Math.min(this.nextExpiry, shape.expiresAt);
         }
       }
     }
+  }
+
+  nextFadeUpdate(now: number): number | undefined {
+    this.updateSchedule();
+    const next = Math.min(this.nextExpiry, Math.max(now, this.nextFade));
     return Number.isFinite(next) ? next : undefined;
   }
 
@@ -81,6 +98,7 @@ export class DrawingHistory {
     this.shapes = [];
     this.past = [];
     this.future = [];
+    this.scheduleDirty = true;
   }
 
   clear() {
@@ -105,6 +123,7 @@ export class DrawingHistory {
     if (!previous) return;
     this.future.push(this.shapes);
     this.shapes = previous;
+    this.scheduleDirty = true;
   }
 
   redo() {
@@ -112,5 +131,6 @@ export class DrawingHistory {
     if (!next) return;
     this.past.push(this.shapes);
     this.shapes = next;
+    this.scheduleDirty = true;
   }
 }

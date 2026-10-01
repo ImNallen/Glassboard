@@ -12,11 +12,14 @@ vi.mock('./lib/session', async importOriginal => ({
   reportHistory: vi.fn().mockResolvedValue(undefined),
   drawingEvents: vi.fn().mockResolvedValue(() => {}),
 }));
-vi.mock('./lib/drawing', async importOriginal => ({
-  ...await importOriginal<typeof import('./lib/drawing')>(),
-  render: vi.fn(),
-  shapeAtPoint: vi.fn(),
-}));
+vi.mock('./lib/drawing', async importOriginal => {
+  const actual = await importOriginal<typeof import('./lib/drawing')>();
+  const render = vi.fn();
+  return { ...actual, render, shapeAtPoint: vi.fn(), OverlayRenderer: class {
+    paint(...args: Parameters<typeof actual.render>) { render(...args); }
+    reset() {}
+  } };
+});
 
 let component: ReturnType<typeof mount> | undefined;
 let frames: Map<number, FrameRequestCallback>;

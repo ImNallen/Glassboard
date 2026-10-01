@@ -20,24 +20,29 @@ export function capturePixels(region: CaptureRegion, viewport: { width: number; 
 
 /** Compose only screenshot pixels and drawings; editor chrome never enters the export. */
 export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, region: CaptureRegion, shapes: Shape[], viewport = { width: window.innerWidth, height: window.innerHeight }): Promise<Blob> {
+  const started = import.meta.env.DEV ? performance.now() : 0;
   const size = image instanceof HTMLImageElement ? { width: image.naturalWidth, height: image.naturalHeight } : image;
   const source = capturePixels(region, viewport, size);
   if (!source.width || !source.height) return Promise.reject(new Error('Select a region to copy.'));
   const scaleX = size.width / viewport.width, scaleY = size.height / viewport.height;
   const output = document.createElement('canvas');
   output.width = source.width; output.height = source.height;
-  const annotations = document.createElement('canvas');
-  annotations.width = source.width; annotations.height = source.height;
-  const ctx = output.getContext('2d'), drawing = annotations.getContext('2d');
-  if (!ctx || !drawing) return Promise.reject(new Error('Could not create the image. Try again.'));
+  const ctx = output.getContext('2d');
+  if (!ctx) return Promise.reject(new Error('Could not create the image. Try again.'));
   ctx.drawImage(image, source.x, source.y, source.width, source.height, 0, 0, source.width, source.height);
   const translated = shapes.map(shape => ({ ...shape,
     points: shape.points.map(point => ({ x: point.x - source.x / scaleX, y: (point.y * scaleY - source.y) / scaleX })),
     fadeSeconds: 0 as const, expiresAt: undefined,
   }));
-  render(drawing, translated, null, source.width / scaleX, source.height / scaleX, scaleX);
-  ctx.drawImage(annotations, 0, 0);
-  return new Promise((resolve, reject) => output.toBlob(blob => blob ? resolve(blob) : reject(new Error('Could not encode the image. Try again.')), 'image/png'));
+  if (translated.length) render(ctx, translated, null, source.width / scaleX, source.height / scaleX, scaleX, Date.now(), false);
+  const encodingStarted = import.meta.env.DEV ? performance.now() : 0;
+  if (import.meta.env.DEV) console.debug(`Screenshot composed in ${(encodingStarted - started).toFixed(1)} ms`);
+  return new Promise((resolve, reject) => output.toBlob(blob => {
+    if (import.meta.env.DEV) console.debug(`Screenshot PNG encoded in ${(performance.now() - encodingStarted).toFixed(1)} ms`);
+    output.width = 0; output.height = 0;
+    if (blob) resolve(blob);
+    else reject(new Error('Could not encode the image. Try again.'));
+  }, 'image/png'));
 }
 
 export function captureKeydown(event: KeyboardEvent, { copy, cancel }: { copy: () => void; cancel: () => void }) {
@@ -50,6 +55,7 @@ export function captureKeydown(event: KeyboardEvent, { copy, cancel }: { copy: (
     event.preventDefault();
     if (!event.repeat) copy();
   } else if (key === 'escape' && !editable) {
-    event.preventDefault(); cancel();
+    event.preventDefault();
+    if (!event.repeat) cancel();
   }
 }

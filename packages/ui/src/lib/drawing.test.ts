@@ -2,6 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
 const arrow = (): Shape => ({ id: 'one', tool: 'arrow', color: '#ff6259', width: 4, points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] });
 describe('auto-fade', () => {
+  it('retains the renderable array until a deadline is due, including during fading', () => {
+    const history = new DrawingHistory();
+    history.add({ ...arrow(), fadeSeconds: 3 }, 0);
+    const shapes = history.shapes;
+    for (const now of [1, 2000, 2500, 2750, 2999]) {
+      expect(history.expire(now)).toBe(false);
+      expect(history.shapes).toBe(shapes);
+    }
+    expect(history.expire(3000)).toBe(true);
+    expect(history.shapes).not.toBe(shapes);
+  });
   it.each([3, 5, 10] as const)('starts the %ss timer on completion and fades only at the end', seconds => {
     const draft = createShape({ ...arrow(), colorMode: 'rainbow', autoFadeSeconds: seconds }, 0, { x: 0, y: 0 });
     expect(shapeOpacity(draft, 999999)).toBe(1);

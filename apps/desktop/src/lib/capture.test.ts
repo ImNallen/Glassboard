@@ -1,12 +1,31 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { decodeCaptureFrame, getCaptureImage } from './capture';
+import { decodeCaptureFrame, getCaptureImage, copyCaptureImage, copyCaptureRegion } from './capture';
 import { invoke } from '@tauri-apps/api/core';
 
 vi.mock('@glassboard/ui/session', () => ({ native: true }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
+
+it('copies a plain screenshot using only capture identity and source pixel bounds', async () => {
+  const region = { x: 20, y: 41, width: 82, height: 62 };
+  await copyCaptureRegion(42, region);
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('copy_capture_region', { id: 42, region });
+});
+
+it('copies PNG bytes as a binary request with capture identity outside the body', async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 0, 255]).buffer;
+  const image = { arrayBuffer: async () => png } as Blob;
+  await copyCaptureImage(42, Promise.resolve(image));
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('copy_capture', png, { headers: { 'x-glassboard-capture-id': '42' } });
+});
+
+it('propagates a clipboard failure so the editor can keep the capture open', async () => {
+  vi.mocked(invoke).mockRejectedValueOnce(new Error('clipboard unavailable'));
+  const image = { arrayBuffer: async () => new ArrayBuffer(8) } as Blob;
+  await expect(copyCaptureImage(42, Promise.resolve(image))).rejects.toThrow('clipboard unavailable');
+});
 
 it('reads little-endian dimensions and shares the full-resolution RGBA bytes without a copy', () => {
   vi.stubGlobal('ImageData', class {

@@ -49,9 +49,9 @@ Leaving annotation mode hides the overlay and immediately clears drawings and un
 
 ## Screenshot capture
 
-Open Glassboard with the usual **Cmd+Shift+A** on macOS or **Ctrl+Shift+A** on Windows, then press **Cmd+S / Ctrl+S** or choose **Screenshot** in the drawing toolbar. Glassboard hides its windows, freezes the display under the cursor, and lets you drag a region to capture. While Screenshot is selected, each new drag replaces the selected area. Choose a drawing tool to add arrows, text, shapes, or highlighting. The toolbar stays on your preferred dock edge. **Copy & close** puts the annotated region on the image clipboard and returns you to work; paste it into a chat, a coding agent, or any app that accepts images. **Cmd+C / Ctrl+C** copies and closes, including a selection with no annotations. There is no save dialog or file written to disk.
+Open Glassboard with the usual **Cmd+Shift+A** on macOS or **Ctrl+Shift+A** on Windows, then press **Cmd+S / Ctrl+S** or choose **Screenshot** in the drawing toolbar. Glassboard hides its windows, freezes the display under the cursor, and lets you drag a region to capture. While Screenshot is selected, each new drag replaces the selected area. Choose a drawing tool to add arrows, text, shapes, or highlighting. The toolbar stays on your preferred dock edge and hides while selecting an area, then returns when you finish the drag. **Copy & close** puts the annotated region on the image clipboard and returns you to work; paste it into a chat, a coding agent, or any app that accepts images. **Cmd+C / Ctrl+C** copies and closes, including a selection with no annotations. There is no save dialog or file written to disk.
 
-Copying selected annotation text still works normally while the text editor is focused. Press **Enter** to finish the text before using **Cmd+C / Ctrl+C** to copy the image. **Escape** discards pending text first; press it outside the text editor to cancel the capture. Press **Cmd+S / Ctrl+S** or choose **Screenshot** again to select a different region of the same frozen display; this discards the previous annotations. Choosing a drawing tool before selecting an area returns to live annotation. A failed clipboard write keeps the capture open so you can retry.
+Copying selected annotation text still works normally while the text editor is focused. Press **Enter** to finish the text before using **Cmd+C / Ctrl+C** to copy the image. **Escape** discards pending text first; while selecting an area, it reveals the toolbar and discards any unfinished drag. Otherwise, press it outside the text editor to cancel the capture. Press **Cmd+S / Ctrl+S** or choose **Screenshot** again to select a different region of the same frozen display; this discards the previous annotations. Choosing a drawing tool before selecting an area returns to live annotation. A failed clipboard write keeps the capture open so you can retry.
 
 Capture annotations remain visible until copied or cancelled, regardless of your normal auto-fade preference. Captures have their own drawing history, start fresh, and retain the source screenshot's pixel density. Starting a capture ends the live screen-annotation session. The annotate/work shortcut remains the only global shortcut; screenshot capture is a tool within that session.
 
@@ -101,7 +101,26 @@ is only placed on the clipboard when copied.
 
 The tests cover undo/redo branches, undoable clear, immutable stroke history, constrained geometry, mode transitions, and shortcut validation. Native behavior must also be checked on each OS.
 
-Screenshot startup transfers a binary RGBA frame directly into the editor canvas; only the selected, annotated region is encoded to PNG when copying. Debug builds also optimize XCap's full-display pixel conversion. To compare frame preparation with the previous fast PNG encoder on a 3840×2160 fixture, run `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml benchmark_capture_preparation -- --ignored --nocapture`. The manual benchmark reports median preparation time and size, and verifies that every pixel matches the source. It stays out of normal test runs because wall-clock timings depend on the machine and build profile.
+Screenshot startup transfers a binary RGBA frame directly into the editor canvas. Plain native captures send only source-pixel crop bounds back to Rust, which crops the retained frame and writes it to the clipboard without a browser export or PNG round trip. Annotated captures compose directly onto one cropped canvas and send the resulting PNG bytes as a binary request. Browser previews continue using PNG clipboard images. Both paths retain pixel density, preserve cancellation checks, and keep failed copies open for retry.
+
+On macOS, the CoreGraphics capture backend explicitly excludes windows owned by Glassboard from its screenshot window list, removing the fixed 150 ms hide delay. This exclusion affects only Glassboard's own screenshot request; other apps' screen sharing still includes annotations. Native Accelerate conversion handles BGRA channel order and padded rows in one pass. On Windows, a main-thread barrier processes queued hide requests before `DwmFlush` waits for compositor completion; the old delay remains a fallback if that flush fails. Windows still needs a runtime compatibility check.
+
+The capture toolbar uses the same native dock bounds and shadow padding as live annotation, including menu-bar/taskbar offsets and display scaling. Its hidden auto-fade slot retains its space so the other controls stay in place when switching modes.
+
+Debug builds log native acquisition, frame readiness, crop/PNG decode, and clipboard-write timings. The dev webview logs editor pixel loading, canvas composition, and PNG encoding. Manual fixture benchmarks stay out of normal tests because timings depend on the machine and build profile:
+
+```sh
+# 4K binary frame preparation versus the previous fast PNG encoder
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml benchmark_capture_preparation -- --ignored --nocapture
+# Direct 1920×1080 crop versus crop plus lossless PNG encode/decode
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml benchmark_plain_capture_copy -- --ignored --nocapture
+# macOS native BGRA conversion on a 4K fixture
+cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml benchmark_bgra_conversion -- --ignored --nocapture
+```
+
+Drawing preferences take effect before disk writes. One background writer coalesces changes after 120 ms of inactivity and flushes pending preferences on normal exit. Save failures appear in the shared session while the current selection remains usable; the next change or exit retries saving. Shortcut changes still register and save transactionally before replacing the working binding.
+
+The overlay caches the stable prefix of completed drawings in one additional bitmap per active display. Drafts and fading shapes render above it in their original order. History edits, resizing, and pixel-density changes rebuild the cache; leaving annotation mode releases it. Expiry checks scan history only when an edit or expiry makes the schedule stale. Native toolbar tracking samples every 16 ms in drawing mode and sleeps while hidden; the reveal animation takes 100 ms.
 
 ## Current boundaries
 
@@ -125,19 +144,21 @@ the native app/tray icons and browser favicons. Generated assets are checked in;
 normal builds do not need the asset-generation tools.
 
 - `src-tauri/src/capture.rs`: native display capture, permission handling, ephemeral screenshot storage, and image clipboard writing.
+- `src-tauri/src/capture_screen.rs`: macOS window exclusion and pixel conversion; Windows compositor synchronization.
 - `src/Capture.svelte`: shared region selection and screenshot editor, with host-provided image loading and clipboard writing.
 - `apps/desktop/src/Capture.svelte`: connects the shared editor to native screenshot and clipboard commands.
 - `src/lib/capture.ts`: selection geometry, pixel-density-aware image composition, and capture shortcuts.
 - `src-tauri/src/main.rs`: application startup, command registration, and native event wiring.
 - `src-tauri/src/session.rs`: authoritative mode and tutorial transitions, with their tests.
 - `src-tauri/src/preferences.rs`: preference defaults, validation, migration, and persistence.
+- `src-tauri/src/preference_saves.rs`: serialized background saves, shortcut save barriers, and shutdown flushing.
 - `src-tauri/src/commands.rs`: native commands and global shortcut handling; `state.rs` manages session snapshots and broadcasts.
 - `src-tauri/src/windows/`: shared window creation, visibility, positioning, and toolbar cursor tracking. Pure placement calculations live in `settings_position.rs` and `toolbar_position.rs`.
 - `src-tauri/src/tray.rs`: menu-bar/system-tray icon and menu actions.
 - `src/Toolbar.svelte`: floating drawing controls that collapse to a pill when the cursor is away.
 - `src/lib/toolbar-hints.svelte.ts`: tooltip timing, placement, accessibility, and hover/focus state.
 - `src/Overlay.svelte`: pointer capture, stroke lifecycle, and demand-driven canvas rendering.
-- `src/lib/drawing.ts`: public drawing API, backed by `drawing/shapes.ts` (shape data and geometry), `drawing/history.ts` (undo/redo and expiry), and `drawing/canvas.ts` (rendering and hit testing).
+- `src/lib/drawing.ts`: public drawing API, backed by `drawing/shapes.ts` (shape data and geometry), `drawing/history.ts` (undo/redo and expiry), `drawing/canvas.ts` (rendering and hit testing), and `drawing/renderer.ts` (completed-drawing cache).
 - `src/lib/session.ts`: typed native bridge and browser preview adapter.
 - `src/lib/keys.ts`: keyboard routing for show/hide, screenshot capture, undo/redo, tool, and color shortcuts.
 - `src/toolbar.css`: toolbar and overlay styles plus the light/dark color variables, scoped so they can sit on any host page.

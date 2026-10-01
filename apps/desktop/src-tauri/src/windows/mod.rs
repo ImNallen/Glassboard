@@ -58,6 +58,8 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
         }
     }
     sync_tutorial(app)?;
+    app.state::<toolbar::ToolbarTracking>()
+        .set_active(state.mode == Mode::Draw);
     publish(app)
 }
 /// Keep the small guide on the active display without covering the drawing toolbar.

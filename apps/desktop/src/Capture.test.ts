@@ -3,11 +3,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
 import Capture from './Capture.svelte';
+import SharedCapture from '@glassboard/ui/Capture.svelte';
 import { action, defaults, savePreferences, subscribe, type Session } from '@glassboard/ui/session';
 import { annotatedCapture } from '@glassboard/ui/capture';
 import { copyCaptureImage, getCaptureImage } from './lib/capture';
 
-vi.mock('./lib/capture', () => ({ getCaptureImage: vi.fn().mockResolvedValue({ width: 2560, height: 1600, data: new Uint8ClampedArray(0) }), copyCaptureImage: vi.fn() }));
+vi.mock('./lib/capture', () => ({ getCaptureImage: vi.fn().mockResolvedValue({ width: 2560, height: 1600, data: new Uint8ClampedArray(0) }), copyCaptureImage: vi.fn(), copyCaptureRegion: vi.fn() }));
 vi.mock('@glassboard/ui/capture', async original => ({ ...await original<typeof import('@glassboard/ui/capture')>(), annotatedCapture: vi.fn().mockResolvedValue(new Blob(['image'], { type: 'image/png' })) }));
 vi.mock('@glassboard/ui/drawing', async original => ({ ...await original<typeof import('@glassboard/ui/drawing')>(), render: vi.fn() }));
 
@@ -29,16 +30,20 @@ afterEach(async () => {
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 
-function select(from: [number, number], to: [number, number]) {
+function selectionPointer(type: string, [x, y]: [number, number]) {
   const surface = document.querySelector('.selection-surface') as HTMLElement;
   surface.setPointerCapture = vi.fn();
+  surface.dispatchEvent(Object.assign(new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y }), { pointerId: 1 }));
+  flushSync();
+}
+
+function select(from: [number, number], to: [number, number]) {
   for (const [type, [x, y]] of [['pointerdown', from], ['pointerup', to]] as const) {
-    surface.dispatchEvent(Object.assign(new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y }), { pointerId: 1 }));
-    flushSync();
+    selectionPointer(type, [x, y]);
   }
 }
 
-async function setup() {
+async function setup(copyRegion?: (id: number, region: { x: number; y: number; width: number; height: number }) => Promise<void>, initialSelection = true) {
   await action('dismiss-tutorial');
   await savePreferences({ ...defaults.preferences, toolbarPosition: 'left', autoFadeSeconds: 5 });
   await action('capture');
@@ -46,12 +51,41 @@ async function setup() {
   let session = structuredClone(defaults);
   stop = await subscribe(value => { session = value; store.set(value); });
   const current = fromStore(store);
-  component = mount(Capture, { target: document.body, props: { get session() { return current.current; }, onerror: vi.fn() } });
+  const props = { get session() { return current.current; }, onerror: vi.fn() };
+  component = copyRegion
+    ? mount(SharedCapture, { target: document.body, props: { ...props, get session() { return current.current; }, getImage: getCaptureImage, copyImage: copyCaptureImage, copyRegion } })
+    : mount(Capture, { target: document.body, props });
   await tick(); await tick();
   flushSync();
-  select([100, 100], [600, 400]);
+  if (initialSelection) select([100, 100], [600, 400]);
   return { state: () => session };
 }
+
+it('uses native crop bounds at source density without composing or encoding plain captures', async () => {
+  vi.stubGlobal('innerWidth', 1280); vi.stubGlobal('innerHeight', 800);
+  const copyRegion = vi.fn().mockResolvedValue(undefined);
+  const app = await setup(copyRegion);
+  select([10.25, 20.75], [50.75, 51.25]);
+  (document.querySelector('button.copy') as HTMLButtonElement).click();
+  await tick(); await tick();
+  expect(copyRegion).toHaveBeenCalledWith(expect.any(Number), { x: 20, y: 41, width: 82, height: 62 });
+  expect(annotatedCapture).not.toHaveBeenCalled();
+  expect(copyCaptureImage).not.toHaveBeenCalled();
+  expect(app.state().capture).toBeNull();
+});
+
+it('keeps a failed native crop open for retry', async () => {
+  const copyRegion = vi.fn().mockRejectedValueOnce(new Error('Clipboard busy')).mockResolvedValue(undefined);
+  const app = await setup(copyRegion);
+  (document.querySelector('button.copy') as HTMLButtonElement).click();
+  await tick(); await tick();
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('Clipboard busy');
+  expect(app.state().capture).not.toBeNull();
+  (document.querySelector('button.copy') as HTMLButtonElement).click();
+  await tick(); await tick();
+  expect(copyRegion).toHaveBeenCalledTimes(2);
+  expect(app.state().capture).toBeNull();
+});
 
 it('keeps failed copies open and closes only after clipboard success', async () => {
   const app = await setup();
@@ -71,7 +105,8 @@ it('keeps failed copies open and closes only after clipboard success', async () 
 });
 
 it('uses permanent capture drawings without changing live fade or dock preferences', async () => {
-  const app = await setup();
+  const copyRegion = vi.fn().mockResolvedValue(undefined);
+  const app = await setup(copyRegion);
   expect(document.querySelector('.toolbar-host')?.classList.contains('vertical')).toBe(true);
   expect(document.querySelector('.toolbar-host')?.classList.contains('left')).toBe(true);
   expect(document.querySelector('.fade-button')).toBeNull();
@@ -91,10 +126,58 @@ it('uses permanent capture drawings without changing live fade or dock preferenc
   document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', metaKey: true, bubbles: true, cancelable: true }));
   await tick(); await tick();
   expect(annotatedCapture).toHaveBeenCalledWith(expect.anything(), { x: 100, y: 100, width: 500, height: 300 }, expect.arrayContaining([expect.objectContaining({ tool: 'text', text: 'Explain this', fadeSeconds: 0 })]));
+  expect(copyRegion).not.toHaveBeenCalled();
 });
 
 it('cancels selection without writing anything to the clipboard', async () => {
   const app = await setup();
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+  await tick();
+  expect(app.state().capture).toBeNull();
+  expect(copyCaptureImage).not.toHaveBeenCalled();
+});
+
+it('keeps the toolbar out of initial selection and every drag until a valid area is finished', async () => {
+  const app = await setup(undefined, false);
+  const tools = document.querySelector('.capture-tools') as HTMLElement;
+  expect(tools.hidden).toBe(true);
+  select([100, 100], [103, 103]);
+  expect(tools.hidden).toBe(true);
+  expect(document.querySelector('.selection')).toBeNull();
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+  flushSync();
+  expect(tools.hidden).toBe(false);
+  expect(app.state().capture).not.toBeNull();
+  selectionPointer('pointerdown', [10, 120]);
+  expect(tools.hidden).toBe(true);
+  selectionPointer('pointermove', [600, 400]);
+  expect(tools.hidden).toBe(true);
+  selectionPointer('pointerup', [600, 400]);
+  expect(tools.hidden).toBe(false);
+  expect(document.querySelector('button.copy')).not.toBeNull();
+});
+
+it('reveals the toolbar on Escape while reselecting and abandons partial drags without copying', async () => {
+  const app = await setup();
+  const tools = document.querySelector('.capture-tools') as HTMLElement;
+  (document.querySelector('button[aria-label="Screenshot"]') as HTMLButtonElement).click();
+  flushSync();
+  expect(tools.hidden).toBe(true);
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+  flushSync();
+  expect(tools.hidden).toBe(false);
+  expect(document.querySelector('button.copy')).not.toBeNull();
+  selectionPointer('pointerdown', [200, 200]);
+  selectionPointer('pointermove', [400, 400]);
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+  flushSync();
+  expect(tools.hidden).toBe(false);
+  expect(document.querySelector('.selection')).toBeNull();
+  expect(document.querySelector('button.copy')).toBeNull();
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', repeat: true, cancelable: true }));
+  selectionPointer('pointerup', [400, 400]);
+  expect(app.state().capture).not.toBeNull();
+  expect(document.querySelector('.selection')).toBeNull();
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
   await tick();
   expect(app.state().capture).toBeNull();

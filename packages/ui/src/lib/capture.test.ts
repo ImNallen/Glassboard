@@ -45,6 +45,7 @@ describe('capture shortcuts', () => {
   it('cancels from the canvas and leaves capture/global/clipboard modifiers alone', () => {
     const copy = vi.fn(), cancel = vi.fn();
     captureKeydown(key('Escape', {}), { copy, cancel });
+    captureKeydown(key('Escape', { repeat: true }), { copy, cancel });
     expect(cancel).toHaveBeenCalledOnce();
     for (const modifiers of [{ metaKey: true, shiftKey: true }, { ctrlKey: true, altKey: true }, { metaKey: true, repeat: true }]) {
       captureKeydown(key('c', modifiers), { copy, cancel });
