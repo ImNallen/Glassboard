@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { DrawingHistory, REGULAR_WIDTH, FREEHAND_TOOLS, CYCLE_COLORS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, render, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, CYCLE_COLORS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
   let canvas: HTMLCanvasElement;
   let textarea = $state<HTMLTextAreaElement | undefined>();
   const history = new DrawingHistory();
+  const renderer = new OverlayRenderer();
   let annotationSession = -1;
   let draft: Shape | null = null;
   let pointer: number | null = null;
@@ -50,7 +51,7 @@
       }
       const ctx = canvas.getContext('2d');
       const shapes = erasing?.size ? history.shapes.filter(shape => !erasing!.has(shape.id)) : history.shapes;
-      if (ctx) render(ctx, shapes, draft, width, height, scale, now);
+      if (ctx) renderer.paint(ctx, shapes, draft, width, height, scale, now);
       const next = history.nextFadeUpdate(now);
       if (next !== undefined) {
         if (next <= now) paint();
@@ -174,6 +175,7 @@
     editor = null;
     cancel();
     history.reset();
+    renderer.reset();
     // Hidden webviews can pause animation frames. Clear the backing bitmap now,
     // before it can be presented again when the native overlay is shown.
     cancelAnimationFrame(frame);
@@ -196,7 +198,7 @@
     }).then(fn => { if (disposed) fn(); else stop = fn; }).catch(onerror);
     syncHistory();
     paint();
-    return () => { disposed = true; stop(); cancelAnimationFrame(frame); clearTimeout(fadeTimer); };
+    return () => { disposed = true; stop(); cancelAnimationFrame(frame); clearTimeout(fadeTimer); renderer.reset(); };
   });
 </script>
 <svelte:window onresize={paint} onblur={blur} />

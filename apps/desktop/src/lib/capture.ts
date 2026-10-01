@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { native } from '@glassboard/ui/session';
 import { previewCaptureImage, copyPreviewCapture } from '@glassboard/ui/capture-preview';
+import type { CaptureRegion } from '@glassboard/ui/capture';
 
 /** Read a native binary frame without PNG decompression or reducing pixel density. */
 export function decodeCaptureFrame(frame: ArrayBuffer): ImageData {
@@ -24,8 +25,13 @@ export async function getCaptureImage(id: number): Promise<ImageData | HTMLImage
 
 export async function copyCaptureImage(id: number, image: Promise<Blob>): Promise<void> {
   if (native) {
-    const png = Array.from(new Uint8Array(await (await image).arrayBuffer()));
-    return invoke<void>('copy_capture', { id, png });
+    const png = await (await image).arrayBuffer();
+    return invoke<void>('copy_capture', png, { headers: { 'x-glassboard-capture-id': String(id) } });
   }
   await copyPreviewCapture(image);
+}
+
+/** Plain captures stay native: only the selected pixel bounds cross the bridge. */
+export function copyCaptureRegion(id: number, region: CaptureRegion): Promise<void> {
+  return invoke<void>('copy_capture_region', { id, region });
 }

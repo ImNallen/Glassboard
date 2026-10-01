@@ -18,6 +18,26 @@ pub struct Layout {
     pub height: u32,
 }
 
+/// Native toolbar window bounds in the full-screen capture webview's CSS pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub(crate) struct ToolbarDock {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Layout {
+    pub(crate) fn in_capture(self, origin: (i32, i32), scale: f64) -> ToolbarDock {
+        ToolbarDock {
+            x: (self.x as f64 - origin.0 as f64) / scale,
+            y: (self.y as f64 - origin.1 as f64) / scale,
+            width: self.width as f64 / scale,
+            height: self.height as f64 / scale,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct TrackingLayout {
     pub dock: Layout,
@@ -85,6 +105,30 @@ pub fn dock_layout(position: ToolbarPosition, work: Bounds, scale: f64, expanded
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn capture_dock_preserves_native_coordinates_with_scaling_and_negative_origins() {
+        let work = Bounds {
+            x: -2520.0,
+            y: 70.0,
+            width: 2460.0,
+            height: 1370.0,
+        };
+        let origin = (-2560, 0);
+        let scale = 2.0;
+        for position in [
+            ToolbarPosition::Left,
+            ToolbarPosition::Right,
+            ToolbarPosition::Bottom,
+        ] {
+            let native = dock_layout(position, work, scale, false);
+            let dock = native.in_capture(origin, scale);
+            assert_eq!(dock.x * scale + origin.0 as f64, native.x as f64);
+            assert_eq!(dock.y * scale + origin.1 as f64, native.y as f64);
+            assert_eq!(dock.width * scale, native.width as f64);
+            assert_eq!(dock.height * scale, native.height as f64);
+        }
+    }
     #[test]
     fn cursor_samples_use_window_css_coordinates_in_every_dock_position() {
         let scale = 2.0;

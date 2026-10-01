@@ -105,6 +105,8 @@
     {#if !capture}<button class="icon-button fade-button" class:active={fadeSeconds !== 0} onclick={() => change({ autoFadeSeconds: nextFade })} use:hint={{ label: `Auto-fade: ${fadeLabel(fadeSeconds)}`, description: `Click for ${fadeLabel(nextFade)}` }} aria-label={`Auto-fade: ${fadeLabel(fadeSeconds)}. Switch to ${fadeLabel(nextFade)}`}>
       {#if fadeSeconds === 0}<InfinityIcon size={19}/>{:else}<span>{fadeSeconds}s</span>{/if}
     </button>
+    {:else}
+      <span class="icon-button fade-spacer" aria-hidden="true"></span>
     {/if}
     <button class="icon-button" disabled={!history?.canUndo} onclick={() => run('undo')} use:hint={{ label: history?.canUndo ? 'Undo' : 'Nothing to undo', key: shortcutLabel('CommandOrControl+Z') }} aria-label="Undo"><Undo2 size={18}/></button>
     <button class="icon-button" disabled={!history?.canRedo} onclick={() => run('redo')} use:hint={{ label: history?.canRedo ? 'Redo' : 'Nothing to redo', key: shortcutLabel('CommandOrControl+Shift+Z') }} aria-label="Redo"><Redo2 size={18}/></button>

@@ -1,4 +1,5 @@
 use crate::{
+    preference_saves::PreferenceSaves,
     preferences::Preferences,
     session::{HistoryAvailability, Mode, Session, TutorialStep},
     state::{publish, report, snapshot, AppState},
@@ -174,6 +175,9 @@ pub(crate) fn register_toggle(app: &tauri::AppHandle, shortcut: &str) -> Result<
 pub(crate) fn set_preferences(app: tauri::AppHandle, preferences: Preferences) -> Result<()> {
     let parsed = preferences.validate()?;
     let old = snapshot(&app).preferences;
+    if preferences == old {
+        return Ok(());
+    }
     let old_parsed: Shortcut = old
         .shortcut
         .parse()
@@ -182,19 +186,25 @@ pub(crate) fn set_preferences(app: tauri::AppHandle, preferences: Preferences) -
     if changed {
         register_toggle(&app, &preferences.shortcut)?;
     }
-    if let Err(e) = preferences.save(&app) {
-        if changed {
-            let _ = app.global_shortcut().unregister(parsed);
-        }
-        return Err(format!("Could not save preferences: {e}"));
-    }
+    let saves = app.state::<PreferenceSaves>();
     if changed {
-        app.global_shortcut()
-            .unregister(old_parsed)
-            .map_err(|e| e.to_string())?;
+        if let Err(e) = saves.save_now(preferences.clone()) {
+            let _ = app.global_shortcut().unregister(parsed);
+            return Err(format!("Could not save preferences: {e}"));
+        }
+        if let Err(error) = app.global_shortcut().unregister(old_parsed) {
+            let _ = app.global_shortcut().unregister(parsed);
+            if let Err(error) = saves.save_now(old.clone()) {
+                report(&app, format!("Could not restore preferences: {error}"));
+            }
+            return Err(error.to_string());
+        }
     }
     let reposition = old.toolbar_position != preferences.toolbar_position;
-    app.state::<AppState>().0.lock().unwrap().preferences = preferences;
+    app.state::<AppState>().0.lock().unwrap().preferences = preferences.clone();
+    if !changed {
+        saves.queue(preferences)?;
+    }
     if reposition {
         position_toolbar(&app)?;
     }

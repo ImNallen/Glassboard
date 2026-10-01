@@ -37,6 +37,8 @@ pub(crate) struct Session {
 pub(crate) struct CaptureSession {
     pub(crate) id: u32,
     pub(crate) ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) toolbar_dock: Option<crate::toolbar_position::ToolbarDock>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -77,6 +79,7 @@ impl Session {
         self.capture = Some(CaptureSession {
             id: self.annotation_session,
             ready: false,
+            toolbar_dock: None,
         });
     }
     pub(crate) fn record_history(

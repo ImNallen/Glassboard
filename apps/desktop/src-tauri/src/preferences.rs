@@ -14,7 +14,7 @@ pub(crate) enum ColorMode {
     Cycle,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Preferences {
     pub(crate) tool: String,

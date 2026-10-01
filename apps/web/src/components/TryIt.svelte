@@ -19,10 +19,11 @@
   let preparingCapture = $state(false);
   let captureRequest = 0;
   let disposed = false;
+  let enabled = $state(false);
   function onerror(e: unknown) { error = String(e); if (e) console.error(e); clearTimeout(errorTimer); errorTimer = setTimeout(() => error = '', 8000); }
   const run = (name: string) => action(name).catch(onerror);
   async function startCapture() {
-    if (preparingCapture || session.capture || session.mode !== 'draw') return;
+    if (!enabled || preparingCapture || session.capture || session.mode !== 'draw') return;
     const request = ++captureRequest;
     preparingCapture = true;
     try {
@@ -39,11 +40,11 @@
     return frame;
   }
   function keydown(event: KeyboardEvent) {
-    if (session.capture) return;
+    if (!enabled || session.capture) return;
     drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror), capture: startCapture, toggleShortcut: false });
   }
   function click(event: MouseEvent) {
-    if (!(event.target as Element | null)?.closest('[data-glassboard-try]')) return;
+    if (!enabled || !(event.target as Element | null)?.closest('[data-glassboard-try]')) return;
     event.preventDefault();
     (event.target as HTMLElement).blur();
     run('show');
@@ -51,44 +52,45 @@
   let drawing = $derived(session.mode === 'draw');
   let capturing = $derived(Boolean(session.capture));
   const copyImage = (_id: number, image: Promise<Blob>) => copyPreviewCapture(image);
-  // A non-interactive copy of the toolbar shows where the real one will appear.
-  // It is replaced by the live toolbar while drawing.
-  const previewSession: Session = { ...structuredClone(defaults), mode: 'draw' };
-  $effect(() => { document.documentElement.classList.toggle('annotating', drawing || capturing); });
+  $effect(() => { document.documentElement.classList.toggle('annotating', enabled && (drawing || capturing)); });
   onMount(() => {
+    // Match the page's demo button breakpoint and end any active session on phones.
+    const desktop = matchMedia('(min-width: 761px)');
+    function updateAvailability() {
+      enabled = desktop.matches;
+      if (!enabled) run('hide');
+    }
+    updateAvailability();
+    desktop.addEventListener('change', updateAvailability);
     let stop = () => {};
     subscribe(value => {
       session = value;
       if (value.mode === 'hidden' && !value.capture) { frame = null; preparingCapture = false; captureRequest++; }
     }).then(fn => { if (disposed) fn(); else stop = fn; }).catch(onerror);
-    return () => { disposed = true; frame = null; stop(); clearTimeout(errorTimer); document.documentElement.classList.remove('annotating'); };
+    return () => { disposed = true; frame = null; stop(); desktop.removeEventListener('change', updateAvailability); clearTimeout(errorTimer); document.documentElement.classList.remove('annotating'); };
   });
 </script>
 
 <svelte:window onkeydown={keydown} onclick={click} />
-<div class="glassboard-layer">
-  {#if !drawing && !capturing}
-    <div class="toolbar-preview" inert aria-hidden="true"><Toolbar session={previewSession} error="" onerror={() => {}} oncapture={() => {}} pinned /></div>
-  {/if}
-  {#if !capturing}
-    <Overlay {session} {onerror} />
-    <!-- Pinned: on a web page there is no screen edge to tuck into, so the toolbar stays open. -->
-    <Toolbar {session} {error} {onerror} oncapture={startCapture} pinned />
-  {:else if session.capture?.ready}
-    {#key session.capture.id}<Capture {session} {onerror} {getImage} {copyImage} />{/key}
-  {/if}
-  {#if drawing || capturing}
+{#if enabled && (drawing || capturing)}
+  <div class="glassboard-layer">
+    {#if !capturing}
+      <Overlay {session} {onerror} />
+      <!-- Pinned: on a web page there is no screen edge to tuck into, so the toolbar stays open. -->
+      <Toolbar {session} {error} {onerror} oncapture={startCapture} pinned />
+    {:else if session.capture?.ready}
+      {#key session.capture.id}<Capture {session} {onerror} {getImage} {copyImage} />{/key}
+    {/if}
     <div class="banner" role="status">
-      <p>{preparingCapture ? 'Preparing screenshot…' : capturing ? 'Drag to select part of this page. Annotate it, then copy and paste it anywhere.' : 'This is the real toolbar. Pick a tool and draw over the page.'}</p>
+      <p>{preparingCapture ? 'Preparing screenshot…' : capturing ? 'Drag to select part of this page. Annotate it, then copy and paste it anywhere.' : 'Pick a tool and draw over the page.'}</p>
       <button type="button" onclick={() => run(capturing ? 'cancel-capture' : 'hide')}>Done <kbd>Esc</kbd></button>
     </div>
-  {/if}
-</div>
+  </div>
+{/if}
 
 <style>
   /* One stacking context above all page content, so the canvas always wins. */
   .glassboard-layer { position: relative; z-index: 50; }
-  .toolbar-preview :global(.toolbar-host) { pointer-events: none; }
   /* Styled as a sibling of the toolbar (same surface variables), placed below the toolbar's
      stacking layer so tooltips can rise over it. */
   .banner { position: fixed; z-index: 5; bottom: 124px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; width: max-content; max-width: calc(100vw - 24px); padding: 8px 8px 8px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 14px; line-height: 1.4; box-shadow: 0 4px 10px var(--shadow); color-scheme: light dark; animation: banner-in 180ms ease-out both; }
