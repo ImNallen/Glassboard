@@ -19,18 +19,19 @@ function strokeColor(ctx: CanvasRenderingContext2D, shape: Shape): string | Canv
   if (shape.colorMode !== 'rainbow') return shape.color;
   const [from, to] = rainbowAxis(shape);
   const gradient = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
-  // Rotate the chosen palette, interpolating only the wraparound endpoints.
-  const offset = ((shape.hue ?? 0) / 360 % 1) * CYCLE_COLORS.length;
+  // Rotate the shape's palette, interpolating only the wraparound endpoints.
+  const colors = shape.colors?.length ? shape.colors : CYCLE_COLORS;
+  const offset = ((shape.hue ?? 0) / 360 % 1) * colors.length;
   const index = Math.floor(offset), fraction = offset - index;
-  const fromColor = parseInt(cycleColor(index).slice(1), 16);
-  const toColor = parseInt(cycleColor(index + 1).slice(1), 16);
+  const fromColor = parseInt(cycleColor(index, colors).slice(1), 16);
+  const toColor = parseInt(cycleColor(index + 1, colors).slice(1), 16);
   const channels = [16, 8, 0].map(shift => Math.round(
     ((fromColor >> shift) & 255) * (1 - fraction) + ((toColor >> shift) & 255) * fraction,
   ));
   const edge = `rgb(${channels.join(', ')})`;
   gradient.addColorStop(0, edge);
-  for (let i = 1; i <= CYCLE_COLORS.length; i++) {
-    gradient.addColorStop((i - fraction) / CYCLE_COLORS.length, cycleColor(index + i));
+  for (let i = 1; i <= colors.length; i++) {
+    gradient.addColorStop((i - fraction) / colors.length, cycleColor(index + i, colors));
   }
   gradient.addColorStop(1, edge);
   return gradient;

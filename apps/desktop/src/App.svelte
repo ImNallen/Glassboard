@@ -34,7 +34,7 @@
 {#if !native && surface !== 'settings' && surface !== 'capture' && !session.capture}
   <main class="preview-background">
     <div class="preview-top"><span class="preview-logo">↗ Glassboard</span><span class="preview-badge">BROWSER PREVIEW</span></div>
-    <div class="preview-copy"><span class="eyebrow">A LITTLE CLARITY GOES A LONG WAY</span><h1>Your screen.<br/>Your point.</h1><p>Draw attention to what matters.<br/>Pick a tool below and make your mark.</p><div class="preview-shortcuts"><kbd>{shortcutLabel(session.preferences.shortcut)}</kbd><span>Annotate / work</span><kbd>Shift</kbd><span>Constrain shapes</span></div></div>
+    <div class="preview-copy"><span class="eyebrow">A LITTLE CLARITY GOES A LONG WAY</span><h1>Your screen.<br/>Your point.</h1><p>Draw attention to what matters.<br/>Pick a tool below and make your mark.</p><div class="preview-shortcuts"><kbd>{shortcutLabel(session.preferences.shortcut)}</kbd><span>Toggle Glassboard</span><kbd>Shift</kbd><span>Constrain shapes</span></div></div>
     <div class="preview-footer"><span>Arrows. Shapes. A little emphasis.</span><span>Nothing between you and your point.</span></div>
   </main>
   {#if session.mode === 'hidden'}<div class="preview-actions"><button class="preview-restore" onclick={() => run('toggle')}>Start annotating</button></div>{/if}

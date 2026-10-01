@@ -2,9 +2,12 @@
   import { ArrowUpRight, Check, X } from '@lucide/svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
   import { action, native, shortcutLabel, type Session } from '@glassboard/ui/session';
+  import { keybinding } from '@glassboard/ui/shortcuts';
   let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
   let busy = $state(false);
   let shortcut = $derived(shortcutLabel(session.preferences.shortcut));
+  let undo = $derived(shortcutLabel(keybinding(session.preferences.keybindings, 'undo')));
+  let hide = $derived(shortcutLabel(keybinding(session.preferences.keybindings, 'hide')));
   async function run(name: string) {
     busy = true;
     try { await action(name); } catch (e) { onerror(e); }
@@ -28,12 +31,12 @@
         <span class="step">1 OF 2 · MAKE A MARK</span>
         <h1>Point something out.</h1>
         <p>Drag anywhere outside this guide to draw. Choose a pen, arrow, shape, or text from the open toolbar.</p>
-        <p class="hint">Hold Shift for straight arrows or equal-sided shapes. Undo with <kbd>{shortcutLabel('CommandOrControl+Z')}</kbd>.</p>
+        <p class="hint">Hold Shift for straight arrows or equal-sided shapes.{#if undo} Undo with <kbd>{undo}</kbd>.{/if}</p>
       {:else if session.tutorial === 'hide'}
         <span class="step">2 OF 2 · BACK TO WORK</span>
         <h1>Made your point?</h1>
         <p>Press <kbd>{shortcut}</kbd> to hide Glassboard and use your screen again.</p>
-        <p class="hint">Escape also returns you to work. Your next annotation session starts clear.</p>
+        <p class="hint">{#if hide}<kbd>{hide}</kbd> also returns you to work. {/if}Your next annotation session starts clear.</p>
       {:else}
         <span class="step"><Check size={13}/> YOU’RE READY</span>
         <h1>Work. Annotate. Repeat.</h1>

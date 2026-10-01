@@ -52,4 +52,15 @@ describe('capture shortcuts', () => {
     }
     expect(copy).not.toHaveBeenCalled();
   });
+  it('follows rebound copy and cancel keys', () => {
+    const copy = vi.fn(), cancel = vi.fn(), keybindings = { copy: 'CommandOrControl+Shift+KeyC', hide: 'KeyQ' };
+    captureKeydown(key('c', { metaKey: true }), { copy, cancel, keybindings });
+    captureKeydown(key('Escape', {}), { copy, cancel, keybindings });
+    expect(copy).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    captureKeydown(key('c', { metaKey: true, shiftKey: true }), { copy, cancel, keybindings });
+    captureKeydown(key('q', {}), { copy, cancel, keybindings });
+    expect(copy).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
+import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, rainbowPreview, shiftingPreview, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
 const arrow = (): Shape => ({ id: 'one', tool: 'arrow', color: '#ff6259', width: 4, points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] });
 describe('auto-fade', () => {
   it('retains the renderable array until a deadline is due, including during fading', () => {
@@ -209,6 +209,49 @@ describe('rainbow and cycling colors', () => {
     shape.points = [{ x: 10, y: 20 }];
     const [from, to] = rainbowAxis(shape);
     expect(Math.hypot(to.x - from.x, to.y - from.y)).toBeGreaterThan(0);
+  });
+});
+describe('custom Rainbow and Shifting colors', () => {
+  const style = { tool: 'arrow' as const, color: '#ffffff' };
+  function rainbowStops(shape: Shape) {
+    const stops = vi.fn();
+    const ctx = {
+      setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(),
+      globalAlpha: 1, lineWidth: 1, stroke: vi.fn(),
+      createLinearGradient: vi.fn(() => ({ addColorStop: stops })),
+    };
+    render(ctx as unknown as CanvasRenderingContext2D, [shape], null, 300, 200, 1);
+    return new Set(stops.mock.calls.map(([, color]) => color));
+  }
+
+  it('cycles through a custom Shifting list of any length', () => {
+    const cycleColors = ['#111111', '#222222'];
+    const colors = [0, 1, 2, 3].map(i => createShape({ ...style, colorMode: 'cycle', cycleColors }, i, { x: 0, y: 0 }).color);
+    expect(colors).toEqual(['#111111', '#222222', '#111111', '#222222']);
+  });
+
+  it('draws a rainbow with the colors chosen when it was made, even after the list changes', () => {
+    const rainbowColors = ['#ff0000', '#00ff00', '#0000ff'];
+    const shape = createShape({ ...style, tool: 'rectangle', colorMode: 'rainbow', rainbowColors }, 0, { x: 0, y: 0 });
+    shape.points.push({ x: 100, y: 50 });
+    rainbowColors[0] = '#ffffff';
+    expect(shape.colors).toEqual(['#ff0000', '#00ff00', '#0000ff']);
+    const stops = rainbowStops(shape);
+    for (const color of ['#00ff00', '#0000ff']) expect(stops.has(color)).toBe(true);
+    expect([...stops].some(color => CYCLE_COLORS.includes(color))).toBe(false);
+    expect(stops.has('#ffffff')).toBe(false);
+  });
+
+  it('keeps drawing older rainbows, saved without colors, in the default palette', () => {
+    const stops = rainbowStops({ ...arrow(), tool: 'rectangle', colorMode: 'rainbow', hue: 0 });
+    expect([...stops].filter(color => color.startsWith('#'))).toEqual(expect.arrayContaining(CYCLE_COLORS.slice(1)));
+    expect(createShape({ ...style, colorMode: 'solid' }, 0, { x: 0, y: 0 }).colors).toBeUndefined();
+  });
+
+  it('previews custom lists', () => {
+    expect(rainbowPreview(['#111111', '#222222'])).toBe('conic-gradient(#111111, #222222, #111111)');
+    expect(shiftingPreview(['#111111', '#222222', '#333333'])).toBe('conic-gradient(#111111 0deg 120deg, #222222 120deg 240deg, #333333 240deg 360deg)');
+    expect(shiftingPreview(['#111111', '#222222', '#333333'], 1)).toContain('#222222 0deg 120deg');
   });
 });
 describe('shift constraints', () => {

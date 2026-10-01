@@ -80,4 +80,42 @@ describe('drawingKeydown', () => {
     drawingKeydown(handled, session('draw'), handlers);
     expect(capture).not.toHaveBeenCalled();
   });
+
+  it('follows rebound and unbound commands', () => {
+    const run = vi.fn(), save = vi.fn();
+    const rebound = session('draw');
+    rebound.preferences.keybindings = { undo: 'Alt+KeyU', hide: '', 'tool-pen': 'KeyP', 'color-blue': 'Shift+KeyB' };
+    const handlers = { run, save, toggleShortcut: false };
+    const oldUndo = press('z', { ctrlKey: true });
+    drawingKeydown(oldUndo, rebound, handlers);
+    expect(oldUndo.defaultPrevented).toBe(false);
+    drawingKeydown(press('u', { altKey: true }), rebound, handlers);
+    expect(run).toHaveBeenCalledWith('undo');
+    const escape = press('Escape');
+    drawingKeydown(escape, rebound, handlers);
+    expect(escape.defaultPrevented).toBe(false);
+    expect(run).not.toHaveBeenCalledWith('hide');
+    drawingKeydown(press('p'), rebound, handlers);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ tool: 'pen' }));
+    drawingKeydown(press('B', { shiftKey: true }), rebound, handlers);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ colorMode: 'solid', color: '#669df0' }));
+  });
+
+  it('mirrors a customized show/hide shortcut in the browser', () => {
+    const run = vi.fn();
+    const custom = session('hidden');
+    custom.preferences.shortcut = 'Alt+Shift+KeyG';
+    drawingKeydown(press('a', { ctrlKey: true, shiftKey: true }), custom, { run, save: vi.fn() });
+    expect(run).not.toHaveBeenCalled();
+    drawingKeydown(press('G', { altKey: true, shiftKey: true }), custom, { run, save: vi.fn() });
+    expect(run).toHaveBeenCalledWith('toggle');
+  });
+
+  it('selects the color a user put in a swatch', () => {
+    const save = vi.fn();
+    const custom = session('draw');
+    custom.preferences.swatches = ['#000000', '#ffffff', '#4dcaa0', '#f2c85b', '#8b5cf6', '#669df0'];
+    drawingKeydown(press('7'), custom, { run: vi.fn(), save, toggleShortcut: false });
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ colorMode: 'solid', color: '#8b5cf6' }));
+  });
 });

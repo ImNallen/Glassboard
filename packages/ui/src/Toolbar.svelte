@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { Pencil, ArrowUpRight, Square, Circle, Highlighter, Type, Eraser, Scan, Undo2, Redo2, Trash2, Infinity as InfinityIcon, X } from '@lucide/svelte';
+  import { Scan, Undo2, Redo2, Trash2, Infinity as InfinityIcon, X } from '@lucide/svelte';
   import { onMount, tick } from 'svelte';
   import { createToolbarHints } from './lib/toolbar-hints.svelte';
-  import { COLOR_SHORTCUTS, TOOL_SHORTCUTS } from './lib/shortcuts';
+  import { COLOR_SHORTCUTS, keybinding, TOOL_SHORTCUTS } from './lib/shortcuts';
+  import { sameColor, swatchColor, swatchName } from './lib/swatches';
+  import { TOOL_ICONS } from './lib/tool-icons';
   import { action, expandToolbar, native, savePreferences, shortcutLabel, toolbarPointer, type Preferences, type Session } from './lib/session';
-  import { AUTO_FADE_OPTIONS, cycleColor, RAINBOW_PREVIEW, type Tool } from './lib/drawing';
+  import { AUTO_FADE_OPTIONS, rainbowPreview, shiftingPreview, type Tool } from './lib/drawing';
   /** `pinned` keeps the toolbar open instead of collapsing to the pill when the cursor is away; hosts without a native window use it. */
   let { session, error, onerror, pinned = false, embedded = false, capture = false, selectingCapture = false, oncapture, onchoose, onsave = savePreferences }: { session: Session; error: string; onerror: (error: unknown) => void; pinned?: boolean; embedded?: boolean; capture?: boolean; selectingCapture?: boolean; oncapture?: () => void; onchoose?: () => void; onsave?: (preferences: Preferences) => Promise<void> } = $props();
   let placement = $derived(session.preferences.toolbarPosition);
@@ -54,10 +56,11 @@
   });
   let history = $derived(selectingCapture ? undefined : session.historyByOverlay[session.activeOverlay]);
   let colorMode = $derived(session.preferences.colorMode);
-  let cyclePreview = $derived(`conic-gradient(${cycleColor(session.cycleIndex)} 0deg 120deg, ${cycleColor(session.cycleIndex + 2)} 120deg 240deg, ${cycleColor(session.cycleIndex + 4)} 240deg 360deg)`);
-  const toolIcons = { arrow: ArrowUpRight, pen: Pencil, rectangle: Square, ellipse: Circle, eraser: Eraser, text: Type, highlighter: Highlighter };
-  const tools = TOOL_SHORTCUTS.map(tool => ({ ...tool, icon: toolIcons[tool.id] }));
-  const colors = COLOR_SHORTCUTS.filter(choice => choice.colorMode === 'solid');
+  let cyclePreview = $derived(shiftingPreview(session.preferences.cycleColors, session.cycleIndex));
+  const tools = TOOL_SHORTCUTS.map(tool => ({ ...tool, icon: TOOL_ICONS[tool.id] }));
+  const keyLabel = (command: string) => shortcutLabel(keybinding(session.preferences.keybindings, command));
+  let colors = $derived(COLOR_SHORTCUTS.flatMap(({ command, slot }) => slot === undefined ? []
+    : [{ command, color: swatchColor(session.preferences.swatches, slot), name: swatchName(session.preferences.swatches, slot) }]));
   let fadeSeconds = $derived(session.preferences.autoFadeSeconds);
   let nextFade = $derived(AUTO_FADE_OPTIONS[(AUTO_FADE_OPTIONS.indexOf(fadeSeconds) + 1) % AUTO_FADE_OPTIONS.length]);
   const fadeLabel = (seconds: number) => seconds === 0 ? 'Until you return to work' : `${seconds}s`;
@@ -90,15 +93,15 @@
   {/if}
   <div class="toolbar" bind:this={bar} onscroll={hints.dismiss} role="toolbar" aria-label="Annotation tools" aria-orientation={vertical ? 'vertical' : 'horizontal'}>
     <div class="tool-row">
-    <div class="tool-group">{#each tools as tool}<button class="icon-button tool" class:active={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'} onclick={() => choose(tool.id)} use:hint={{ label: tool.name, key: shortcutLabel(`CommandOrControl+${tool.key}`) }} aria-label={tool.name} aria-pressed={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'}><tool.icon size={19} strokeWidth={1.8}/></button>{/each}
-      {#if oncapture}<button class="icon-button tool" class:active={selectingCapture} aria-pressed={selectingCapture} aria-label="Screenshot" onclick={oncapture} use:hint={{ label: 'Screenshot', key: shortcutLabel('CommandOrControl+S'), description: 'Drag to select or replace the capture area' }}><Scan size={19} strokeWidth={1.8}/></button>{/if}
+    <div class="tool-group">{#each tools as tool}<button class="icon-button tool" class:active={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'} onclick={() => choose(tool.id)} use:hint={{ label: tool.name, key: keyLabel(tool.command) }} aria-label={tool.name} aria-pressed={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'}><tool.icon size={19} strokeWidth={1.8}/></button>{/each}
+      {#if oncapture}<button class="icon-button tool" class:active={selectingCapture} aria-pressed={selectingCapture} aria-label="Screenshot" onclick={oncapture} use:hint={{ label: 'Screenshot', key: keyLabel('capture'), description: 'Drag to select or replace the capture area' }}><Scan size={19} strokeWidth={1.8}/></button>{/if}
     </div>
     <div class="divider"></div>
     <div class="toolbar-colors" role="group" aria-label="Drawing color">
-      <button class="icon-button color-choice" class:active={colorMode === 'rainbow'} aria-pressed={colorMode === 'rainbow'} use:hint={{ label: 'Rainbow', key: '1', description: 'Changes as you draw' }} aria-label="Rainbow" onclick={() => change({ colorMode: 'rainbow' })}><span class="color-dot" style:background={RAINBOW_PREVIEW}></span></button>
-      <button class="icon-button color-choice" class:active={colorMode === 'cycle'} aria-pressed={colorMode === 'cycle'} use:hint={{ label: 'Shifting colors', key: '2', description: 'A new color for each shape' }} aria-label="Shifting colors: a new color for each shape" onclick={() => change({ colorMode: 'cycle' })}><span class="color-dot" style:background={cyclePreview} aria-hidden="true"></span></button>
-      {#each colors as { color, name, key }}
-        <button class="icon-button color-choice" class:active={colorMode === 'solid' && session.preferences.color === color} aria-pressed={colorMode === 'solid' && session.preferences.color === color} use:hint={{ label: name, key }} aria-label={name} onclick={() => change({ color, colorMode: 'solid' })}><span class="color-dot" style:background={color}></span></button>
+      <button class="icon-button color-choice" class:active={colorMode === 'rainbow'} aria-pressed={colorMode === 'rainbow'} use:hint={{ label: 'Rainbow', key: keyLabel('color-rainbow'), description: 'Changes as you draw' }} aria-label="Rainbow" onclick={() => change({ colorMode: 'rainbow' })}><span class="color-dot" style:background={rainbowPreview(session.preferences.rainbowColors)}></span></button>
+      <button class="icon-button color-choice" class:active={colorMode === 'cycle'} aria-pressed={colorMode === 'cycle'} use:hint={{ label: 'Shifting colors', key: keyLabel('color-cycle'), description: 'A new color for each shape' }} aria-label="Shifting colors: a new color for each shape" onclick={() => change({ colorMode: 'cycle' })}><span class="color-dot" style:background={cyclePreview} aria-hidden="true"></span></button>
+      {#each colors as { color, name, command }}
+        <button class="icon-button color-choice" class:active={colorMode === 'solid' && sameColor(session.preferences.color, color)} aria-pressed={colorMode === 'solid' && sameColor(session.preferences.color, color)} use:hint={{ label: name, key: keyLabel(command) }} aria-label={name} onclick={() => change({ color, colorMode: 'solid' })}><span class="color-dot" style:background={color}></span></button>
       {/each}
     </div>
     <div class="divider"></div>
@@ -108,8 +111,8 @@
     {:else}
       <span class="icon-button fade-spacer" aria-hidden="true"></span>
     {/if}
-    <button class="icon-button" disabled={!history?.canUndo} onclick={() => run('undo')} use:hint={{ label: history?.canUndo ? 'Undo' : 'Nothing to undo', key: shortcutLabel('CommandOrControl+Z') }} aria-label="Undo"><Undo2 size={18}/></button>
-    <button class="icon-button" disabled={!history?.canRedo} onclick={() => run('redo')} use:hint={{ label: history?.canRedo ? 'Redo' : 'Nothing to redo', key: shortcutLabel('CommandOrControl+Shift+Z') }} aria-label="Redo"><Redo2 size={18}/></button>
+    <button class="icon-button" disabled={!history?.canUndo} onclick={() => run('undo')} use:hint={{ label: history?.canUndo ? 'Undo' : 'Nothing to undo', key: keyLabel('undo') }} aria-label="Undo"><Undo2 size={18}/></button>
+    <button class="icon-button" disabled={!history?.canRedo} onclick={() => run('redo')} use:hint={{ label: history?.canRedo ? 'Redo' : 'Nothing to redo', key: keyLabel('redo') }} aria-label="Redo"><Redo2 size={18}/></button>
     <button class="icon-button" disabled={selectingCapture} onclick={() => run('clear')} use:hint={{ label: 'Clear this display' }} aria-label="Clear this display"><Trash2 size={17}/></button>
     </div>
 

@@ -1,14 +1,15 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { CYCLE_COLORS, type AutoFadeSeconds, type ColorMode, type Tool } from './drawing';
-import { DEFAULT_SHORTCUT, formatShortcut } from './shortcuts';
+import { DEFAULT_SHORTCUT, formatShortcut, platformMac, type Keybindings } from './shortcuts';
+import { defaultSwatches } from './swatches';
 export type ToolbarPosition = 'left' | 'right' | 'bottom';
 export type ToolbarDock = { x: number; y: number; width: number; height: number };
-export type Preferences = { tool: Tool; color: string; colorMode: ColorMode; shortcut: string; toolbarPosition: ToolbarPosition; autoFadeSeconds: AutoFadeSeconds; tutorialCompleted: boolean };
+export type Preferences = { tool: Tool; color: string; colorMode: ColorMode; shortcut: string; keybindings: Keybindings; swatches: string[]; rainbowColors: string[]; cycleColors: string[]; toolbarPosition: ToolbarPosition; autoFadeSeconds: AutoFadeSeconds; tutorialCompleted: boolean };
 export type HistoryAvailability = { canUndo: boolean; canRedo: boolean };
 export type Session = { mode: 'hidden' | 'draw'; annotationSession: number; tutorial: 'welcome' | 'draw' | 'hide' | 'done' | null; settingsOpen: boolean; activeOverlay: string; cycleIndex: number; historyByOverlay: Record<string, HistoryAvailability>; preferences: Preferences; error: string | null; capture: { id: number; ready: boolean; toolbarDock?: ToolbarDock } | null };
 export const native = isTauri();
-export const defaults: Session = { mode: 'hidden', annotationSession: 0, tutorial: 'welcome', settingsOpen: false, activeOverlay: 'overlay-0', cycleIndex: 0, historyByOverlay: {}, capture: null, preferences: { tool: 'arrow', color: CYCLE_COLORS[0], colorMode: 'rainbow', shortcut: DEFAULT_SHORTCUT, toolbarPosition: 'bottom', autoFadeSeconds: 0, tutorialCompleted: false }, error: null };
+export const defaults: Session = { mode: 'hidden', annotationSession: 0, tutorial: 'welcome', settingsOpen: false, activeOverlay: 'overlay-0', cycleIndex: 0, historyByOverlay: {}, capture: null, preferences: { tool: 'arrow', color: CYCLE_COLORS[0], colorMode: 'rainbow', shortcut: DEFAULT_SHORTCUT, keybindings: {}, swatches: defaultSwatches(), rainbowColors: [...CYCLE_COLORS], cycleColors: [...CYCLE_COLORS], toolbarPosition: 'bottom', autoFadeSeconds: 0, tutorialCompleted: false }, error: null };
 let preview = structuredClone(defaults);
 try {
   if (localStorage.getItem('glassboard-tutorial-completed') === 'true') {
@@ -86,7 +87,20 @@ export async function action(action: string) {
 }
 export async function savePreferences(preferences: Preferences) {
   if (native) return invoke<void>('set_preferences', { preferences });
-  preview.preferences = preferences; publish();
+  // Copy nested values so a Svelte state proxy never reaches structuredClone.
+  preview.preferences = { ...preferences, keybindings: { ...preferences.keybindings }, swatches: [...preferences.swatches], rainbowColors: [...preferences.rainbowColors], cycleColors: [...preferences.cycleColors] }; publish();
+}
+// The OS owns the login item; the browser preview keeps a stand-in.
+let previewAutostart = false;
+/** Whether Glassboard opens at login. */
+export async function getAutostart() {
+  if (native) return invoke<boolean>('get_autostart');
+  return previewAutostart;
+}
+/** Turn opening at login on or off, returning the state the OS now reports. */
+export async function setAutostart(enabled: boolean) {
+  if (native) return invoke<boolean>('set_autostart', { enabled });
+  return previewAutostart = enabled;
 }
 export type ToolbarPointer = { near: boolean; x: number; y: number };
 /** Focus-independent cursor samples in toolbar CSS pixels; null means the cursor left. */
@@ -104,5 +118,5 @@ export async function reportHistory(availability: HistoryAvailability, annotatio
   publish();
 }
 export async function expandToolbar(expanded: boolean) { if (native) await invoke('expand_toolbar', { expanded }); }
-export const mac = navigator.platform.toLowerCase().includes('mac');
+export const mac = platformMac;
 export function shortcutLabel(shortcut: string) { return formatShortcut(shortcut, mac); }

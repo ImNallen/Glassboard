@@ -1,4 +1,5 @@
 import { render, type Point, type Shape } from './drawing';
+import { keybinding, matchesShortcut, type Keybindings } from './shortcuts';
 
 export type CaptureRegion = { x: number; y: number; width: number; height: number };
 
@@ -45,16 +46,16 @@ export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, re
   }, 'image/png'));
 }
 
-export function captureKeydown(event: KeyboardEvent, { copy, cancel }: { copy: () => void; cancel: () => void }) {
+export function captureKeydown(event: KeyboardEvent, { copy, cancel, keybindings }: { copy: () => void; cancel: () => void; keybindings?: Keybindings }) {
   if (event.defaultPrevented) return;
   const target = event.target instanceof Element ? event.target : document.activeElement;
   const editable = target?.closest('input, textarea, select, [contenteditable="true"]');
-  const key = event.key.toLowerCase();
   // Copy remains normal text copy while a text editor has focus.
-  if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && key === 'c' && !editable) {
+  if (editable) return;
+  if (matchesShortcut(event, keybinding(keybindings, 'copy'))) {
     event.preventDefault();
     if (!event.repeat) copy();
-  } else if (key === 'escape' && !editable) {
+  } else if (matchesShortcut(event, keybinding(keybindings, 'hide'))) {
     event.preventDefault();
     if (!event.repeat) cancel();
   }

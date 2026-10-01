@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, CYCLE_COLORS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
   let canvas: HTMLCanvasElement;
@@ -20,7 +20,7 @@
   const editorWidth = REGULAR_WIDTH;
   const editorFontSize = textFontSize(editorWidth);
   const editorLineHeight = textLineHeight(editorWidth);
-  let editorColor = $derived(session.preferences.colorMode === 'cycle' ? cycleColor(session.cycleIndex) : session.preferences.color);
+  let editorColor = $derived(session.preferences.colorMode === 'cycle' ? cycleColor(session.cycleIndex, session.preferences.cycleColors) : session.preferences.color);
   let editorSize = $derived.by(() => {
     const ctx = editor && canvas?.getContext('2d');
     if (!editor || !ctx) return { width: 0, height: 0 };
@@ -29,8 +29,9 @@
   });
   let editorGradient = $derived.by(() => {
     if (!editor || session.preferences.colorMode !== 'rainbow') return '';
-    const start = Math.floor(editor.hue / 360 * CYCLE_COLORS.length);
-    return `linear-gradient(90deg, ${CYCLE_COLORS.map((_, i) => cycleColor(start + i)).join(', ')})`;
+    const colors = session.preferences.rainbowColors;
+    const start = Math.floor(editor.hue / 360 * colors.length);
+    return `linear-gradient(90deg, ${colors.map((_, i) => cycleColor(start + i, colors)).join(', ')})`;
   });
   function syncHistory(advanceCycle = false) {
     if (annotationSession < 0) return;

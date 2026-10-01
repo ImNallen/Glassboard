@@ -1,4 +1,4 @@
-import { tick } from 'svelte';
+import { tick, untrack } from 'svelte';
 import type { ToolbarPosition } from './session';
 
 type Hint = { label: string; key?: string; description?: string };
@@ -89,7 +89,8 @@ export function createToolbarHints(options: Options) {
     return {
       update(next: Hint) {
         content = next;
-        if (tip?.node === node) tip = { ...next, node };
+        // Svelte calls update inside the effect tracking the hint's parameters; reading tip there would re-run it on every tip change.
+        untrack(() => { if (tip?.node === node) tip = { ...next, node }; });
       },
       destroy() {
         node.removeEventListener('pointerenter', enter);
