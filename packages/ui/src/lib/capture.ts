@@ -1,4 +1,5 @@
 import { render, type Point, type Shape } from './drawing';
+import { commandFor, keybinding, sameShortcut, type Keybindings } from './shortcuts';
 
 export type CaptureRegion = { x: number; y: number; width: number; height: number };
 
@@ -45,17 +46,26 @@ export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, re
   }, 'image/png'));
 }
 
-export function captureKeydown(event: KeyboardEvent, { copy, cancel }: { copy: () => void; cancel: () => void }) {
+export function captureKeydown(event: KeyboardEvent, { copy, cancel, keybindings }: { copy: () => void; cancel: () => void; keybindings?: Keybindings }) {
   if (event.defaultPrevented) return;
   const target = event.target instanceof Element ? event.target : document.activeElement;
   const editable = target?.closest('input, textarea, select, [contenteditable="true"]');
-  const key = event.key.toLowerCase();
   // Copy remains normal text copy while a text editor has focus.
-  if ((event.metaKey || event.ctrlKey) && !event.shiftKey && !event.altKey && key === 'c' && !editable) {
+  if (editable) return;
+  const command = commandFor(event, keybindings);
+  if (command === 'copy') {
     event.preventDefault();
     if (!event.repeat) copy();
-  } else if (key === 'escape' && !editable) {
+  } else if (command === 'hide') {
     event.preventDefault();
     if (!event.repeat) cancel();
   }
+}
+
+/**
+ * Whether a clipboard `copy` event (from Cmd/Ctrl+C or Edit › Copy) should copy the capture.
+ * Only while Copy is still bound to the standard shortcut, so rebinding or unbinding it takes effect.
+ */
+export function copiesOnClipboardEvent(keybindings?: Keybindings): boolean {
+  return sameShortcut(keybinding(keybindings, 'copy'), 'CommandOrControl+KeyC');
 }

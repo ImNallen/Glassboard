@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colorShortcut, formatShortcut, heldModifiers, recordShortcut, toolShortcut } from './shortcuts';
+import { colorShortcut, commandFor, formatShortcut, heldModifiers, KEYBINDINGS, keybinding, matchesShortcut, normalizeShortcut, recordShortcut, sameShortcut, shortcutKeys, toolShortcut } from './shortcuts';
 
 describe('color shortcuts', () => {
   const event = { key: '1', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
@@ -75,5 +75,76 @@ describe('shortcut labels', () => {
     expect(formatShortcut('Super+Comma', false)).toBe('Win+,');
     expect(formatShortcut('Alt+NumpadAdd', false)).toBe('Alt+Num Add');
     expect(formatShortcut('Control+F12', false)).toBe('Ctrl+F12');
+  });
+});
+
+describe('keybindings', () => {
+  const press = (key: string, code: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey', boolean>> = {}) =>
+    ({ key, code, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
+  it('gives every command a unique default', () => {
+    const ids = KEYBINDINGS.map(binding => binding.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const mac of [true, false]) {
+      const shortcuts = KEYBINDINGS.map(binding => normalizeShortcut(binding.shortcut, mac));
+      expect(new Set(shortcuts).size).toBe(shortcuts.length);
+    }
+    for (const id of ids) expect(id).toMatch(/^[a-z0-9-]{1,32}$/);
+  });
+  it('uses saved bindings over defaults, and an empty binding unbinds', () => {
+    expect(keybinding(undefined, 'undo')).toBe('CommandOrControl+KeyZ');
+    expect(keybinding({ undo: 'Alt+KeyU' }, 'undo')).toBe('Alt+KeyU');
+    expect(keybinding({ undo: '' }, 'undo')).toBe('');
+    expect(commandFor(press('z', 'KeyZ', { metaKey: true }), { undo: 'Alt+KeyU' }, true)).toBeUndefined();
+    expect(commandFor(press('u', 'KeyU', { altKey: true }), { undo: 'Alt+KeyU' }, true)).toBe('undo');
+    expect(commandFor(press('1', 'Digit1'), { 'color-rainbow': '' }, true)).toBeUndefined();
+    expect(toolShortcut(press('p', 'KeyP'), { 'tool-pen': 'KeyP' }, true)).toBe('pen');
+    expect(colorShortcut(press('r', 'KeyR', { shiftKey: true }), { 'color-red': 'Shift+KeyR' }, true)).toEqual({ colorMode: 'solid', color: '#f46b78' });
+  });
+  it('matches letters by layout and other keys by position', () => {
+    // AZERTY: the physical Q key types "a".
+    expect(matchesShortcut(press('a', 'KeyQ', { metaKey: true }), 'CommandOrControl+KeyA', true)).toBe(true);
+    expect(matchesShortcut(press('!', 'Digit1', { shiftKey: true }), 'Shift+Digit1', true)).toBe(true);
+    expect(matchesShortcut(press('å', 'KeyA', { altKey: true }), 'Alt+KeyA', true)).toBe(true);
+    expect(matchesShortcut(press('Escape', 'Escape'), 'Escape', true)).toBe(true);
+    expect(matchesShortcut(press('Escape', 'Escape', { shiftKey: true }), 'Escape', true)).toBe(false);
+    expect(matchesShortcut(press('[', 'BracketLeft', { ctrlKey: true }), 'CommandOrControl+BracketLeft', false)).toBe(true);
+  });
+  it('separates the second platform modifier when a binding names it', () => {
+    expect(matchesShortcut(press('k', 'KeyK', { ctrlKey: true }), 'Control+KeyK', true)).toBe(true);
+    expect(matchesShortcut(press('k', 'KeyK', { metaKey: true }), 'Control+KeyK', true)).toBe(false);
+    expect(matchesShortcut(press('k', 'KeyK', { metaKey: true, ctrlKey: true }), 'CommandOrControl+Control+KeyK', true)).toBe(true);
+    expect(matchesShortcut(press('k', 'KeyK', { metaKey: true }), 'CommandOrControl+Control+KeyK', true)).toBe(false);
+  });
+  it('keeps a second-modifier binding reachable next to a CommandOrControl binding on the same key', () => {
+    const mac = { undo: 'CommandOrControl+KeyK', redo: 'Control+KeyK' };
+    expect(commandFor(press('k', 'KeyK', { metaKey: true }), mac, true)).toBe('undo');
+    expect(commandFor(press('k', 'KeyK', { ctrlKey: true }), mac, true)).toBe('redo');
+    const windows = { undo: 'CommandOrControl+KeyK', redo: 'Super+KeyK' };
+    expect(commandFor(press('k', 'KeyK', { ctrlKey: true }), windows, false)).toBe('undo');
+    expect(commandFor(press('k', 'KeyK', { metaKey: true }), windows, false)).toBe('redo');
+    expect(toolShortcut(press('k', 'KeyK', { ctrlKey: true }), { 'tool-pen': 'CommandOrControl+KeyK', 'tool-text': 'Control+KeyK' }, true)).toBe('text');
+    // With nothing else on the key, either command key still works for a CommandOrControl binding.
+    expect(commandFor(press('z', 'KeyZ', { ctrlKey: true }), {}, true)).toBe('undo');
+    expect(commandFor(press('z', 'KeyZ', { metaKey: true }), {}, false)).toBe('undo');
+  });
+  it('compares shortcuts written in different forms', () => {
+    expect(sameShortcut('CommandOrControl+Shift+A', 'Shift+CmdOrCtrl+KeyA')).toBe(true);
+    expect(sameShortcut('Super+KeyA', 'CommandOrControl+KeyA', true)).toBe(true);
+    expect(sameShortcut('Control+KeyA', 'CommandOrControl+KeyA', false)).toBe(true);
+    expect(sameShortcut('Control+KeyA', 'CommandOrControl+KeyA', true)).toBe(false);
+    expect(sameShortcut('', '')).toBe(true);
+    expect(sameShortcut('', 'KeyA')).toBe(false);
+  });
+  it('records layout letters for in-app bindings and positions for the global shortcut', () => {
+    const azertyA = press('a', 'KeyQ', { metaKey: true });
+    expect(recordShortcut(azertyA, true)).toBe('CommandOrControl+KeyA');
+    expect(recordShortcut(azertyA, true, true)).toBe('CommandOrControl+KeyQ');
+    expect(recordShortcut(press('3', 'Digit3'), true)).toBe('Digit3');
+  });
+  it('splits shortcuts into keycap labels', () => {
+    expect(shortcutKeys('CommandOrControl+Shift+KeyZ', true)).toEqual(['⌘', '⇧', 'Z']);
+    expect(shortcutKeys('CommandOrControl+Shift+KeyZ', false)).toEqual(['Ctrl', 'Shift', 'Z']);
+    expect(shortcutKeys('Escape', true)).toEqual(['Esc']);
+    expect(shortcutKeys('', true)).toEqual([]);
   });
 });

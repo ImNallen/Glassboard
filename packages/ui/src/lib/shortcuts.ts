@@ -1,42 +1,123 @@
-import { CYCLE_COLORS, type ColorMode, type Tool } from './drawing';
+import type { ColorMode, Tool } from './drawing';
+import { swatchColor } from './swatches';
 
 export const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+A';
-type KeyEvent = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>;
+type KeyEvent = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'> & Partial<Pick<KeyboardEvent, 'code'>>;
+export const platformMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
-export const TOOL_SHORTCUTS: readonly { id: Tool; name: string; key: string }[] = [
-  { id: 'arrow', name: 'Arrow', key: '1' },
-  { id: 'pen', name: 'Pen', key: '2' },
-  { id: 'rectangle', name: 'Square', key: '3' },
-  { id: 'ellipse', name: 'Circle', key: '4' },
-  { id: 'eraser', name: 'Eraser', key: 'E' },
-  { id: 'text', name: 'Text', key: 'T' },
-  { id: 'highlighter', name: 'Highlighter', key: 'H' },
+/** Saved changes to in-app bindings, keyed by command id. An empty string leaves the command unbound. */
+export type Keybindings = Partial<Record<string, string>>;
+export type KeybindingGroup = 'Drawing' | 'Tools' | 'Colors' | 'Screenshot';
+export const KEYBINDING_GROUPS: readonly KeybindingGroup[] = ['Drawing', 'Tools', 'Colors', 'Screenshot'];
+
+export const TOOL_SHORTCUTS: readonly { id: Tool; command: string; name: string; shortcut: string }[] = [
+  { id: 'arrow', command: 'tool-arrow', name: 'Arrow', shortcut: 'CommandOrControl+Digit1' },
+  { id: 'pen', command: 'tool-pen', name: 'Pen', shortcut: 'CommandOrControl+Digit2' },
+  { id: 'rectangle', command: 'tool-rectangle', name: 'Square', shortcut: 'CommandOrControl+Digit3' },
+  { id: 'ellipse', command: 'tool-ellipse', name: 'Circle', shortcut: 'CommandOrControl+Digit4' },
+  { id: 'eraser', command: 'tool-eraser', name: 'Eraser', shortcut: 'CommandOrControl+KeyE' },
+  { id: 'text', command: 'tool-text', name: 'Text', shortcut: 'CommandOrControl+KeyT' },
+  { id: 'highlighter', command: 'tool-highlighter', name: 'Highlighter', shortcut: 'CommandOrControl+KeyH' },
 ];
 
-export const COLOR_SHORTCUTS: readonly { key: string; name: string; colorMode: ColorMode; color?: string }[] = [
-  { key: '1', name: 'Rainbow', colorMode: 'rainbow' },
-  { key: '2', name: 'Shifting', colorMode: 'cycle' },
-  { key: '3', name: 'Black', colorMode: 'solid', color: '#000000' },
-  { key: '4', name: 'White', colorMode: 'solid', color: '#ffffff' },
-  { key: '5', name: 'Green', colorMode: 'solid', color: CYCLE_COLORS[2] },
-  { key: '6', name: 'Yellow', colorMode: 'solid', color: CYCLE_COLORS[1] },
-  { key: '7', name: 'Red', colorMode: 'solid', color: CYCLE_COLORS[0] },
-  { key: '8', name: 'Blue', colorMode: 'solid', color: CYCLE_COLORS[4] },
+/** Solid colors select a swatch slot, whose color the user can change. Command ids keep their default color names. */
+export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMode: ColorMode; slot?: number; shortcut: string }[] = [
+  { command: 'color-rainbow', name: 'Rainbow', colorMode: 'rainbow', shortcut: 'Digit1' },
+  { command: 'color-cycle', name: 'Shifting', colorMode: 'cycle', shortcut: 'Digit2' },
+  { command: 'color-black', name: 'Black', colorMode: 'solid', slot: 0, shortcut: 'Digit3' },
+  { command: 'color-white', name: 'White', colorMode: 'solid', slot: 1, shortcut: 'Digit4' },
+  { command: 'color-green', name: 'Green', colorMode: 'solid', slot: 2, shortcut: 'Digit5' },
+  { command: 'color-yellow', name: 'Yellow', colorMode: 'solid', slot: 3, shortcut: 'Digit6' },
+  { command: 'color-red', name: 'Red', colorMode: 'solid', slot: 4, shortcut: 'Digit7' },
+  { command: 'color-blue', name: 'Blue', colorMode: 'solid', slot: 5, shortcut: 'Digit8' },
 ];
 
-export function colorShortcut(event: KeyEvent): { colorMode: ColorMode; color?: string } | undefined {
-  if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-  const choice = COLOR_SHORTCUTS.find(choice => choice.key === event.key);
-  if (!choice) return;
-  return choice.color ? { colorMode: choice.colorMode, color: choice.color } : { colorMode: choice.colorMode };
+/** The preference change a color choice makes. */
+export function colorChoice(choice: (typeof COLOR_SHORTCUTS)[number], swatches?: readonly string[]): { colorMode: ColorMode; color?: string } {
+  return choice.slot === undefined ? { colorMode: choice.colorMode } : { colorMode: choice.colorMode, color: swatchColor(swatches, choice.slot) };
 }
 
-export function toolShortcut(event: KeyEvent): Tool | undefined {
-  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-  return TOOL_SHORTCUTS.find(tool => tool.key.toLowerCase() === event.key.toLowerCase())?.id;
+/** Every in-app binding with its default. The show/hide shortcut is global and lives in `Preferences.shortcut`. */
+export const KEYBINDINGS: readonly { id: string; group: KeybindingGroup; name: string; shortcut: string; description?: string }[] = [
+  { id: 'undo', group: 'Drawing', name: 'Undo', shortcut: 'CommandOrControl+KeyZ' },
+  { id: 'redo', group: 'Drawing', name: 'Redo', shortcut: 'CommandOrControl+Shift+KeyZ' },
+  { id: 'hide', group: 'Drawing', name: 'Close Glassboard', shortcut: 'Escape' },
+  ...TOOL_SHORTCUTS.map(tool => ({ id: tool.command, group: 'Tools' as const, name: tool.name, shortcut: tool.shortcut })),
+  ...COLOR_SHORTCUTS.map(color => ({ id: color.command, group: 'Colors' as const, name: color.name, shortcut: color.shortcut })),
+  { id: 'capture', group: 'Screenshot', name: 'Take screenshot', shortcut: 'CommandOrControl+KeyS' },
+  { id: 'copy', group: 'Screenshot', name: 'Copy & close', shortcut: 'CommandOrControl+KeyC', description: 'In the screenshot editor' },
+];
+
+/** The shortcut bound to a command: the saved choice, or the default. */
+export function keybinding(keybindings: Keybindings | undefined, id: string): string {
+  return keybindings?.[id] ?? KEYBINDINGS.find(binding => binding.id === id)?.shortcut ?? '';
 }
 
-// Key codes the native shortcut parser accepts verbatim. Escape cancels recording instead.
+/** The in-app command bound to a key press, if any. */
+/**
+ * The in-app command bound to a key press, if any. An exact match wins, so a binding on the
+ * platform's second modifier (Control on macOS, Super on Windows) isn't shadowed by a
+ * CommandOrControl binding on the same key, which otherwise accepts either modifier.
+ */
+export function commandFor(event: KeyEvent, keybindings: Keybindings | undefined, mac = platformMac): string | undefined {
+  const bound = (exact: boolean) => KEYBINDINGS.find(binding => matchesShortcut(event, keybinding(keybindings, binding.id), mac, exact))?.id;
+  return bound(true) ?? bound(false);
+}
+
+export function colorShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac, swatches?: readonly string[]): { colorMode: ColorMode; color?: string } | undefined {
+  const command = commandFor(event, keybindings, mac);
+  const choice = COLOR_SHORTCUTS.find(choice => choice.command === command);
+  return choice && colorChoice(choice, swatches);
+}
+
+export function toolShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac): Tool | undefined {
+  const command = commandFor(event, keybindings, mac);
+  return TOOL_SHORTCUTS.find(tool => tool.command === command)?.id;
+}
+
+const MODIFIER_ORDER = ['CommandOrControl', 'Control', 'Super', 'Alt', 'Shift'];
+const COMMAND_ALIASES = ['commandorcontrol', 'cmdorctrl', 'commandorctrl', 'cmdorcontrol'];
+
+/** Canonical form for comparison: platform command key as CommandOrControl, modifiers in recording order, letters and digits as key codes. */
+export function normalizeShortcut(shortcut: string, mac = platformMac): string {
+  const modifiers = new Set<string>();
+  let key = '';
+  for (const part of shortcut.split('+').map(part => part.trim()).filter(Boolean)) {
+    const lower = part.toLowerCase();
+    if (COMMAND_ALIASES.includes(lower)) modifiers.add('CommandOrControl');
+    else if (['command', 'cmd', 'super'].includes(lower)) modifiers.add(mac ? 'CommandOrControl' : 'Super');
+    else if (['control', 'ctrl'].includes(lower)) modifiers.add(mac ? 'Control' : 'CommandOrControl');
+    else if (['alt', 'option'].includes(lower)) modifiers.add('Alt');
+    else if (lower === 'shift') modifiers.add('Shift');
+    else key = /^[a-z]$/i.test(part) ? `Key${part.toUpperCase()}` : /^\d$/.test(part) ? `Digit${part}` : part;
+  }
+  return [...MODIFIER_ORDER.filter(modifier => modifiers.has(modifier)), key].filter(Boolean).join('+');
+}
+
+export function sameShortcut(a: string, b: string, mac = platformMac): boolean {
+  return normalizeShortcut(a, mac) === normalizeShortcut(b, mac);
+}
+
+// Letters and digits follow the keyboard layout; other keys use their physical position.
+function eventKey(event: KeyEvent, physical = false): string {
+  if (!physical && /^[a-z]$/i.test(event.key)) return `Key${event.key.toUpperCase()}`;
+  if (!physical && /^\d$/.test(event.key)) return `Digit${event.key}`;
+  return event.code || event.key;
+}
+
+/** `exact` requires the platform command modifier itself for CommandOrControl, instead of either command key. */
+export function matchesShortcut(event: KeyEvent, shortcut: string, mac = platformMac, exact = false): boolean {
+  if (!shortcut) return false;
+  const modifiers = normalizeShortcut(shortcut, mac).split('+');
+  if (modifiers.pop() !== eventKey(event)) return false;
+  const command = mac ? event.metaKey : event.ctrlKey, secondary = mac ? event.ctrlKey : event.metaKey;
+  const wantsCommand = modifiers.includes('CommandOrControl'), wantsSecondary = modifiers.includes(mac ? 'Control' : 'Super');
+  // Either command key works for a plain CommandOrControl binding, as Cmd and Ctrl did before rebinding.
+  const commandMatches = wantsCommand && !wantsSecondary && !exact ? command || secondary : command === wantsCommand && secondary === wantsSecondary;
+  return commandMatches && event.altKey === modifiers.includes('Alt') && event.shiftKey === modifiers.includes('Shift');
+}
+
+// Key codes the native shortcut parser accepts verbatim. Escape cancels recording instead; resetting restores an Escape default.
 const RECORDABLE = /^(Key[A-Z]|Digit\d|F([1-9]|1\d|2[0-4])|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal|Enter|Equal)|Arrow(Up|Down|Left|Right)|Space|Enter|Tab|Backspace|Delete|Insert|Home|End|Page(Up|Down)|Backquote|Backslash|Bracket(Left|Right)|Comma|Period|Slash|Semicolon|Quote|Minus|Equal)$/;
 export const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Fn', 'AltGraph', 'Hyper', 'Super', 'OS']);
 
@@ -47,14 +128,18 @@ export function heldModifiers(event: Omit<KeyEvent, 'key'>, mac: boolean): strin
   return [command && 'CommandOrControl', secondary && (mac ? 'Control' : 'Super'), event.altKey && 'Alt', event.shiftKey && 'Shift'].filter((m): m is string => Boolean(m));
 }
 
-/** Build a shortcut string from a key press, or undefined for modifier-only or unsupported keys. */
-export function recordShortcut(event: KeyEvent & Pick<KeyboardEvent, 'code'>, mac: boolean): string | undefined {
-  if (MODIFIER_KEYS.has(event.key) || !RECORDABLE.test(event.code)) return;
-  return [...heldModifiers(event, mac), event.code].join('+');
+/**
+ * Build a shortcut string from a key press, or undefined for modifier-only or unsupported keys.
+ * `physical` records key positions, as the native global shortcut needs; otherwise letters and digits follow the layout.
+ */
+export function recordShortcut(event: KeyEvent & Pick<KeyboardEvent, 'code'>, mac: boolean, physical = false): string | undefined {
+  const key = eventKey(event, physical);
+  if (MODIFIER_KEYS.has(event.key) || !RECORDABLE.test(key)) return;
+  return [...heldModifiers(event, mac), key].join('+');
 }
 
 const KEY_NAMES: Record<string, string> = {
-  Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End',
+  Escape: 'Esc', Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End',
   PageUp: 'Page Up', PageDown: 'Page Down', Backquote: '`', Backslash: '\\', BracketLeft: '[', BracketRight: ']', Comma: ',',
   Period: '.', Slash: '/', Semicolon: ';', Quote: "'", Minus: '-', Equal: '=', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
 };
@@ -67,14 +152,18 @@ function keyName(code: string): string {
 
 /** Render a shortcut string using platform conventions. */
 export function formatShortcut(shortcut: string, mac: boolean): string {
-  const parts = shortcut.split('+').map(part => part.trim()).filter(Boolean).map(part => {
+  return shortcutKeys(shortcut, mac).join(mac ? '' : '+');
+}
+
+/** The labels of each key in a shortcut, for rendering as separate keycaps. */
+export function shortcutKeys(shortcut: string, mac: boolean): string[] {
+  return shortcut.split('+').map(part => part.trim()).filter(Boolean).map(part => {
     const lower = part.toLowerCase();
-    if (['commandorcontrol', 'cmdorctrl', 'commandorctrl', 'cmdorcontrol'].includes(lower)) return mac ? '⌘' : 'Ctrl';
+    if (COMMAND_ALIASES.includes(lower)) return mac ? '⌘' : 'Ctrl';
     if (['command', 'cmd', 'super'].includes(lower)) return mac ? '⌘' : 'Win';
     if (['control', 'ctrl'].includes(lower)) return mac ? '⌃' : 'Ctrl';
     if (['alt', 'option'].includes(lower)) return mac ? '⌥' : 'Alt';
     if (lower === 'shift') return mac ? '⇧' : 'Shift';
     return keyName(part);
   });
-  return parts.join(mac ? '' : '+');
 }

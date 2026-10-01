@@ -14,8 +14,8 @@ mod windows;
 
 use capture::{copy_capture, copy_capture_region, get_capture_image, CaptureImage};
 use commands::{
-    action, activate_overlay, expand_toolbar, get_session, perform, register_toggle,
-    report_history, set_preferences,
+    action, activate_overlay, expand_toolbar, get_autostart, get_session, perform, register_toggle,
+    report_history, set_autostart, set_preferences,
 };
 use preference_saves::PreferenceSaves;
 use preferences::Preferences;
@@ -42,6 +42,9 @@ fn main() {
             let _ = app.run_on_main_thread(move || reopen(&handle));
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
+        // Login items use a macOS Launch Agent and the Windows Run registry key.
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .on_window_event(|window, event| {
             // Native activation (including clicking another display) can raise a
             // transparent drawing window above the toolbar before a drawing command.
@@ -86,6 +89,8 @@ fn main() {
             activate_overlay,
             report_history,
             set_preferences,
+            get_autostart,
+            set_autostart,
             expand_toolbar,
             get_capture_image,
             copy_capture,

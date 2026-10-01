@@ -17,6 +17,8 @@ export type Shape = {
   points: Point[];
   colorMode?: ColorMode;
   hue?: number;
+  /** The rainbow's colors when the shape was drawn, so later palette edits leave it unchanged. */
+  colors?: string[];
   fadeSeconds?: AutoFadeSeconds;
   expiresAt?: number;
   text?: string;
@@ -27,6 +29,8 @@ type DrawingStyle = {
   color: string;
   colorMode: ColorMode;
   autoFadeSeconds?: AutoFadeSeconds;
+  rainbowColors?: readonly string[];
+  cycleColors?: readonly string[];
 };
 
 export function shapeOpacity(shape: Shape, now: number): number {
@@ -37,18 +41,27 @@ export const PALETTE = [
   ['#4fc5d5', 'Aqua'], ['#669df0', 'Sky blue'], ['#a184e8', 'Violet'],
   ['#e580b5', 'Pink'],
 ] as const;
+/** The default colors for both Rainbow and Shifting; users can replace either list. */
 export const CYCLE_COLORS = PALETTE.map(([color]) => color);
-export const RAINBOW_PREVIEW = `conic-gradient(${[...CYCLE_COLORS, CYCLE_COLORS[0]].join(', ')})`;
-export function cycleColor(index: number): string { return CYCLE_COLORS[index % CYCLE_COLORS.length]; }
+export function cycleColor(index: number, colors: readonly string[] = CYCLE_COLORS): string { return colors[index % colors.length]; }
+/** A swatch showing a rainbow's colors all the way around. */
+export function rainbowPreview(colors: readonly string[] = CYCLE_COLORS): string { return `conic-gradient(${[...colors, colors[0]].join(', ')})`; }
+export const RAINBOW_PREVIEW = rainbowPreview();
+/** A swatch showing three colors spread across the Shifting sequence, starting at `index`. */
+export function shiftingPreview(colors: readonly string[] = CYCLE_COLORS, index = 0): string {
+  const [a, b, c] = [0, 1, 2].map(step => cycleColor(index + Math.round(step * colors.length / 3), colors));
+  return `conic-gradient(${a} 0deg 120deg, ${b} 120deg 240deg, ${c} 240deg 360deg)`;
+}
 
 export function createShape(style: DrawingStyle, cycleIndex: number, start: Point): Shape {
   return {
     id: crypto.randomUUID(),
     tool: style.tool,
     width: REGULAR_WIDTH,
-    color: style.colorMode === 'cycle' ? cycleColor(cycleIndex) : style.color,
+    color: style.colorMode === 'cycle' ? cycleColor(cycleIndex, style.cycleColors) : style.color,
     colorMode: style.colorMode,
     hue: style.colorMode === 'rainbow' ? Math.random() * 360 : 0,
+    ...(style.colorMode === 'rainbow' ? { colors: [...(style.rainbowColors ?? CYCLE_COLORS)] } : {}),
     points: [{ ...start }],
     fadeSeconds: style.autoFadeSeconds ?? 0,
   };

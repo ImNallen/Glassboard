@@ -3,10 +3,10 @@
   import { Copy } from '@lucide/svelte';
   import Overlay from '@glassboard/ui/Overlay.svelte';
   import Toolbar from '@glassboard/ui/Toolbar.svelte';
-  import { action, native, savePreferences, shortcutLabel, type Session, type Preferences } from '@glassboard/ui/session';
+  import { action, mac, native, savePreferences, shortcutLabel, type Session, type Preferences } from '@glassboard/ui/session';
   import { drawingKeydown } from '@glassboard/ui/keys';
-  import { toolShortcut } from '@glassboard/ui/shortcuts';
-  import { annotatedCapture, captureKeydown, capturePixels, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
+  import { keybinding, toolShortcut } from '@glassboard/ui/shortcuts';
+  import { annotatedCapture, captureKeydown, capturePixels, copiesOnClipboardEvent, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
 
   let { session, onerror, getImage, copyImage, copyRegion }: { session: Session; onerror: (error: unknown) => void; getImage: (id: number) => Promise<ImageData | HTMLImageElement | HTMLCanvasElement>; copyImage: (id: number, image: Promise<Blob>) => Promise<void>; copyRegion?: (id: number, region: CaptureRegion) => Promise<void> } = $props();
   // The parent keys this editor by capture id.
@@ -26,6 +26,7 @@
   let overlay = $state<Overlay>();
   let disposed = false;
   let toolbarDock = $derived(session.capture?.toolbarDock);
+  let copyKey = $derived(shortcutLabel(keybinding(session.preferences.keybindings, 'copy')));
   let editingSession = $derived<Session>({ ...session, mode: 'draw', tutorial: null, settingsOpen: false,
     activeOverlay: 'capture', preferences: { ...session.preferences, autoFadeSeconds: 0 } });
   const run = (name: string) => action(name).catch(onerror);
@@ -83,16 +84,16 @@
     return savePreferences({ ...session.preferences, tool: preferences.tool, color: preferences.color, colorMode: preferences.colorMode });
   }
   function keydown(event: KeyboardEvent) {
-    captureKeydown(event, { copy, cancel });
+    captureKeydown(event, { copy, cancel, keybindings: session.preferences.keybindings });
     if (event.defaultPrevented || dragging || busy) return;
-    const choosingTool = Boolean(toolShortcut(event));
+    const choosingTool = Boolean(toolShortcut(event, session.preferences.keybindings, mac));
     drawingKeydown(event, editingSession, { run, capture: reselect, save: preferences => save(preferences).then(() => {
       if (choosingTool) chooseDrawingTool();
     }).catch(fail) });
   }
   function copied(event: ClipboardEvent) {
     const target = event.target instanceof Element ? event.target : document.activeElement;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    if (target?.closest('input, textarea, [contenteditable="true"]') || !copiesOnClipboardEvent(session.preferences.keybindings)) return;
     event.preventDefault(); copy();
   }
   onMount(() => {
@@ -132,7 +133,7 @@
   </div>
   {#if region && !dragging}
     <div class="capture-actions" role="group" aria-label="Capture controls">
-      <button class="copy" disabled={busy || !loaded} onclick={copy} title={shortcutLabel('CommandOrControl+C')}><Copy size={16}/>{busy ? 'Copying…' : 'Copy & close'}<kbd>{shortcutLabel('CommandOrControl+C')}</kbd></button>
+      <button class="copy" disabled={busy || !loaded} onclick={copy} title={copyKey || undefined}><Copy size={16}/>{busy ? 'Copying…' : 'Copy & close'}{#if copyKey}<kbd>{copyKey}</kbd>{/if}</button>
     </div>
   {/if}
   {#if error}<div class="capture-error" role="alert">{error}</div>{/if}

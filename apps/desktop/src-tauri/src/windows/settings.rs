@@ -5,8 +5,8 @@ use crate::{
 };
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
 
-pub(super) const SETTINGS_WIDTH: f64 = 360.0;
-pub(super) const SETTINGS_HEIGHT: f64 = 560.0;
+pub(super) const SETTINGS_WIDTH: f64 = 380.0;
+pub(super) const SETTINGS_HEIGHT: f64 = 620.0;
 
 pub(crate) fn position_settings(
     app: &tauri::AppHandle,

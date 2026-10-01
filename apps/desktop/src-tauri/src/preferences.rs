@@ -1,5 +1,6 @@
 use crate::{toolbar_position::ToolbarPosition, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Modifiers, Shortcut};
 
@@ -23,6 +24,18 @@ pub(crate) struct Preferences {
     #[serde(default)]
     pub(crate) color_mode: ColorMode,
     pub(crate) shortcut: String,
+    /// In-app binding overrides by command id; an empty shortcut unbinds the command.
+    #[serde(default)]
+    pub(crate) keybindings: BTreeMap<String, String>,
+    /// The toolbar's solid color swatches, in toolbar order.
+    #[serde(default = "default_swatches")]
+    pub(crate) swatches: Vec<String>,
+    /// Rainbow's gradient colors, in order.
+    #[serde(default = "default_sequence")]
+    pub(crate) rainbow_colors: Vec<String>,
+    /// The colors Shifting steps through, one per shape.
+    #[serde(default = "default_sequence")]
+    pub(crate) cycle_colors: Vec<String>,
     #[serde(default)]
     pub(crate) toolbar_position: ToolbarPosition,
     #[serde(default)]
@@ -37,11 +50,37 @@ impl Default for Preferences {
             color: "#f46b78".into(),
             color_mode: ColorMode::Rainbow,
             shortcut: DEFAULT_SHORTCUT.into(),
+            keybindings: BTreeMap::new(),
+            swatches: default_swatches(),
+            rainbow_colors: default_sequence(),
+            cycle_colors: default_sequence(),
             toolbar_position: ToolbarPosition::Bottom,
             auto_fade_seconds: 0,
             tutorial_completed: false,
         }
     }
+}
+fn default_swatches() -> Vec<String> {
+    [
+        "#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#669df0",
+    ]
+    .map(String::from)
+    .to_vec()
+}
+fn default_sequence() -> Vec<String> {
+    [
+        "#f46b78", "#f2c85b", "#4dcaa0", "#4fc5d5", "#669df0", "#a184e8", "#e580b5",
+    ]
+    .map(String::from)
+    .to_vec()
+}
+fn valid_sequence(colors: &[String]) -> bool {
+    (2..=8).contains(&colors.len()) && colors.iter().all(|color| is_hex_color(color))
+}
+fn is_hex_color(color: &str) -> bool {
+    color.len() == 7
+        && color.starts_with('#')
+        && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
 }
 // Upgrade saved palette colors while retaining all other preferences.
 fn deserialize_color<'de, D: serde::Deserializer<'de>>(
@@ -89,11 +128,25 @@ impl Preferences {
         ]
         .contains(&self.tool.as_str())
             || ![0, 3, 5, 10].contains(&self.auto_fade_seconds)
-            || self.color.len() != 7
-            || !self.color.starts_with('#')
-            || !self.color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+            || !is_hex_color(&self.color)
+            || self.swatches.len() != 6
+            || !self.swatches.iter().all(|color| is_hex_color(color))
+            || !valid_sequence(&self.rainbow_colors)
+            || !valid_sequence(&self.cycle_colors)
         {
             return Err("Invalid drawing preferences".into());
+        }
+        if self.keybindings.len() > 64
+            || self.keybindings.iter().any(|(command, shortcut)| {
+                command.is_empty()
+                    || command.len() > 32
+                    || !command
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                    || (!shortcut.is_empty() && shortcut.parse::<Shortcut>().is_err())
+            })
+        {
+            return Err("Invalid keybindings".into());
         }
         let shortcut: Shortcut = self
             .shortcut
@@ -132,6 +185,102 @@ mod tests {
         ] {
             p.shortcut = shortcut.into();
             assert!(p.validate().is_ok(), "{shortcut}");
+        }
+    }
+    #[test]
+    fn swatches_are_saved_and_validated() {
+        let preferences = Preferences {
+            swatches: [
+                "#123abc", "#FFFFFF", "#000000", "#8b5cf6", "#8b5cf6", "#00c7be",
+            ]
+            .map(String::from)
+            .to_vec(),
+            ..Preferences::default()
+        };
+        assert!(preferences.validate().is_ok());
+        let restored: Preferences =
+            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
+        assert_eq!(restored.swatches, preferences.swatches);
+        for swatches in [
+            vec!["#000000"; 5],
+            vec!["#000000"; 7],
+            vec![
+                "#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#fff",
+            ],
+            vec![
+                "#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#gggggg",
+            ],
+        ] {
+            let invalid = Preferences {
+                swatches: swatches.into_iter().map(String::from).collect(),
+                ..Preferences::default()
+            };
+            assert!(invalid.validate().is_err(), "{:?}", invalid.swatches);
+        }
+    }
+    #[test]
+    fn rainbow_and_shifting_colors_are_saved_and_validated() {
+        let preferences = Preferences {
+            rainbow_colors: vec!["#000000".into(), "#FFFFFF".into()],
+            cycle_colors: vec!["#123abc".into(); 8],
+            ..Preferences::default()
+        };
+        assert!(preferences.validate().is_ok());
+        let restored: Preferences =
+            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
+        assert_eq!(restored.rainbow_colors, preferences.rainbow_colors);
+        assert_eq!(restored.cycle_colors, preferences.cycle_colors);
+        let json = serde_json::to_value(&preferences).unwrap();
+        assert!(json.get("rainbowColors").is_some() && json.get("cycleColors").is_some());
+        for colors in [
+            vec![],
+            vec!["#000000"],
+            vec!["#000000"; 9],
+            vec!["#000000", "red"],
+        ] {
+            let colors: Vec<String> = colors.into_iter().map(String::from).collect();
+            for invalid in [
+                Preferences {
+                    rainbow_colors: colors.clone(),
+                    ..Preferences::default()
+                },
+                Preferences {
+                    cycle_colors: colors.clone(),
+                    ..Preferences::default()
+                },
+            ] {
+                assert!(invalid.validate().is_err(), "{colors:?}");
+            }
+        }
+    }
+    #[test]
+    fn keybindings_are_saved_and_validated() {
+        let mut preferences = Preferences::default();
+        for (command, shortcut) in [
+            ("undo", "CommandOrControl+KeyU"),
+            ("color-red", "Digit9"),
+            ("hide", "Escape"),
+            ("tool-pen", "Alt+Shift+KeyP"),
+            ("copy", ""),
+        ] {
+            preferences
+                .keybindings
+                .insert(command.into(), shortcut.into());
+        }
+        assert!(preferences.validate().is_ok());
+        let restored: Preferences =
+            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
+        assert_eq!(restored.keybindings, preferences.keybindings);
+        for (command, shortcut) in [
+            ("undo", "not a shortcut"),
+            ("undo", "CommandOrControl+"),
+            ("", "KeyA"),
+            ("Undo", "KeyA"),
+            ("tool_pen", "KeyA"),
+        ] {
+            let mut invalid = Preferences::default();
+            invalid.keybindings.insert(command.into(), shortcut.into());
+            assert!(invalid.validate().is_err(), "{command}: {shortcut}");
         }
     }
     #[test]
@@ -187,6 +336,10 @@ mod tests {
         assert_eq!(preferences.auto_fade_seconds, 0);
         assert_eq!(preferences.color, "#68aaff");
         assert_eq!(preferences.shortcut, "CommandOrControl+Shift+B");
+        assert!(preferences.keybindings.is_empty());
+        assert_eq!(preferences.swatches, default_swatches());
+        assert_eq!(preferences.rainbow_colors, default_sequence());
+        assert_eq!(preferences.cycle_colors, default_sequence());
         // Retired line-width preferences are ignored without resetting other settings.
         assert!(serde_json::to_value(&preferences)
             .unwrap()

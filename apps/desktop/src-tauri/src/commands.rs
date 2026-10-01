@@ -12,7 +12,11 @@ use crate::{
     Result,
 };
 use tauri::{Emitter, Manager};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+use tauri_plugin_opener::OpenerExt;
+
+const REPOSITORY_URL: &str = "https://github.com/ImNallen/Glassboard";
 
 pub(crate) fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
     if action == "capture" {
@@ -27,6 +31,18 @@ pub(crate) fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
         let mut preferences = snapshot(app).preferences;
         preferences.tutorial_completed = true;
         set_preferences(app.clone(), preferences)?;
+    }
+    // Fixed URLs keep the webviews from opening arbitrary links.
+    let link = match action {
+        "open-github" => Some(REPOSITORY_URL.to_string()),
+        "report-issue" => Some(format!("{REPOSITORY_URL}/issues/new")),
+        _ => None,
+    };
+    if let Some(url) = link {
+        return app
+            .opener()
+            .open_url(url, None::<&str>)
+            .map_err(|e| e.to_string());
     }
     if action == "quit" {
         app.exit(0);
@@ -156,6 +172,26 @@ pub(crate) fn expand_toolbar(
     }
     *app.state::<ToolbarExpanded>().0.lock().unwrap() = expanded;
     position_toolbar(&app)
+}
+/// Whether Glassboard opens at login. The OS holds this setting, so it can change outside the app.
+#[tauri::command]
+pub(crate) fn get_autostart(app: tauri::AppHandle) -> Result<bool> {
+    app.autolaunch()
+        .is_enabled()
+        .map_err(|e| format!("Could not read the login item: {e}"))
+}
+#[tauri::command]
+pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool> {
+    let launcher = app.autolaunch();
+    if enabled {
+        launcher.enable()
+    } else {
+        launcher.disable()
+    }
+    .map_err(|e| format!("Could not change the login item: {e}"))?;
+    launcher
+        .is_enabled()
+        .map_err(|e| format!("Could not read the login item: {e}"))
 }
 pub(crate) fn register_toggle(app: &tauri::AppHandle, shortcut: &str) -> Result<()> {
     let parsed: Shortcut = shortcut

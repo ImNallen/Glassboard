@@ -74,6 +74,24 @@ it('uses native crop bounds at source density without composing or encoding plai
   expect(app.state().capture).toBeNull();
 });
 
+it('ignores the old clipboard shortcut once Copy is rebound', async () => {
+  const copyRegion = vi.fn().mockResolvedValue(undefined);
+  const app = await setup(copyRegion);
+  await savePreferences({ ...app.state().preferences, keybindings: { copy: 'CommandOrControl+Shift+KeyC' } });
+  await tick();
+  const clipboard = new Event('copy', { bubbles: true, cancelable: true });
+  window.dispatchEvent(clipboard);
+  await tick(); await tick();
+  expect(clipboard.defaultPrevented).toBe(false);
+  expect(copyRegion).not.toHaveBeenCalled();
+  expect(app.state().capture).not.toBeNull();
+  await savePreferences({ ...app.state().preferences, keybindings: {} });
+  await tick();
+  window.dispatchEvent(new Event('copy', { bubbles: true, cancelable: true }));
+  await tick(); await tick();
+  expect(copyRegion).toHaveBeenCalledOnce();
+});
+
 it('keeps a failed native crop open for retry', async () => {
   const copyRegion = vi.fn().mockRejectedValueOnce(new Error('Clipboard busy')).mockResolvedValue(undefined);
   const app = await setup(copyRegion);

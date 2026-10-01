@@ -17,7 +17,10 @@
     "./toolbar.css": "./src/toolbar.css",
     "./capture": "./src/lib/capture.ts",
     "./Capture.svelte": "./src/Capture.svelte",
-    "./capture-preview": "./src/lib/capture-preview.ts"
+    "./capture-preview": "./src/lib/capture-preview.ts",
+    "./tool-icons": "./src/lib/tool-icons.ts",
+    "./swatches": "./src/lib/swatches.ts",
+    "./themes": "./src/lib/themes.ts"
   },
   "scripts": {
     "check": "svelte-check --tsconfig ./tsconfig.json",

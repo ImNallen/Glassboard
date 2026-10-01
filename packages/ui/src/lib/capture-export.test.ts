@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { annotatedCapture } from './capture';
 import { render } from './drawing';
 
-vi.mock('./drawing', () => ({ render: vi.fn() }));
+vi.mock('./drawing', async importOriginal => ({ ...await importOriginal<typeof import('./drawing')>(), render: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
 
 function setup() {
