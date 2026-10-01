@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A quiet tool for directing attention"
 authors = ["Glassboard"]
 edition = "2021"
+license = "MIT"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -11,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 xcap = "0.9.8"
@@ -21,6 +23,11 @@ image = { version = "0.25.10", default-features = false, features = ["png"] }
 # even in local debug bundles while Glassboard's own code stays debuggable.
 [profile.dev.package.xcap]
 opt-level = 3
+
+# macOS 27's dyld rejects proc-macro dylibs that rustc strips in release builds
+# ("mis-aligned LINKEDIT string pool"). Build-time code never ships in the app.
+[profile.release.build-override]
+strip = false
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
