@@ -35,6 +35,12 @@ type Result<T> = std::result::Result<T, String>;
 
 fn main() {
     tauri::Builder::default()
+        // Registered first so a second launch exits before creating windows,
+        // a tray icon, or a competing global shortcut.
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || reopen(&handle));
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .on_window_event(|window, event| {
             // Native activation (including clicking another display) can raise a
@@ -144,24 +150,29 @@ fn main() {
             }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen { .. } = event {
-                let session = snapshot(app);
-                // Activating the app must preserve an unfinished capture or its
-                // permission/error explanation, rather than switch to live drawing.
-                let target = if session.capture.is_some() {
-                    "capture"
-                } else if session.settings_open {
-                    "settings"
-                } else {
-                    if let Err(error) = perform(app, "show") {
-                        report(app, error);
-                    }
-                    "toolbar"
-                };
-                if let Some(window) = app.get_webview_window(target) {
-                    let _ = window.set_focus();
-                }
+                reopen(app);
             }
-            #[cfg(not(target_os = "macos"))]
-            let _ = (app, event);
         });
+}
+
+// Reopening the app (from the Dock, or by launching it again while it runs)
+// must preserve an unfinished capture or its permission/error explanation,
+// and an open tutorial step, rather than switch to live drawing.
+fn reopen(app: &tauri::AppHandle) {
+    let session = snapshot(app);
+    let target = if session.capture.is_some() {
+        "capture"
+    } else if session.settings_open {
+        "settings"
+    } else if session.tutorial.is_some() {
+        "tutorial"
+    } else {
+        if let Err(error) = perform(app, "show") {
+            report(app, error);
+        }
+        "toolbar"
+    };
+    if let Some(window) = app.get_webview_window(target) {
+        let _ = window.set_focus();
+    }
 }

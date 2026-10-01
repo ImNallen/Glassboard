@@ -1,6 +1,7 @@
 {
   "name": "glassboard",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "apps/*",

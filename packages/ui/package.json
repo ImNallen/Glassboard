@@ -2,6 +2,7 @@
   "name": "@glassboard/ui",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Drawing engine, session adapter, and Svelte components shared by the Glassboard desktop app and website.",
   "exports": {
