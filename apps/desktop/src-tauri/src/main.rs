@@ -157,13 +157,15 @@ fn main() {
 
 // Reopening the app (from the Dock, or by launching it again while it runs)
 // must preserve an unfinished capture or its permission/error explanation,
-// rather than switch to live drawing.
+// and an open tutorial step, rather than switch to live drawing.
 fn reopen(app: &tauri::AppHandle) {
     let session = snapshot(app);
     let target = if session.capture.is_some() {
         "capture"
     } else if session.settings_open {
         "settings"
+    } else if session.tutorial.is_some() {
+        "tutorial"
     } else {
         if let Err(error) = perform(app, "show") {
             report(app, error);
