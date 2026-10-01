@@ -6,7 +6,7 @@
   import { action, mac, native, savePreferences, shortcutLabel, type Session, type Preferences } from '@glassboard/ui/session';
   import { drawingKeydown } from '@glassboard/ui/keys';
   import { keybinding, toolShortcut } from '@glassboard/ui/shortcuts';
-  import { annotatedCapture, captureKeydown, capturePixels, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
+  import { annotatedCapture, captureKeydown, capturePixels, copiesOnClipboardEvent, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
 
   let { session, onerror, getImage, copyImage, copyRegion }: { session: Session; onerror: (error: unknown) => void; getImage: (id: number) => Promise<ImageData | HTMLImageElement | HTMLCanvasElement>; copyImage: (id: number, image: Promise<Blob>) => Promise<void>; copyRegion?: (id: number, region: CaptureRegion) => Promise<void> } = $props();
   // The parent keys this editor by capture id.
@@ -93,7 +93,7 @@
   }
   function copied(event: ClipboardEvent) {
     const target = event.target instanceof Element ? event.target : document.activeElement;
-    if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+    if (target?.closest('input, textarea, [contenteditable="true"]') || !copiesOnClipboardEvent(session.preferences.keybindings)) return;
     event.preventDefault(); copy();
   }
   onMount(() => {

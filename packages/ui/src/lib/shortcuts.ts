@@ -54,17 +54,25 @@ export function keybinding(keybindings: Keybindings | undefined, id: string): st
 }
 
 /** The in-app command bound to a key press, if any. */
+/**
+ * The in-app command bound to a key press, if any. An exact match wins, so a binding on the
+ * platform's second modifier (Control on macOS, Super on Windows) isn't shadowed by a
+ * CommandOrControl binding on the same key, which otherwise accepts either modifier.
+ */
 export function commandFor(event: KeyEvent, keybindings: Keybindings | undefined, mac = platformMac): string | undefined {
-  return KEYBINDINGS.find(binding => matchesShortcut(event, keybinding(keybindings, binding.id), mac))?.id;
+  const bound = (exact: boolean) => KEYBINDINGS.find(binding => matchesShortcut(event, keybinding(keybindings, binding.id), mac, exact))?.id;
+  return bound(true) ?? bound(false);
 }
 
 export function colorShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac, swatches?: readonly string[]): { colorMode: ColorMode; color?: string } | undefined {
-  const choice = COLOR_SHORTCUTS.find(choice => matchesShortcut(event, keybinding(keybindings, choice.command), mac));
+  const command = commandFor(event, keybindings, mac);
+  const choice = COLOR_SHORTCUTS.find(choice => choice.command === command);
   return choice && colorChoice(choice, swatches);
 }
 
 export function toolShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac): Tool | undefined {
-  return TOOL_SHORTCUTS.find(tool => matchesShortcut(event, keybinding(keybindings, tool.command), mac))?.id;
+  const command = commandFor(event, keybindings, mac);
+  return TOOL_SHORTCUTS.find(tool => tool.command === command)?.id;
 }
 
 const MODIFIER_ORDER = ['CommandOrControl', 'Control', 'Super', 'Alt', 'Shift'];
@@ -97,14 +105,15 @@ function eventKey(event: KeyEvent, physical = false): string {
   return event.code || event.key;
 }
 
-export function matchesShortcut(event: KeyEvent, shortcut: string, mac = platformMac): boolean {
+/** `exact` requires the platform command modifier itself for CommandOrControl, instead of either command key. */
+export function matchesShortcut(event: KeyEvent, shortcut: string, mac = platformMac, exact = false): boolean {
   if (!shortcut) return false;
   const modifiers = normalizeShortcut(shortcut, mac).split('+');
   if (modifiers.pop() !== eventKey(event)) return false;
   const command = mac ? event.metaKey : event.ctrlKey, secondary = mac ? event.ctrlKey : event.metaKey;
   const wantsCommand = modifiers.includes('CommandOrControl'), wantsSecondary = modifiers.includes(mac ? 'Control' : 'Super');
   // Either command key works for a plain CommandOrControl binding, as Cmd and Ctrl did before rebinding.
-  const commandMatches = wantsCommand && !wantsSecondary ? command || secondary : command === wantsCommand && secondary === wantsSecondary;
+  const commandMatches = wantsCommand && !wantsSecondary && !exact ? command || secondary : command === wantsCommand && secondary === wantsSecondary;
   return commandMatches && event.altKey === modifiers.includes('Alt') && event.shiftKey === modifiers.includes('Shift');
 }
 

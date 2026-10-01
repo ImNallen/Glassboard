@@ -115,6 +115,18 @@ describe('keybindings', () => {
     expect(matchesShortcut(press('k', 'KeyK', { metaKey: true, ctrlKey: true }), 'CommandOrControl+Control+KeyK', true)).toBe(true);
     expect(matchesShortcut(press('k', 'KeyK', { metaKey: true }), 'CommandOrControl+Control+KeyK', true)).toBe(false);
   });
+  it('keeps a second-modifier binding reachable next to a CommandOrControl binding on the same key', () => {
+    const mac = { undo: 'CommandOrControl+KeyK', redo: 'Control+KeyK' };
+    expect(commandFor(press('k', 'KeyK', { metaKey: true }), mac, true)).toBe('undo');
+    expect(commandFor(press('k', 'KeyK', { ctrlKey: true }), mac, true)).toBe('redo');
+    const windows = { undo: 'CommandOrControl+KeyK', redo: 'Super+KeyK' };
+    expect(commandFor(press('k', 'KeyK', { ctrlKey: true }), windows, false)).toBe('undo');
+    expect(commandFor(press('k', 'KeyK', { metaKey: true }), windows, false)).toBe('redo');
+    expect(toolShortcut(press('k', 'KeyK', { ctrlKey: true }), { 'tool-pen': 'CommandOrControl+KeyK', 'tool-text': 'Control+KeyK' }, true)).toBe('text');
+    // With nothing else on the key, either command key still works for a CommandOrControl binding.
+    expect(commandFor(press('z', 'KeyZ', { ctrlKey: true }), {}, true)).toBe('undo');
+    expect(commandFor(press('z', 'KeyZ', { metaKey: true }), {}, false)).toBe('undo');
+  });
   it('compares shortcuts written in different forms', () => {
     expect(sameShortcut('CommandOrControl+Shift+A', 'Shift+CmdOrCtrl+KeyA')).toBe(true);
     expect(sameShortcut('Super+KeyA', 'CommandOrControl+KeyA', true)).toBe(true);

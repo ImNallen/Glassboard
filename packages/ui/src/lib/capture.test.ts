@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { captureKeydown, capturePixels, captureRegion } from './capture';
+import { captureKeydown, capturePixels, captureRegion, copiesOnClipboardEvent } from './capture';
 
 describe('capture geometry', () => {
   it('supports reverse drags, negative coordinates, and the display edge', () => {
@@ -62,5 +62,18 @@ describe('capture shortcuts', () => {
     captureKeydown(key('q', {}), { copy, cancel, keybindings });
     expect(copy).toHaveBeenCalledOnce();
     expect(cancel).toHaveBeenCalledOnce();
+  });
+  it('lets a second-modifier Cancel binding share the Copy key', () => {
+    const copy = vi.fn(), cancel = vi.fn(), keybindings = { hide: 'Super+KeyC' };
+    captureKeydown(key('c', { metaKey: true }), { copy, cancel, keybindings });
+    captureKeydown(key('c', { ctrlKey: true }), { copy, cancel, keybindings });
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(copy).toHaveBeenCalledOnce();
+  });
+  it('copies on clipboard events only while Copy keeps the standard shortcut', () => {
+    expect(copiesOnClipboardEvent()).toBe(true);
+    expect(copiesOnClipboardEvent({ copy: 'CmdOrCtrl+C' })).toBe(true);
+    expect(copiesOnClipboardEvent({ copy: 'CommandOrControl+Shift+KeyC' })).toBe(false);
+    expect(copiesOnClipboardEvent({ copy: '' })).toBe(false);
   });
 });
