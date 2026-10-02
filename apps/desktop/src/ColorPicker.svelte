@@ -75,18 +75,18 @@
 
 <style>
   .picker { display: flex; flex-direction: column; gap: 10px; }
-  .field { position: relative; height: 104px; border-radius: 8px; cursor: crosshair; touch-action: none; box-shadow: inset 0 0 0 1px var(--swatch-border);
+  .field { position: relative; height: 104px; border-radius: 8px; cursor: crosshair; touch-action: none; box-shadow: inset 0 0 0 1px var(--gb-swatch-border);
     background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, var(--hue)); }
-  .field:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .field:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .thumb { position: absolute; width: 14px; height: 14px; border-radius: 50%; translate: -50% -50%; pointer-events: none; box-shadow: 0 0 0 2px #fff, 0 0 0 3px #0000004d, 0 1px 3px #00000059; }
-  .hue { -webkit-appearance: none; appearance: none; width: 100%; height: 12px; margin: 0; border-radius: 6px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--swatch-border);
+  .hue { -webkit-appearance: none; appearance: none; width: 100%; height: 12px; margin: 0; border-radius: 6px; cursor: pointer; box-shadow: inset 0 0 0 1px var(--gb-swatch-border);
     background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
   .hue::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px #0000004d, 0 1px 3px #00000059; }
   .hue::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1px #0000004d, 0 1px 3px #00000059; }
-  .hue:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
-  .hex { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 4px 0 6px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-surface); }
-  .hex:focus-within { border-color: var(--focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 22%, transparent); }
-  .preview { width: 18px; height: 18px; flex-shrink: 0; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--swatch-border); }
-  .hex-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
-  .hex input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: .3px; -webkit-user-select: text; user-select: text; }
+  .hue:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 3px; }
+  .hex { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 4px 0 6px; border-radius: 8px; border: 1px solid var(--gb-border); background: var(--gb-input-surface); }
+  .hex:focus-within { border-color: var(--gb-focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gb-focus-ring) 22%, transparent); }
+  .preview { width: 18px; height: 18px; flex-shrink: 0; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
+  .hex-label { font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--gb-muted); }
+  .hex input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--gb-text); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: .3px; -webkit-user-select: text; user-select: text; }
 </style>

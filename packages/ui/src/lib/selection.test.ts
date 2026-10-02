@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { protectSelection } from './selection';
+import { isEditableTarget, protectSelection } from './selection';
 
 let stop: () => void;
 let canvas: HTMLCanvasElement;
@@ -80,5 +80,21 @@ describe('overlay selection protection', () => {
     selectCanvas();
     stop = protectSelection();
     expect(document.getSelection()!.rangeCount).toBe(0);
+  });
+});
+
+describe('editable targets', () => {
+  it('treats form fields and editable content as text, and other elements as the drawing', () => {
+    document.body.innerHTML = '<label><input></label><textarea></textarea><select></select><div contenteditable="true"><b>x</b></div><div contenteditable=""></div><div contenteditable="false"></div><button></button>';
+    const [input, textarea, select, editable, bold, empty, locked, button] = ['input', 'textarea', 'select', '[contenteditable="true"]', 'b', '[contenteditable=""]', '[contenteditable="false"]', 'button'].map(selector => document.querySelector(selector)!);
+    for (const target of [input, textarea, select, editable, bold, bold.firstChild, empty]) expect(isEditableTarget(target)).toBe(true);
+    for (const target of [locked, button, canvas, null]) expect(isEditableTarget(target)).toBe(false);
+  });
+  it('uses the focused element for events sent to the window or document', () => {
+    input.focus();
+    expect(isEditableTarget(window)).toBe(true);
+    expect(isEditableTarget(document)).toBe(true);
+    input.blur();
+    expect(isEditableTarget(window)).toBe(false);
   });
 });

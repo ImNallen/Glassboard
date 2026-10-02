@@ -1,90 +1,160 @@
-use crate::{toolbar_position::ToolbarPosition, Result};
+use crate::{windows::geometry::ToolbarPosition, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::{collections::BTreeMap, io::Write, path::Path};
+use std::{collections::BTreeMap, io::Write, path::Path, sync::LazyLock};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Modifiers, Shortcut};
 
-pub(crate) const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+A";
 const FILE_NAME: &str = "preferences.json";
 const BACKUP_NAME: &str = "preferences.json.bak";
 /// Saved files carry this so upgrades apply only to files written before them.
 const FORMAT_VERSION: u64 = 1;
+const INVALID_DRAWING: &str = "Invalid drawing preferences";
 
-#[derive(Clone, Copy, Default, Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum Tool {
+    Pen,
+    Arrow,
+    Rectangle,
+    Ellipse,
+    Highlighter,
+    Text,
+    Eraser,
+}
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub(crate) enum ColorMode {
     Solid,
-    #[default]
     Rainbow,
     Cycle,
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct Preferences {
-    pub(crate) tool: String,
-    pub(crate) color: String,
-    #[serde(default)]
-    pub(crate) color_mode: ColorMode,
-    pub(crate) shortcut: String,
-    /// In-app binding overrides by command id; an empty shortcut unbinds the command.
-    #[serde(default)]
-    pub(crate) keybindings: BTreeMap<String, String>,
-    /// The toolbar's solid color swatches, in toolbar order.
-    #[serde(default = "default_swatches")]
-    pub(crate) swatches: Vec<String>,
-    /// Rainbow's gradient colors, in order.
-    #[serde(default = "default_sequence")]
-    pub(crate) rainbow_colors: Vec<String>,
-    /// The colors Shifting steps through, one per shape.
-    #[serde(default = "default_sequence")]
-    pub(crate) cycle_colors: Vec<String>,
-    #[serde(default)]
-    pub(crate) toolbar_position: ToolbarPosition,
-    #[serde(default)]
-    pub(crate) auto_fade_seconds: u8,
-    #[serde(default)]
-    pub(crate) tutorial_completed: bool,
-}
-impl Default for Preferences {
-    fn default() -> Self {
-        Self {
-            tool: "arrow".into(),
-            color: "#f46b78".into(),
-            color_mode: ColorMode::Rainbow,
-            shortcut: DEFAULT_SHORTCUT.into(),
-            keybindings: BTreeMap::new(),
-            swatches: default_swatches(),
-            rainbow_colors: default_sequence(),
-            cycle_colors: default_sequence(),
-            toolbar_position: ToolbarPosition::Bottom,
-            auto_fade_seconds: 0,
-            tutorial_completed: false,
-        }
+/// `#rrggbb`, kept in the case the user typed.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "String")]
+pub(crate) struct HexColor(String);
+impl TryFrom<String> for HexColor {
+    type Error = &'static str;
+    fn try_from(color: String) -> std::result::Result<Self, Self::Error> {
+        let valid = color.len() == 7
+            && color.starts_with('#')
+            && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit);
+        valid.then_some(Self(color)).ok_or(INVALID_DRAWING)
     }
 }
-fn default_swatches() -> Vec<String> {
-    [
-        "#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#669df0",
-    ]
-    .map(String::from)
-    .to_vec()
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "Vec<HexColor>")]
+pub(crate) struct ColorSequence(Vec<HexColor>);
+impl TryFrom<Vec<HexColor>> for ColorSequence {
+    type Error = &'static str;
+    fn try_from(colors: Vec<HexColor>) -> std::result::Result<Self, Self::Error> {
+        (2..=8)
+            .contains(&colors.len())
+            .then_some(Self(colors))
+            .ok_or(INVALID_DRAWING)
+    }
 }
-fn default_sequence() -> Vec<String> {
-    [
-        "#f46b78", "#f2c85b", "#4dcaa0", "#4fc5d5", "#669df0", "#a184e8", "#e580b5",
-    ]
-    .map(String::from)
-    .to_vec()
+
+#[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "u8")]
+pub(crate) struct AutoFadeSeconds(u8);
+impl TryFrom<u8> for AutoFadeSeconds {
+    type Error = &'static str;
+    fn try_from(seconds: u8) -> std::result::Result<Self, Self::Error> {
+        [0, 3, 5, 10]
+            .contains(&seconds)
+            .then_some(Self(seconds))
+            .ok_or(INVALID_DRAWING)
+    }
 }
-fn valid_sequence(colors: &[String]) -> bool {
-    (2..=8).contains(&colors.len()) && colors.iter().all(|color| is_hex_color(color))
+
+/// In-app binding overrides by command id; an empty shortcut unbinds the command.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "BTreeMap<String, String>")]
+pub(crate) struct Keybindings(BTreeMap<String, String>);
+impl TryFrom<BTreeMap<String, String>> for Keybindings {
+    type Error = &'static str;
+    fn try_from(bindings: BTreeMap<String, String>) -> std::result::Result<Self, Self::Error> {
+        let invalid = bindings.len() > 64
+            || bindings.iter().any(|(command, shortcut)| {
+                command.is_empty()
+                    || command.len() > 32
+                    || !command
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                    || (!shortcut.is_empty() && shortcut.parse::<Shortcut>().is_err())
+            });
+        (!invalid)
+            .then_some(Self(bindings))
+            .ok_or("Invalid keybindings")
+    }
 }
-fn is_hex_color(color: &str) -> bool {
-    color.len() == 7
-        && color.starts_with('#')
-        && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+
+/// The global show/hide shortcut, saved as the user recorded it.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "String", into = "String")]
+pub(crate) struct ToggleShortcut {
+    text: String,
+    parsed: Shortcut,
+}
+impl ToggleShortcut {
+    pub(crate) fn as_str(&self) -> &str {
+        &self.text
+    }
+    pub(crate) fn parsed(&self) -> Shortcut {
+        self.parsed
+    }
+}
+impl TryFrom<String> for ToggleShortcut {
+    type Error = String;
+    fn try_from(text: String) -> std::result::Result<Self, Self::Error> {
+        let parsed: Shortcut = text.parse().map_err(|e| format!("Invalid shortcut: {e}"))?;
+        if !parsed
+            .mods
+            .intersects(Modifiers::CONTROL | Modifiers::SUPER | Modifiers::ALT)
+        {
+            return Err("Include CommandOrControl, Control, Super, or Alt in the shortcut.".into());
+        }
+        Ok(Self { text, parsed })
+    }
+}
+impl From<ToggleShortcut> for String {
+    fn from(shortcut: ToggleShortcut) -> Self {
+        shortcut.text
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Preferences {
+    pub(crate) tool: Tool,
+    pub(crate) color: HexColor,
+    pub(crate) color_mode: ColorMode,
+    pub(crate) shortcut: ToggleShortcut,
+    pub(crate) keybindings: Keybindings,
+    /// The toolbar's solid color swatches, in toolbar order.
+    pub(crate) swatches: [HexColor; 6],
+    /// Rainbow's gradient colors, in order.
+    pub(crate) rainbow_colors: ColorSequence,
+    /// The colors Shifting steps through, one per shape.
+    pub(crate) cycle_colors: ColorSequence,
+    pub(crate) toolbar_position: ToolbarPosition,
+    pub(crate) auto_fade_seconds: AutoFadeSeconds,
+    pub(crate) tutorial_completed: bool,
+}
+/// The webviews import the same file, so the defaults have one source.
+const DEFAULTS_JSON: &str =
+    include_str!("../../../../packages/ui/src/contract/preference-defaults.json");
+static DEFAULTS: LazyLock<Preferences> = LazyLock::new(|| {
+    serde_json::from_str(DEFAULTS_JSON).expect("preference-defaults.json holds valid preferences")
+});
+impl Default for Preferences {
+    fn default() -> Self {
+        DEFAULTS.clone()
+    }
 }
 // Palette colors from before saved files had a version, mapped to their replacements.
 fn upgraded_color(color: &str) -> &str {
@@ -100,6 +170,17 @@ fn upgraded_color(color: &str) -> &str {
     }
 }
 impl Preferences {
+    /// Parses a saved file or webview payload. A missing field takes the shared default.
+    pub(crate) fn parse(saved: Value) -> serde_json::Result<Self> {
+        let Value::Object(fields) = saved else {
+            return serde_json::from_value(saved);
+        };
+        let mut merged = serde_json::to_value(Self::default())?;
+        for (field, value) in fields {
+            merged[field] = value;
+        }
+        serde_json::from_value(merged)
+    }
     /// Loads saved preferences, with a message for the user when any had to be reset.
     pub(crate) fn load(app: &tauri::AppHandle) -> (Self, Option<String>) {
         match app.path().app_config_dir() {
@@ -112,61 +193,16 @@ impl Preferences {
     }
 
     pub(crate) fn save(&self, app: &tauri::AppHandle) -> Result<()> {
-        let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
+        let dir = app.path().app_config_dir()?;
         self.save_to(&dir)
     }
 
     fn save_to(&self, dir: &Path) -> Result<()> {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let mut saved = serde_json::to_value(self).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(dir)?;
+        let mut saved = serde_json::to_value(self)?;
         saved["version"] = FORMAT_VERSION.into();
-        let bytes = serde_json::to_vec_pretty(&saved).map_err(|e| e.to_string())?;
-        write_atomically(&dir.join(FILE_NAME), &bytes).map_err(|e| e.to_string())
-    }
-
-    pub(crate) fn validate(&self) -> Result<Shortcut> {
-        if ![
-            "pen",
-            "arrow",
-            "rectangle",
-            "ellipse",
-            "highlighter",
-            "text",
-            "eraser",
-        ]
-        .contains(&self.tool.as_str())
-            || ![0, 3, 5, 10].contains(&self.auto_fade_seconds)
-            || !is_hex_color(&self.color)
-            || self.swatches.len() != 6
-            || !self.swatches.iter().all(|color| is_hex_color(color))
-            || !valid_sequence(&self.rainbow_colors)
-            || !valid_sequence(&self.cycle_colors)
-        {
-            return Err("Invalid drawing preferences".into());
-        }
-        if self.keybindings.len() > 64
-            || self.keybindings.iter().any(|(command, shortcut)| {
-                command.is_empty()
-                    || command.len() > 32
-                    || !command
-                        .bytes()
-                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-                    || (!shortcut.is_empty() && shortcut.parse::<Shortcut>().is_err())
-            })
-        {
-            return Err("Invalid keybindings".into());
-        }
-        let shortcut: Shortcut = self
-            .shortcut
-            .parse()
-            .map_err(|e| format!("Invalid shortcut: {e}"))?;
-        if !shortcut
-            .mods
-            .intersects(Modifiers::CONTROL | Modifiers::SUPER | Modifiers::ALT)
-        {
-            return Err("Include CommandOrControl, Control, Super, or Alt in the shortcut.".into());
-        }
-        Ok(shortcut)
+        let bytes = serde_json::to_vec_pretty(&saved)?;
+        Ok(write_atomically(&dir.join(FILE_NAME), &bytes)?)
     }
 }
 
@@ -260,9 +296,7 @@ fn recover(saved: Map<String, Value>) -> (Preferences, Vec<String>) {
 }
 
 fn parse(fields: &Map<String, Value>) -> Option<Preferences> {
-    serde_json::from_value::<Preferences>(Value::Object(fields.clone()))
-        .ok()
-        .filter(|preferences| preferences.validate().is_ok())
+    Preferences::parse(Value::Object(fields.clone())).ok()
 }
 
 /// Writes beside the destination and renames into place, so a crash or power
@@ -283,224 +317,144 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
+    const SHORTCUT_GRAMMAR: &str =
+        include_str!("../../../../packages/ui/src/contract/toggle-shortcuts.json");
+    fn hex(color: &str) -> HexColor {
+        HexColor(color.into())
+    }
+    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","shortcut":"Alt+Shift+KeyG","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
+    fn shortcut(text: &str) -> ToggleShortcut {
+        String::from(text).try_into().unwrap()
+    }
+    fn with(field: &str, value: Value) -> serde_json::Result<Preferences> {
+        let mut fields = serde_json::to_value(Preferences::default()).unwrap();
+        fields[field] = value;
+        serde_json::from_value(fields)
+    }
     #[test]
-    fn shortcut_validation_rejects_unmodified_and_malformed_keys() {
-        let mut p = Preferences::default();
-        assert!(p.validate().is_ok());
-        for shortcut in ["A", "Shift+A", "not a shortcut", "CommandOrControl+Shift+"] {
-            p.shortcut = shortcut.into();
-            assert!(p.validate().is_err(), "{shortcut}");
-        }
-        // Recorded shortcuts use browser key codes, which the native parser accepts.
-        for shortcut in [
-            "CommandOrControl+Shift+KeyA",
-            "Alt+Digit1",
-            "Control+Space",
-            "CommandOrControl+F5",
-            "Alt+Shift+ArrowUp",
-            "Super+Comma",
-            "CommandOrControl+Shift+S",
-        ] {
-            p.shortcut = shortcut.into();
-            assert!(p.validate().is_ok(), "{shortcut}");
+    fn saved_and_sent_preferences_keep_their_exact_json() {
+        let default_json = serde_json::to_string(&Preferences::default()).unwrap();
+        // Every field in the shared file is one the struct knows; an unknown key would be dropped here.
+        assert_eq!(
+            serde_json::from_str::<Value>(&default_json).unwrap(),
+            serde_json::from_str::<Value>(DEFAULTS_JSON).unwrap()
+        );
+        for (name, json) in [("default", default_json.as_str()), ("custom", CUSTOM_JSON)] {
+            let sent: Preferences = serde_json::from_str(json).unwrap();
+            assert_eq!(serde_json::to_string(&sent).unwrap(), json, "{name}");
+            let mut file: Value = serde_json::from_str(json).unwrap();
+            file["version"] = FORMAT_VERSION.into();
+            let stored = serde_json::to_vec_pretty(&file).unwrap();
+            let dir = scratch_dir(&format!("exact-{name}"));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(dir.join(FILE_NAME), &stored).unwrap();
+            let (loaded, warning) = load_from(&dir);
+            assert!(warning.is_none(), "{name}");
+            loaded.save_to(&dir).unwrap();
+            assert_eq!(
+                std::fs::read(dir.join(FILE_NAME)).unwrap(),
+                stored,
+                "{name}"
+            );
+            std::fs::remove_dir_all(dir).unwrap();
         }
     }
     #[test]
-    fn swatches_are_saved_and_validated() {
-        let preferences = Preferences {
-            swatches: [
-                "#123abc", "#FFFFFF", "#000000", "#8b5cf6", "#8b5cf6", "#00c7be",
-            ]
-            .map(String::from)
-            .to_vec(),
-            ..Preferences::default()
-        };
-        assert!(preferences.validate().is_ok());
-        let restored: Preferences =
-            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
-        assert_eq!(restored.swatches, preferences.swatches);
-        for swatches in [
-            vec!["#000000"; 5],
-            vec!["#000000"; 7],
-            vec![
-                "#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#fff",
-            ],
-            vec![
-                "#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#gggggg",
-            ],
-        ] {
-            let invalid = Preferences {
-                swatches: swatches.into_iter().map(String::from).collect(),
-                ..Preferences::default()
-            };
-            assert!(invalid.validate().is_err(), "{:?}", invalid.swatches);
+    fn toggle_shortcuts_follow_the_shared_grammar() {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Grammar {
+            recordable_keys: Vec<String>,
+            toggle: Toggle,
+        }
+        #[derive(Deserialize)]
+        struct Toggle {
+            valid: Vec<String>,
+            unmodified: Vec<String>,
+            malformed: Vec<String>,
+        }
+        let grammar: Grammar = serde_json::from_str(SHORTCUT_GRAMMAR).unwrap();
+        for key in &grammar.recordable_keys {
+            assert!(
+                with("shortcut", format!("Alt+{key}").into()).is_ok(),
+                "{key}"
+            );
+        }
+        for text in &grammar.toggle.valid {
+            assert_eq!(
+                with("shortcut", text.as_str().into())
+                    .unwrap()
+                    .shortcut
+                    .as_str(),
+                text
+            );
+        }
+        // Settings shows this message as is when a recorded shortcut has no modifier.
+        for text in &grammar.toggle.unmodified {
+            assert_eq!(
+                with("shortcut", text.as_str().into())
+                    .unwrap_err()
+                    .to_string(),
+                "Include CommandOrControl, Control, Super, or Alt in the shortcut.",
+                "{text}"
+            );
+        }
+        for text in &grammar.toggle.malformed {
+            assert!(with("shortcut", text.as_str().into()).is_err(), "{text}");
         }
     }
     #[test]
-    fn rainbow_and_shifting_colors_are_saved_and_validated() {
-        let preferences = Preferences {
-            rainbow_colors: vec!["#000000".into(), "#FFFFFF".into()],
-            cycle_colors: vec!["#123abc".into(); 8],
-            ..Preferences::default()
-        };
-        assert!(preferences.validate().is_ok());
-        let restored: Preferences =
-            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
-        assert_eq!(restored.rainbow_colors, preferences.rainbow_colors);
-        assert_eq!(restored.cycle_colors, preferences.cycle_colors);
-        let json = serde_json::to_value(&preferences).unwrap();
-        assert!(json.get("rainbowColors").is_some() && json.get("cycleColors").is_some());
-        for colors in [
-            vec![],
-            vec!["#000000"],
-            vec!["#000000"; 9],
-            vec!["#000000", "red"],
+    fn out_of_range_drawing_preferences_are_rejected() {
+        for (field, value) in [
+            ("tool", json!("pencil")),
+            ("colorMode", json!("neon")),
+            ("toolbarPosition", json!("top")),
+            ("autoFadeSeconds", json!(4)),
+            ("color", json!("")),
+            ("color", json!("#fff")),
+            ("color", json!("#12345678")),
+            ("color", json!("1234567")),
+            ("color", json!("#gggggg")),
+            ("color", json!("#é1234")),
+            ("swatches", json!(vec!["#000000"; 5])),
+            ("swatches", json!(vec!["#000000"; 7])),
+            (
+                "swatches",
+                json!(["#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#fff"]),
+            ),
+            ("rainbowColors", json!([])),
+            ("rainbowColors", json!(["#000000"])),
+            ("cycleColors", json!(vec!["#000000"; 9])),
+            ("cycleColors", json!(["#000000", "red"])),
+            ("keybindings", json!({"undo": "not a shortcut"})),
+            ("keybindings", json!({"undo": "CommandOrControl+"})),
+            ("keybindings", json!({"": "KeyA"})),
+            ("keybindings", json!({"Undo": "KeyA"})),
+            ("keybindings", json!({"tool_pen": "KeyA"})),
         ] {
-            let colors: Vec<String> = colors.into_iter().map(String::from).collect();
-            for invalid in [
-                Preferences {
-                    rainbow_colors: colors.clone(),
-                    ..Preferences::default()
-                },
-                Preferences {
-                    cycle_colors: colors.clone(),
-                    ..Preferences::default()
-                },
-            ] {
-                assert!(invalid.validate().is_err(), "{colors:?}");
-            }
+            assert!(with(field, value.clone()).is_err(), "{field}: {value}");
         }
-    }
-    #[test]
-    fn keybindings_are_saved_and_validated() {
-        let mut preferences = Preferences::default();
-        for (command, shortcut) in [
-            ("undo", "CommandOrControl+KeyU"),
-            ("color-red", "Digit9"),
-            ("hide", "Escape"),
-            ("tool-pen", "Alt+Shift+KeyP"),
-            ("copy", ""),
-        ] {
-            preferences
-                .keybindings
-                .insert(command.into(), shortcut.into());
-        }
-        assert!(preferences.validate().is_ok());
-        let restored: Preferences =
-            serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
-        assert_eq!(restored.keybindings, preferences.keybindings);
-        for (command, shortcut) in [
-            ("undo", "not a shortcut"),
-            ("undo", "CommandOrControl+"),
-            ("", "KeyA"),
-            ("Undo", "KeyA"),
-            ("tool_pen", "KeyA"),
-        ] {
-            let mut invalid = Preferences::default();
-            invalid.keybindings.insert(command.into(), shortcut.into());
-            assert!(invalid.validate().is_err(), "{command}: {shortcut}");
-        }
-    }
-    #[test]
-    fn auto_fade_preferences_are_saved_and_validated() {
-        for seconds in [0, 3, 5, 10] {
-            let preferences = Preferences {
-                auto_fade_seconds: seconds,
-                ..Preferences::default()
-            };
-            assert!(preferences.validate().is_ok());
-            let saved = serde_json::to_string(&preferences).unwrap();
-            let restored: Preferences = serde_json::from_str(&saved).unwrap();
-            assert_eq!(restored.auto_fade_seconds, seconds);
-        }
-        let invalid = Preferences {
-            auto_fade_seconds: 4,
-            ..Preferences::default()
-        };
-        assert!(invalid.validate().is_err());
-    }
-    #[test]
-    fn every_tool_is_accepted_and_unknown_tools_are_rejected() {
-        for tool in [
-            "pen",
-            "arrow",
-            "rectangle",
-            "ellipse",
-            "highlighter",
-            "text",
-            "eraser",
-        ] {
-            let preferences = Preferences {
-                tool: tool.into(),
-                ..Preferences::default()
-            };
-            assert!(preferences.validate().is_ok(), "{tool}");
-        }
-        let invalid = Preferences {
-            tool: "pencil".into(),
-            ..Preferences::default()
-        };
-        assert!(invalid.validate().is_err());
     }
     #[test]
     fn older_preferences_default_to_rainbow_and_keep_color_and_shortcut() {
-        let preferences: Preferences = serde_json::from_str(
-            r##"{"tool":"pen","color":"#68aaff","width":7,"shortcut":"CommandOrControl+Shift+B"}"##,
+        let preferences = Preferences::parse(
+            serde_json::from_str(
+                r##"{"tool":"pen","color":"#68aaff","width":7,"shortcut":"CommandOrControl+Shift+B"}"##,
+            )
+            .unwrap(),
         )
         .unwrap();
-        assert_eq!(preferences.color_mode, ColorMode::Rainbow);
-        assert_eq!(preferences.toolbar_position, ToolbarPosition::Bottom);
-        assert_eq!(preferences.tool, "pen");
-        assert_eq!(preferences.auto_fade_seconds, 0);
-        assert_eq!(preferences.color, "#68aaff");
-        assert_eq!(preferences.shortcut, "CommandOrControl+Shift+B");
-        assert!(preferences.keybindings.is_empty());
-        assert_eq!(preferences.swatches, default_swatches());
-        assert_eq!(preferences.rainbow_colors, default_sequence());
-        assert_eq!(preferences.cycle_colors, default_sequence());
         // Retired line-width preferences are ignored without resetting other settings.
-        assert!(serde_json::to_value(&preferences)
-            .unwrap()
-            .get("width")
-            .is_none());
-        assert!(preferences.validate().is_ok());
-    }
-    #[test]
-    fn custom_colors_are_validated_and_preserved() {
-        for color in ["#000000", "#ffffff", "#123aBC", "#ff6259"] {
-            let preferences = Preferences {
-                color: color.into(),
+        assert_eq!(
+            preferences,
+            Preferences {
+                tool: Tool::Pen,
+                color: hex("#68aaff"),
+                shortcut: shortcut("CommandOrControl+Shift+B"),
                 ..Preferences::default()
-            };
-            assert!(preferences.validate().is_ok());
-            let loaded: Preferences =
-                serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
-            assert_eq!(loaded.color, color);
-        }
-        for color in ["", "#", "#fff", "#12345678", "1234567", "#gggggg", "#é1234"] {
-            let preferences = Preferences {
-                color: color.into(),
-                ..Preferences::default()
-            };
-            assert!(preferences.validate().is_err(), "{color}");
-        }
-    }
-    #[test]
-    fn toolbar_positions_survive_saving_and_loading() {
-        for position in [
-            ToolbarPosition::Left,
-            ToolbarPosition::Right,
-            ToolbarPosition::Bottom,
-        ] {
-            let preferences = Preferences {
-                toolbar_position: position,
-                ..Preferences::default()
-            };
-            let loaded: Preferences =
-                serde_json::from_slice(&serde_json::to_vec(&preferences).unwrap()).unwrap();
-            assert_eq!(loaded.toolbar_position, position);
-            assert!(loaded.validate().is_ok());
-        }
+            }
+        );
     }
     fn scratch_dir(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -522,7 +476,7 @@ mod tests {
         let dir = scratch_dir("saved");
         Preferences::default().save_to(&dir).unwrap();
         let preferences = Preferences {
-            tool: "pen".into(),
+            tool: Tool::Pen,
             ..Preferences::default()
         };
         preferences.save_to(&dir).unwrap();
@@ -561,13 +515,17 @@ mod tests {
         std::fs::write(dir.join(FILE_NAME), saved).unwrap();
         let (preferences, warning) = load_from(&dir);
         assert!(warning.is_some());
-        assert_eq!(preferences.tool, Preferences::default().tool);
-        assert_eq!(preferences.auto_fade_seconds, 0);
-        assert_eq!(preferences.color, "#123abc");
-        assert_eq!(preferences.shortcut, "Alt+KeyG");
-        assert_eq!(preferences.keybindings["undo"], "CommandOrControl+KeyU");
-        assert_eq!(preferences.toolbar_position, ToolbarPosition::Left);
-        assert!(preferences.tutorial_completed);
+        assert_eq!(
+            preferences,
+            Preferences {
+                color: hex("#123abc"),
+                shortcut: shortcut("Alt+KeyG"),
+                keybindings: Keybindings([("undo".into(), "CommandOrControl+KeyU".into())].into()),
+                toolbar_position: ToolbarPosition::Left,
+                tutorial_completed: true,
+                ..Preferences::default()
+            }
+        );
         let (_, reset) = recover(serde_json::from_str(saved).unwrap());
         assert_eq!(reset, ["autoFadeSeconds", "tool"]);
         let (reloaded, warning) = load_from(&dir);
@@ -581,7 +539,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
         let dir = scratch_dir("unreadable");
         let custom = Preferences {
-            tool: "pen".into(),
+            tool: Tool::Pen,
             ..Preferences::default()
         };
         custom.save_to(&dir).unwrap();
@@ -610,29 +568,19 @@ mod tests {
         )
         .unwrap();
         let (legacy, warning) = load_from(&dir);
-        assert_eq!(legacy.color, "#669df0");
+        assert_eq!(legacy.color, hex("#669df0"));
         assert!(warning.is_none());
         // A color the user picks now is kept, both from the webview and from disk.
-        let picked: Preferences = serde_json::from_str(
-            r##"{"tool":"pen","color":"#3388ff","shortcut":"CommandOrControl+Shift+A"}"##,
+        let picked = Preferences::parse(
+            serde_json::from_str(
+                r##"{"tool":"pen","color":"#3388ff","shortcut":"CommandOrControl+Shift+A"}"##,
+            )
+            .unwrap(),
         )
         .unwrap();
-        assert_eq!(picked.color, "#3388ff");
+        assert_eq!(picked.color, hex("#3388ff"));
         picked.save_to(&dir).unwrap();
-        assert_eq!(load_from(&dir).0.color, "#3388ff");
+        assert_eq!(load_from(&dir).0.color, hex("#3388ff"));
         std::fs::remove_dir_all(dir).unwrap();
-    }
-    #[test]
-    fn color_modes_survive_saving_and_loading() {
-        for mode in [ColorMode::Solid, ColorMode::Rainbow, ColorMode::Cycle] {
-            let preferences = Preferences {
-                color_mode: mode,
-                ..Preferences::default()
-            };
-            let bytes = serde_json::to_vec(&preferences).unwrap();
-            let loaded: Preferences = serde_json::from_slice(&bytes).unwrap();
-            assert_eq!(loaded.color_mode, mode);
-            assert!(loaded.validate().is_ok());
-        }
     }
 }

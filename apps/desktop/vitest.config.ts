@@ -3,4 +3,5 @@ import viteConfig from './vite.config.ts';
 
 export default mergeConfig(viteConfig, defineConfig({
   resolve: { conditions: ['browser'] },
+  test: { setupFiles: ['src/test-setup.ts'] },
 }));

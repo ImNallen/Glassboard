@@ -1,8 +1,9 @@
-import { COLOR_SHORTCUTS, colorChoice, commandFor, matchesShortcut, TOOL_SHORTCUTS } from './shortcuts';
-import { mac, native, type Preferences, type Session } from './session';
+import { colorShortcut, commandFor, matchesShortcut, platformMac, toolShortcut } from './shortcuts';
+import { isEditableTarget } from './selection';
+import { native, type Action, type Preferences, type Session } from './session';
 
 type Handlers = {
-  run: (action: string) => void;
+  run: (action: Action) => void;
   save: (preferences: Preferences) => void;
   /** Start screenshot capture when the host provides a capture editor. */
   capture?: () => void;
@@ -16,11 +17,11 @@ type Handlers = {
  */
 export function drawingKeydown(event: KeyboardEvent, session: Session, { run, save, capture, toggleShortcut = !native }: Handlers) {
   if (event.defaultPrevented) return;
-  if ((event.target as HTMLElement)?.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (isEditableTarget(event.target)) return;
   const { keybindings, shortcut } = session.preferences;
-  if (toggleShortcut && matchesShortcut(event, shortcut, mac)) { event.preventDefault(); run('toggle'); return; }
+  if (toggleShortcut && matchesShortcut(event, shortcut, platformMac)) { event.preventDefault(); run('toggle'); return; }
   if (session.mode === 'hidden') return;
-  const command = commandFor(event, keybindings, mac);
+  const command = commandFor(event, keybindings, platformMac);
   if (command === 'capture') {
     if (!capture) return;
     event.preventDefault();
@@ -28,12 +29,8 @@ export function drawingKeydown(event: KeyboardEvent, session: Session, { run, sa
     return;
   }
   if (command === 'hide' || command === 'undo' || command === 'redo') { event.preventDefault(); run(command); return; }
-  const color = COLOR_SHORTCUTS.find(choice => choice.command === command);
-  if (color) {
-    event.preventDefault();
-    save({ ...session.preferences, ...colorChoice(color, session.preferences.swatches) });
-    return;
-  }
-  const tool = TOOL_SHORTCUTS.find(tool => tool.command === command);
-  if (tool) { event.preventDefault(); save({ ...session.preferences, tool: tool.id }); }
+  const color = colorShortcut(event, keybindings, platformMac, session.preferences.swatches);
+  if (color) { event.preventDefault(); save({ ...session.preferences, ...color }); return; }
+  const tool = toolShortcut(event, keybindings, platformMac);
+  if (tool) { event.preventDefault(); save({ ...session.preferences, tool }); }
 }

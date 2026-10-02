@@ -1,14 +1,9 @@
-import { CYCLE_COLORS } from './drawing';
+import preferenceDefaults from '../contract/preference-defaults.json';
+import { cycleColor, CYCLE_COLORS } from './drawing';
 
+const SWATCH_NAMES = ['Black', 'White', 'Green', 'Yellow', 'Red', 'Blue'];
 /** The toolbar's solid color swatches, in toolbar order. Users can replace each color. */
-export const DEFAULT_SWATCHES: readonly { color: string; name: string }[] = [
-  { color: '#000000', name: 'Black' },
-  { color: '#ffffff', name: 'White' },
-  { color: CYCLE_COLORS[2], name: 'Green' },
-  { color: CYCLE_COLORS[1], name: 'Yellow' },
-  { color: CYCLE_COLORS[0], name: 'Red' },
-  { color: CYCLE_COLORS[4], name: 'Blue' },
-];
+export const DEFAULT_SWATCHES: readonly { color: string; name: string }[] = preferenceDefaults.swatches.map((color, slot) => ({ color, name: SWATCH_NAMES[slot] }));
 export const defaultSwatches = () => DEFAULT_SWATCHES.map(swatch => swatch.color);
 
 /** Quick picks for the color editor: the Glassboard palette, vivid hues, then neutrals and deep tones. */
@@ -63,4 +58,18 @@ export function hsvToHex({ h, s, v }: Hsv): string {
     return Math.round((v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255).toString(16).padStart(2, '0');
   };
   return `#${channel(5)}${channel(3)}${channel(1)}`;
+}
+
+/** A swatch showing a rainbow's colors all the way around. */
+export function rainbowPreview(colors: readonly string[] = CYCLE_COLORS): string { return `conic-gradient(${[...colors, colors[0]].join(', ')})`; }
+/** A swatch showing three colors spread across the Shifting sequence, starting at `index`. */
+export function shiftingPreview(colors: readonly string[] = CYCLE_COLORS, index = 0): string {
+  const [a, b, c] = [0, 1, 2].map(step => cycleColor(index + Math.round(step * colors.length / 3), colors));
+  return `conic-gradient(${a} 0deg 120deg, ${b} 120deg 240deg, ${c} 240deg 360deg)`;
+}
+/** A strip blending through `colors` from left to right. */
+export function gradientStrip(colors: readonly string[]): string { return `linear-gradient(90deg, ${colors.join(', ')})`; }
+/** A strip of equal hard-edged bands, one per color. */
+export function bandStrip(colors: readonly string[]): string {
+  return `linear-gradient(90deg, ${colors.map((color, i) => `${color} ${i / colors.length * 100}% ${(i + 1) / colors.length * 100}%`).join(', ')})`;
 }

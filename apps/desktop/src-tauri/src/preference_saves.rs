@@ -38,19 +38,17 @@ impl PreferenceSaves {
     }
 
     pub(crate) fn save_now(&self, preferences: Preferences) -> Result<()> {
-        let (sender, receiver) = mpsc::channel();
-        self.0
-            .send(SaveRequest::Save(preferences, sender))
-            .map_err(|_| "Preference saving is unavailable".to_string())?;
-        receiver
-            .recv()
-            .map_err(|_| "Preference saving stopped".to_string())?
+        self.request(|sender| SaveRequest::Save(preferences, sender))
     }
 
     pub(crate) fn flush(&self) -> Result<()> {
+        self.request(SaveRequest::Flush)
+    }
+
+    fn request(&self, make: impl FnOnce(Sender<Result<()>>) -> SaveRequest) -> Result<()> {
         let (sender, receiver) = mpsc::channel();
         self.0
-            .send(SaveRequest::Flush(sender))
+            .send(make(sender))
             .map_err(|_| "Preference saving is unavailable".to_string())?;
         receiver
             .recv()
@@ -122,6 +120,7 @@ fn save_loop(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::preferences::Tool;
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -138,7 +137,7 @@ mod tests {
                     started.send(()).unwrap();
                     wait.recv().unwrap();
                 }
-                saved.lock().unwrap().push(p.tool.clone());
+                saved.lock().unwrap().push(p.tool);
                 Ok(())
             },
             |_| panic!("unexpected save failure"),
@@ -147,13 +146,13 @@ mod tests {
         writing.recv_timeout(Duration::from_secs(2)).unwrap();
         writer
             .queue(Preferences {
-                tool: "pen".into(),
+                tool: Tool::Pen,
                 ..Preferences::default()
             })
             .unwrap();
         release.send(()).unwrap();
         writer.flush().unwrap();
-        assert_eq!(writes.lock().unwrap().last().unwrap(), "pen");
+        assert_eq!(writes.lock().unwrap().last().unwrap(), &Tool::Pen);
     }
 
     #[test]
@@ -162,21 +161,21 @@ mod tests {
         let saved = writes.clone();
         let writer = PreferenceSaves::spawn(
             move |p| {
-                saved.lock().unwrap().push(p.tool.clone());
+                saved.lock().unwrap().push(p.tool);
                 Ok(())
             },
             |_| panic!("unexpected save failure"),
         );
-        for tool in ["pen", "rectangle", "text"] {
+        for tool in [Tool::Pen, Tool::Rectangle, Tool::Text] {
             writer
                 .queue(Preferences {
-                    tool: tool.into(),
+                    tool,
                     ..Preferences::default()
                 })
                 .unwrap();
         }
         writer.flush().unwrap();
-        assert_eq!(*writes.lock().unwrap(), ["text"]);
+        assert_eq!(*writes.lock().unwrap(), [Tool::Text]);
     }
 
     #[test]
@@ -185,7 +184,7 @@ mod tests {
         let saved = writes.clone();
         let writer = PreferenceSaves::spawn(
             move |p| {
-                saved.lock().unwrap().push(p.shortcut.clone());
+                saved.lock().unwrap().push(p.shortcut.as_str().to_owned());
                 Ok(())
             },
             |_| panic!("unexpected save failure"),
@@ -193,7 +192,7 @@ mod tests {
         writer.queue(Preferences::default()).unwrap();
         writer
             .save_now(Preferences {
-                shortcut: "Alt+A".into(),
+                shortcut: String::from("Alt+A").try_into().unwrap(),
                 ..Preferences::default()
             })
             .unwrap();
@@ -207,28 +206,28 @@ mod tests {
         let saved = writes.clone();
         let writer = PreferenceSaves::spawn(
             move |p| {
-                if p.shortcut == "Alt+A" {
+                if p.shortcut.as_str() == "Alt+A" {
                     return Err("disk full".into());
                 }
-                saved.lock().unwrap().push(p.tool.clone());
+                saved.lock().unwrap().push(p.tool);
                 Ok(())
             },
             |_| panic!("unexpected background failure"),
         );
         writer
             .queue(Preferences {
-                tool: "pen".into(),
+                tool: Tool::Pen,
                 ..Preferences::default()
             })
             .unwrap();
         assert!(writer
             .save_now(Preferences {
-                shortcut: "Alt+A".into(),
+                shortcut: String::from("Alt+A").try_into().unwrap(),
                 ..Preferences::default()
             })
             .is_err());
         writer.flush().unwrap();
-        assert_eq!(writes.lock().unwrap().last().unwrap(), "pen");
+        assert_eq!(writes.lock().unwrap().last().unwrap(), &Tool::Pen);
     }
 
     #[test]

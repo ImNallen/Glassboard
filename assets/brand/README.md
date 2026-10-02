@@ -25,8 +25,8 @@ This optional asset-generation command requires `rsvg-convert` and Python's Pill
 neither is a runtime dependency. All other graphics in this folder are generated from the master.
 
 The generator also updates `apps/desktop/src-tauri/icons/icon.{png,icns,ico}`, the macOS
-template and Windows tray images, and `apps/desktop/public/favicon.{svg,ico}`. The macOS
-template is rendered at 36 px for Tauri's 18 pt presentation on Retina displays.
+template and Windows tray images, and `favicon.{svg,ico}` in both `apps/desktop/public`
+and `apps/web/public`. The macOS template is rendered at 36 px for Tauri's 18 pt presentation on Retina displays.
 The tutorial and settings use the SVG master directly as a CSS mask, inheriting
 their surrounding text color in both appearances. The GitHub README uses the app
 icon; the separate avatar export remains available for an account or organization.

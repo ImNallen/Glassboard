@@ -4,7 +4,7 @@ import { flushSync, mount, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
 import Overlay from './Overlay.svelte';
 import { defaults, reportHistory } from './lib/session';
-import { render, shapeAtPoint } from './lib/drawing';
+import { REGULAR_WIDTH, render, shapeAtPoint, TEXT_FONT_FAMILY, textFontSize, textLineHeight } from './lib/drawing';
 
 vi.mock('./lib/session', async importOriginal => ({
   ...await importOriginal<typeof import('./lib/session')>(),
@@ -156,4 +156,15 @@ it('discards the stroke on pointercancel, when the browser took the gesture', ()
   pointer(canvas, 'pointermove', 110, 80);
   pointer(canvas, 'pointercancel', 110, 80);
   expect(drawn()).toHaveLength(0);
+});
+
+it('sets the inline text editor in the font the canvas draws committed text with', () => {
+  const { store, canvas } = setup();
+  vi.mocked(canvas.getContext).mockReturnValue({ clearRect, save() {}, restore() {}, measureText: () => ({ width: 40 }) } as unknown as CanvasRenderingContext2D);
+  store.update(session => ({ ...session, preferences: { ...session.preferences, tool: 'text' } }));
+  flushSync();
+  pointer(canvas, 'pointerdown', 10, 20);
+  const editor = document.querySelector('textarea')!;
+  expect([editor.style.fontWeight, editor.style.fontSize, editor.style.fontFamily.replaceAll('"', "'")]).toEqual(['600', `${textFontSize(REGULAR_WIDTH)}px`, TEXT_FONT_FAMILY]);
+  expect(editor.style.lineHeight).toBe(`${textLineHeight(REGULAR_WIDTH)}px`);
 });

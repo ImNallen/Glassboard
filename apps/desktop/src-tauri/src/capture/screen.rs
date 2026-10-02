@@ -23,9 +23,8 @@ pub(crate) fn capture(
             app.run_on_main_thread(move || {
                 let status = unsafe { windows_sys::Win32::Graphics::Dwm::DwmFlush() };
                 let _ = send.send(status);
-            })
-            .map_err(|e| e.to_string())?;
-            let status = receive.recv().map_err(|e| e.to_string())?;
+            })?;
+            let status = receive.recv()?;
             if status < 0 {
                 // Preserve capture on systems where compositor synchronization fails.
                 log::warn!("Compositor flush failed ({status:#x}); using capture delay");
@@ -40,7 +39,7 @@ pub(crate) fn capture(
         // Windows monitor handles stay on this worker, rather than crossing threads.
         xcap::Monitor::from_point(point.0, point.1)
             .and_then(|monitor| monitor.capture_image())
-            .map_err(|e| format!("Could not capture the screen: {e}"))
+            .map_err(|e| format!("Could not capture the screen: {e}").into())
     }
 }
 
@@ -92,7 +91,7 @@ mod macos {
         if !read {
             return Err("Could not read a capture window ID".into());
         }
-        u32::try_from(number).map_err(|e| e.to_string())
+        Ok(u32::try_from(number)?)
     }
 
     pub(super) fn capture(position: (i32, i32), size: (u32, u32)) -> Result<image::RgbaImage> {
@@ -182,7 +181,7 @@ mod macos {
             vImagePermuteChannels_ARGB8888(&source, &destination, [2, 1, 0, 3].as_ptr(), 0)
         };
         if status != 0 {
-            return Err(format!("Could not convert screenshot pixels: {status}"));
+            return Err(format!("Could not convert screenshot pixels: {status}").into());
         }
         image::RgbaImage::from_raw(width as u32, height as u32, pixels)
             .ok_or("Could not prepare the screenshot pixels".into())
@@ -192,22 +191,6 @@ mod macos {
     mod tests {
         use super::*;
 
-        #[test]
-        #[ignore = "manual full-resolution native pixel conversion benchmark"]
-        fn benchmark_bgra_conversion() {
-            let width = 3840;
-            let height = 2160;
-            let bytes = vec![127; width * height * 4];
-            let mut samples = Vec::new();
-            for _ in 0..5 {
-                let started = std::time::Instant::now();
-                let image = bgra_image(&bytes, width, height, width * 4).unwrap();
-                samples.push(started.elapsed().as_secs_f64() * 1000.0);
-                assert_eq!(image.as_raw(), &bytes);
-            }
-            samples.sort_by(f64::total_cmp);
-            eprintln!("Native 4K BGRA conversion: median {:.2} ms", samples[2]);
-        }
         #[test]
         fn converts_bgra_rows_without_copying_padding() {
             let bytes = [

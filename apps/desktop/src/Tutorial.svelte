@@ -1,16 +1,17 @@
 <script lang="ts">
   import { ArrowUpRight, Check, X } from '@lucide/svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
-  import { action, native, shortcutLabel, type Session } from '@glassboard/ui/session';
-  import { keybinding } from '@glassboard/ui/shortcuts';
-  let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
+  import { action, native, type Session, type Action } from '@glassboard/ui/session';
+  import { keyLabel, shortcutLabel } from '@glassboard/ui/shortcuts';
+  import type { Errors } from '@glassboard/ui/errors';
+  let { session, errors }: { session: Session; errors: Errors } = $props();
   let busy = $state(false);
   let shortcut = $derived(shortcutLabel(session.preferences.shortcut));
-  let undo = $derived(shortcutLabel(keybinding(session.preferences.keybindings, 'undo')));
-  let hide = $derived(shortcutLabel(keybinding(session.preferences.keybindings, 'hide')));
-  async function run(name: string) {
+  let undo = $derived(keyLabel(session.preferences.keybindings, 'undo'));
+  let hide = $derived(keyLabel(session.preferences.keybindings, 'hide'));
+  async function run(name: Action) {
     busy = true;
-    try { await action(name); } catch (e) { onerror(e); }
+    try { await action(name); } catch (e) { errors.report(e); }
     finally { busy = false; }
   }
 </script>
@@ -58,31 +59,31 @@
     {#if session.shortcutUnavailable}
       <p class="error" role="alert">Another app is using <kbd>{shortcut}</kbd>. <button class="link" disabled={busy} onclick={() => run('settings')}>Choose a different shortcut</button></p>
     {/if}
-    {#if error || session.error}
-      <p class="error" role="alert">{error || session.error} <button class="link" onclick={() => { onerror(''); if (session.error) run('dismiss-error'); }}>Dismiss</button></p>
+    {#if errors.message}
+      <p class="error" role="alert">{errors.message} <button class="link" onclick={errors.dismiss}>Dismiss</button></p>
     {/if}
   </aside>
 {/if}
 
 <style>
-  .tutorial { color-scheme: light dark; margin: 8px; padding: 20px; height: calc(100vh - 16px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 3px 10px var(--shadow); display: flex; flex-direction: column; }
+  .tutorial { color-scheme: light dark; margin: 8px; padding: 20px; height: calc(100vh - 16px); overflow-y: auto; background: var(--gb-surface); border: 1px solid var(--gb-border); border-radius: 16px; box-shadow: 0 3px 10px var(--gb-shadow); display: flex; flex-direction: column; }
   .tutorial.preview { position: fixed; z-index: 30; top: 20px; left: 50%; transform: translateX(-50%); width: min(384px, calc(100vw - 32px)); height: auto; min-height: 300px; max-height: calc(100vh - 120px); margin: 0; }
   header, footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   header { margin-bottom: 18px; }
   header .icon-button { width: 26px; height: 26px; margin: -6px; }
   .brand { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; }
-  .step { display: flex; align-items: center; gap: 5px; font-size: 9px; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; }
+  .step { display: flex; align-items: center; gap: 5px; font-size: 9px; letter-spacing: 1.2px; color: var(--gb-muted); font-weight: 600; }
   h1 { font-size: 24px; letter-spacing: -.8px; line-height: 1.2; margin: 9px 0 12px; font-weight: 600; }
   p { font-size: 13px; line-height: 1.6; margin: 0 0 12px; }
   kbd { white-space: nowrap; }
-  .hint { color: var(--muted); font-size: 12px; }
+  .hint { color: var(--gb-muted); font-size: 12px; }
   footer { margin-top: auto; padding-top: 6px; }
   footer button { font-size: 12px; min-height: 34px; border-radius: 8px; }
-  .primary { display: flex; align-items: center; gap: 8px; background: var(--selected); padding: 8px 12px; margin-left: auto; }
-  .primary:hover { background: var(--selected-border); }
-  .secondary { color: var(--secondary-text); padding: 0; }
+  .primary { display: flex; align-items: center; gap: 8px; background: var(--gb-selected); padding: 8px 12px; margin-left: auto; }
+  .primary:hover { background: var(--gb-selected-border); }
+  .secondary { color: var(--gb-secondary-text); padding: 0; }
   .secondary:hover { text-decoration: underline; }
-  .mode { font-size: 11px; color: var(--muted); }
-  .error { margin: 8px 0 0; color: var(--error-text); font-size: 11px; overflow-wrap: anywhere; }
+  .mode { font-size: 11px; color: var(--gb-muted); }
+  .error { margin: 8px 0 0; color: var(--gb-error-text); font-size: 11px; overflow-wrap: anywhere; }
   .link { padding: 0; font-size: inherit; color: inherit; text-decoration: underline; }
 </style>

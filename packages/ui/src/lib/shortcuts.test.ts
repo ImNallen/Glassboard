@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colorShortcut, commandFor, formatShortcut, heldModifiers, KEYBINDINGS, keybinding, matchesShortcut, normalizeShortcut, recordShortcut, sameShortcut, shortcutKeys, toolShortcut } from './shortcuts';
+import { colorShortcut, commandFor, DEFAULT_SHORTCUT, formatShortcut, heldModifiers, KEYBINDINGS, keybinding, keyLabel, matchesShortcut, normalizeShortcut, rebindCommand, rebindToggle, recordShortcut, sameShortcut, shortcutKeys, toolShortcut } from './shortcuts';
 
 describe('color shortcuts', () => {
   const event = { key: '1', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
@@ -141,10 +141,34 @@ describe('keybindings', () => {
     expect(recordShortcut(azertyA, true, true)).toBe('CommandOrControl+KeyQ');
     expect(recordShortcut(press('3', 'Digit3'), true)).toBe('Digit3');
   });
+  it('labels the shortcut bound to a command', () => {
+    expect(keyLabel(undefined, 'hide')).toBe('Esc');
+    expect(keyLabel({ hide: 'KeyQ' }, 'hide')).toBe('Q');
+    expect(keyLabel({ hide: '' }, 'hide')).toBe('');
+  });
   it('splits shortcuts into keycap labels', () => {
     expect(shortcutKeys('CommandOrControl+Shift+KeyZ', true)).toEqual(['⌘', '⇧', 'Z']);
     expect(shortcutKeys('CommandOrControl+Shift+KeyZ', false)).toEqual(['Ctrl', 'Shift', 'Z']);
     expect(shortcutKeys('Escape', true)).toEqual(['Esc']);
     expect(shortcutKeys('', true)).toEqual([]);
+  });
+});
+
+describe('rebinding', () => {
+  const current = { shortcut: DEFAULT_SHORTCUT, keybindings: { redo: '' } };
+  it('moves the show/hide shortcut, unbinding the command that used it', () => {
+    expect(rebindToggle(current, 'Shift+CmdOrCtrl+KeyA', true)).toBeUndefined();
+    expect(rebindToggle(current, 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: 'CommandOrControl+KeyZ', keybindings: { redo: '', undo: '' }, moved: ['Undo'] });
+    expect(current.keybindings).toEqual({ redo: '' });
+  });
+  it('moves a command shortcut from the command that used it', () => {
+    expect(rebindCommand(current, 'undo', 'CmdOrCtrl+KeyZ', true)).toBeUndefined();
+    expect(rebindCommand(current, 'undo', DEFAULT_SHORTCUT, true)).toBe('toggle');
+    expect(rebindCommand(current, 'redo', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, keybindings: { undo: '', redo: 'CommandOrControl+KeyZ' }, moved: ['Undo'] });
+    expect(current.keybindings).toEqual({ redo: '' });
+  });
+  it('drops a binding equal to the default and unbinds on an empty shortcut', () => {
+    expect(rebindCommand({ ...current, keybindings: { undo: 'Alt+KeyU' } }, 'undo', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, keybindings: {}, moved: [] });
+    expect(rebindCommand(current, 'undo', '', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, keybindings: { redo: '', undo: '' }, moved: [] });
   });
 });

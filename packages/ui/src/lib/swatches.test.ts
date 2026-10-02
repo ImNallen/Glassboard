@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultSwatches, hexToHsv, hsvToHex, parseHexColor, swatchColor, swatchName, SWATCH_PRESETS } from './swatches';
+import { bandStrip, defaultSwatches, gradientStrip, hexToHsv, hsvToHex, parseHexColor, rainbowPreview, shiftingPreview, swatchColor, swatchName, SWATCH_PRESETS } from './swatches';
 
 describe('swatches', () => {
   it('keeps the toolbar palette as the default', () => {
@@ -29,5 +29,14 @@ describe('swatches', () => {
     expect(hexToHsv('#000000')).toEqual({ h: 0, s: 0, v: 0 });
     expect(hsvToHex({ h: 120, s: 1, v: 1 })).toBe('#00ff00');
     for (const color of [...SWATCH_PRESETS, ...defaultSwatches()]) expect(hsvToHex(hexToHsv(color))).toBe(color);
+  });
+  it('previews custom lists', () => {
+    expect(rainbowPreview(['#111111', '#222222'])).toBe('conic-gradient(#111111, #222222, #111111)');
+    expect(shiftingPreview(['#111111', '#222222', '#333333'])).toBe('conic-gradient(#111111 0deg 120deg, #222222 120deg 240deg, #333333 240deg 360deg)');
+    expect(shiftingPreview(['#111111', '#222222', '#333333'], 1)).toContain('#222222 0deg 120deg');
+  });
+  it('draws list strips as a blend or as equal bands', () => {
+    expect(gradientStrip(['#111111', '#222222', '#333333'])).toBe('linear-gradient(90deg, #111111, #222222, #333333)');
+    expect(bandStrip(['#111111', '#222222'])).toBe('linear-gradient(90deg, #111111 0% 50%, #222222 50% 100%)');
   });
 });

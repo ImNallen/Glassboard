@@ -1,38 +1,35 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod capture;
-mod capture_screen;
 mod commands;
+mod error;
 mod preference_saves;
 mod preferences;
 mod session;
-mod settings_position;
 mod startup_error;
 mod state;
-mod toolbar_position;
 mod tray;
 mod windows;
 
-use capture::{copy_capture, copy_capture_region, get_capture_image, CaptureImage};
+use capture::{copy_capture, copy_capture_region, get_capture_image};
 use commands::{
-    action, activate_overlay, expand_toolbar, get_autostart, get_session, perform, register_toggle,
-    report_history, set_autostart, set_preferences,
+    action, activate_overlay, expand_toolbar, get_autostart, get_session, register_toggle,
+    report_history, set_autostart, set_preferences, transition,
 };
 use preference_saves::PreferenceSaves;
 use preferences::Preferences;
-use session::Session;
+use session::{Session, Transition};
 use state::{report, snapshot, AppState};
 use std::sync::Mutex;
 use tauri::Manager;
 use tray::TrayAnchor;
 use windows::{
     apply_windows, select_cursor_monitor,
-    toolbar::{
-        position_toolbar, watch_toolbar_proximity, ToolbarExpanded, ToolbarLayout, ToolbarTracking,
-    },
+    toolbar::{position_toolbar, watch_toolbar_proximity, Toolbar},
+    Surface,
 };
 
-type Result<T> = std::result::Result<T, String>;
+use error::Result;
 
 fn main() {
     // Release builds have no console, so record panics in the log before the
@@ -65,13 +62,14 @@ fn main() {
         .on_window_event(|window, event| {
             // Native activation (including clicking another display) can raise a
             // transparent drawing window above the toolbar before a drawing command.
+            let surface = Surface::parse(window.label());
             #[cfg(target_os = "windows")]
-            if window.label().starts_with("overlay-")
+            if matches!(surface, Some(Surface::Overlay(_)))
                 && matches!(event, tauri::WindowEvent::Focused(true))
             {
                 windows::raise_toolbar(window.app_handle());
             }
-            let settings = window.label() == "settings";
+            let settings = surface == Some(Surface::Settings);
             let should_close = match event {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     api.prevent_close();
@@ -84,16 +82,13 @@ fn main() {
                 _ => false,
             };
             if should_close {
-                if let Err(error) = perform(
+                if let Err(error) = transition(
                     window.app_handle(),
-                    if settings {
-                        "close-settings"
-                    } else if window.label() == "capture" {
-                        "cancel-capture"
-                    } else if window.label() == "tutorial" {
-                        "dismiss-tutorial"
-                    } else {
-                        "hide"
+                    match surface {
+                        Some(Surface::Settings) => Transition::CloseSettings,
+                        Some(Surface::Capture) => Transition::CancelCapture,
+                        Some(Surface::Tutorial) => Transition::DismissTutorial,
+                        Some(Surface::Toolbar | Surface::Overlay(_)) | None => Transition::Hide,
                     },
                 ) {
                     report(window.app_handle(), error);
@@ -171,11 +166,8 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         }
         app.set_menu(menu)?;
     }
-    app.manage(CaptureImage(Mutex::new(None)));
     app.manage(TrayAnchor(Mutex::new(None)));
-    app.manage(ToolbarExpanded(Mutex::new(false)));
-    app.manage(ToolbarLayout(Mutex::new(None)));
-    app.manage(ToolbarTracking::default());
+    app.manage(Toolbar::default());
     windows::create_windows(app)?;
     tray::create_tray(app)?;
     let handle = app.handle();
@@ -189,10 +181,10 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     }
     select_cursor_monitor(handle);
     // The app still works with a misplaced window, so these are not fatal.
-    problems.extend(position_toolbar(handle).err());
-    problems.extend(apply_windows(handle).err());
+    problems.extend(position_toolbar(handle).err().map(|e| e.to_string()));
+    problems.extend(apply_windows(handle).err().map(|e| e.to_string()));
     if snapshot(handle).tutorial.is_some() {
-        if let Some(tutorial) = app.get_webview_window("tutorial") {
+        if let Some(tutorial) = Surface::Tutorial.window(app) {
             problems.extend(tutorial.set_focus().err().map(|e| e.to_string()));
         }
     }
@@ -200,7 +192,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     // The tutorial explains problems itself. Otherwise nothing is on screen
     // at launch, so open Settings to explain them.
     if (!problems.is_empty() || session.shortcut_unavailable) && session.tutorial.is_none() {
-        if let Err(error) = perform(handle, "settings") {
+        if let Err(error) = transition(handle, Transition::Settings) {
             log::error!("Could not open settings: {error}");
         }
     }
@@ -217,18 +209,18 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
 fn reopen(app: &tauri::AppHandle) {
     let session = snapshot(app);
     let target = if session.capture.is_some() {
-        "capture"
+        Surface::Capture
     } else if session.settings_open {
-        "settings"
+        Surface::Settings
     } else if session.tutorial.is_some() {
-        "tutorial"
+        Surface::Tutorial
     } else {
-        if let Err(error) = perform(app, "show") {
+        if let Err(error) = transition(app, Transition::Show) {
             report(app, error);
         }
-        "toolbar"
+        Surface::Toolbar
     };
-    if let Some(window) = app.get_webview_window(target) {
+    if let Some(window) = target.window(app) {
         let _ = window.set_focus();
     }
 }

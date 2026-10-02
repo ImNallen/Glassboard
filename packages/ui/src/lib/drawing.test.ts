@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, rainbowPreview, shiftingPreview, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
+import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
 const arrow = (): Shape => ({ id: 'one', tool: 'arrow', color: '#ff6259', width: 4, points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] });
 describe('auto-fade', () => {
   it('retains the renderable array until a deadline is due, including during fading', () => {
@@ -117,20 +117,20 @@ describe('annotation history', () => {
   it('erases one shape and restores its stacking order through undo/redo', () => {
     const h = new DrawingHistory();
     for (const id of ['first', 'middle', 'last']) h.add({ ...arrow(), id });
-    expect(h.remove('middle')).toBe(true);
+    expect(h.removeAll(['middle'])).toBe(true);
     expect(h.shapes.map(shape => shape.id)).toEqual(['first', 'last']);
     h.undo(); expect(h.shapes.map(shape => shape.id)).toEqual(['first', 'middle', 'last']);
     h.redo(); expect(h.shapes.map(shape => shape.id)).toEqual(['first', 'last']);
   });
   it('does not create history for a missed erase or discard redo', () => {
     const h = new DrawingHistory(); h.add(arrow()); h.undo();
-    expect(h.remove('missing')).toBe(false);
+    expect(h.removeAll(['missing'])).toBe(false);
     expect(h.canUndo).toBe(false); expect(h.canRedo).toBe(true);
     h.redo(); expect(h.shapes).toHaveLength(1);
   });
   it('preserves a deleted drawing’s fade deadline and cannot restore it after expiry', () => {
     const h = new DrawingHistory(); h.add({ ...arrow(), fadeSeconds: 3 }, 0);
-    h.remove('one'); h.undo(); expect(h.shapes[0].expiresAt).toBe(3000);
+    h.removeAll(['one']); h.undo(); expect(h.shapes[0].expiresAt).toBe(3000);
     h.redo(); h.expire(3000); h.undo();
     expect(h.shapes).toEqual([]); expect(h.canUndo).toBe(false);
   });
@@ -246,12 +246,6 @@ describe('custom Rainbow and Shifting colors', () => {
     const stops = rainbowStops({ ...arrow(), tool: 'rectangle', colorMode: 'rainbow', hue: 0 });
     expect([...stops].filter(color => color.startsWith('#'))).toEqual(expect.arrayContaining(CYCLE_COLORS.slice(1)));
     expect(createShape({ ...style, colorMode: 'solid' }, 0, { x: 0, y: 0 }).colors).toBeUndefined();
-  });
-
-  it('previews custom lists', () => {
-    expect(rainbowPreview(['#111111', '#222222'])).toBe('conic-gradient(#111111, #222222, #111111)');
-    expect(shiftingPreview(['#111111', '#222222', '#333333'])).toBe('conic-gradient(#111111 0deg 120deg, #222222 120deg 240deg, #333333 240deg 360deg)');
-    expect(shiftingPreview(['#111111', '#222222', '#333333'], 1)).toContain('#222222 0deg 120deg');
   });
 });
 describe('shift constraints', () => {

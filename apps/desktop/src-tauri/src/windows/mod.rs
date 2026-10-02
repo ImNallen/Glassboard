@@ -1,3 +1,4 @@
+pub(crate) mod geometry;
 pub(crate) mod settings;
 mod setup;
 pub(crate) mod toolbar;
@@ -10,92 +11,124 @@ use crate::{
     state::{publish, snapshot, AppState},
     Result,
 };
-use tauri::{Manager, PhysicalPosition, PhysicalSize};
+use geometry::{top_center, Rect, TUTORIAL_SIZE};
+use serde::{Serialize, Serializer};
+use tauri::{Manager, PhysicalPosition, PhysicalRect, PhysicalSize};
+
+/// A webview window. The label names it to Tauri and `?surface=` tells the frontend what to render.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum Surface {
+    /// The drawing window covering one display, by monitor index.
+    Overlay(usize),
+    Capture,
+    Toolbar,
+    Settings,
+    Tutorial,
+}
+impl Surface {
+    pub(crate) fn url(self) -> &'static str {
+        match self {
+            Self::Overlay(_) => "overlay",
+            Self::Capture => "capture",
+            Self::Toolbar => "toolbar",
+            Self::Settings => "settings",
+            Self::Tutorial => "tutorial",
+        }
+    }
+    pub(crate) fn label(self) -> String {
+        match self {
+            Self::Overlay(index) => format!("overlay-{index}"),
+            fixed => fixed.url().into(),
+        }
+    }
+    pub(crate) fn parse(label: &str) -> Option<Self> {
+        if let Some(index) = label.strip_prefix("overlay-") {
+            return index.parse().ok().map(Self::Overlay);
+        }
+        [Self::Capture, Self::Toolbar, Self::Settings, Self::Tutorial]
+            .into_iter()
+            .find(|surface| surface.url() == label)
+    }
+    pub(crate) fn window<R: tauri::Runtime>(
+        self,
+        app: &impl Manager<R>,
+    ) -> Option<tauri::WebviewWindow<R>> {
+        app.get_webview_window(&self.label())
+    }
+}
+impl Serialize for Surface {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.label())
+    }
+}
 
 pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
-    if state.capture.is_none() {
-        *app.state::<crate::capture::CaptureImage>()
-            .0
-            .lock()
-            .unwrap() = None;
-    }
-    if let Some(capture) = app.get_webview_window("capture") {
-        if state.capture.is_some_and(|capture| capture.ready) {
+    if let Some(capture) = Surface::Capture.window(app) {
+        if state
+            .capture
+            .as_ref()
+            .is_some_and(|capture| capture.ready.is_some())
+        {
             capture.show()
         } else {
             capture.hide()
-        }
-        .map_err(|e| e.to_string())?;
+        }?;
     }
     for (label, window) in app.webview_windows() {
-        if label.starts_with("overlay-") {
-            window
-                .set_ignore_cursor_events(state.mode != Mode::Draw)
-                .map_err(|e| e.to_string())?;
-            window
-                .set_focusable(state.mode == Mode::Draw)
-                .map_err(|e| e.to_string())?;
+        if let Some(Surface::Overlay(_)) = Surface::parse(&label) {
+            window.set_ignore_cursor_events(state.mode != Mode::Draw)?;
+            window.set_focusable(state.mode == Mode::Draw)?;
             if state.mode == Mode::Hidden {
                 window.hide()
             } else {
                 window.show()
-            }
-            .map_err(|e| e.to_string())?;
+            }?;
         }
     }
-    if let Some(toolbar) = app.get_webview_window("toolbar") {
+    if let Some(toolbar) = Surface::Toolbar.window(app) {
         if state.mode != Mode::Hidden {
             toolbar.show()
         } else {
             toolbar.hide()
-        }
-        .map_err(|e| e.to_string())?;
+        }?;
     }
     if !state.settings_open || state.capture.is_some() {
-        if let Some(settings) = app.get_webview_window("settings") {
-            settings.hide().map_err(|e| e.to_string())?;
+        if let Some(settings) = Surface::Settings.window(app) {
+            settings.hide()?;
         }
     }
     sync_tutorial(app)?;
-    app.state::<toolbar::ToolbarTracking>()
+    app.state::<toolbar::Toolbar>()
         .set_active(state.mode == Mode::Draw);
     publish(app)
 }
 /// Keep the small guide on the active display without covering the drawing toolbar.
 pub(crate) fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
-    if let Some(window) = app.get_webview_window("tutorial") {
+    if let Some(window) = Surface::Tutorial.window(app) {
         if state.tutorial.is_none() || state.capture.is_some() {
-            return window.hide().map_err(|e| e.to_string());
+            return Ok(window.hide()?);
         }
-        if let Some(overlay) = app.get_webview_window(&state.active_overlay) {
-            if let Some(monitor) = overlay.current_monitor().map_err(|e| e.to_string())? {
-                let area = monitor.work_area();
+        if let Some(overlay) = state.active_overlay.window(app) {
+            if let Some(monitor) = overlay.current_monitor()? {
+                let work = Rect::work_area(&monitor);
                 let scale = monitor.scale_factor();
-                let width = (400.0 * scale).min(area.size.width as f64);
-                let height = (330.0 * scale).min(area.size.height as f64);
-                window
-                    .set_size(PhysicalSize::new(width as u32, height as u32))
-                    .map_err(|e| e.to_string())?;
-                window
-                    .set_position(PhysicalPosition::new(
-                        area.position.x + ((area.size.width as f64 - width) / 2.0) as i32,
-                        area.position.y
-                            + (20.0 * scale).min((area.size.height as f64 - height).max(0.0))
-                                as i32,
-                    ))
-                    .map_err(|e| e.to_string())?;
+                let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
+                let frame = top_center(work, size, scale);
+                // Resize first: macOS keeps the bottom edge when resizing, so a later resize would shift the top.
+                window.set_size(PhysicalSize::new(frame.width, frame.height))?;
+                window.set_position(PhysicalPosition::new(frame.x, frame.y))?;
             }
         }
-        window.show().map_err(|e| e.to_string())?;
+        window.show()?;
     }
     Ok(())
 }
 pub(crate) fn focus_drawing(app: &tauri::AppHandle) {
     let state = snapshot(app);
     if state.mode == Mode::Draw {
-        if let Some(window) = app.get_webview_window(&state.active_overlay) {
+        if let Some(window) = state.active_overlay.window(app) {
             let _ = window.set_focus();
         }
     }
@@ -110,19 +143,41 @@ pub(crate) fn raise_toolbar(app: &tauri::AppHandle) {
 pub(crate) fn select_cursor_monitor(app: &tauri::AppHandle) {
     if let Ok(cursor) = app.cursor_position() {
         for (label, window) in app.webview_windows() {
-            if !label.starts_with("overlay-") {
+            let Some(overlay @ Surface::Overlay(_)) = Surface::parse(&label) else {
                 continue;
-            }
-            if let (Ok(p), Ok(s)) = (window.outer_position(), window.outer_size()) {
-                if cursor.x >= p.x as f64
-                    && cursor.y >= p.y as f64
-                    && cursor.x < p.x as f64 + s.width as f64
-                    && cursor.y < p.y as f64 + s.height as f64
-                {
-                    app.state::<AppState>().0.lock().unwrap().active_overlay = label;
+            };
+            if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
+                if Rect::from(PhysicalRect { position, size }).contains(cursor.x, cursor.y, 0.0) {
+                    app.state::<AppState>().0.lock().unwrap().active_overlay = overlay;
                     break;
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Surface::{self, *};
+    #[test]
+    fn surfaces_keep_the_labels_and_urls_the_frontend_reads() {
+        for (surface, label, url) in [
+            (Overlay(2), "overlay-2", "overlay"),
+            (Capture, "capture", "capture"),
+            (Toolbar, "toolbar", "toolbar"),
+            (Settings, "settings", "settings"),
+            (Tutorial, "tutorial", "tutorial"),
+        ] {
+            assert_eq!((surface.label().as_str(), surface.url()), (label, url));
+            assert_eq!(Surface::parse(label), Some(surface));
+            let by_surface = std::collections::HashMap::from([(surface, surface)]);
+            assert_eq!(
+                serde_json::to_value(by_surface).unwrap(),
+                serde_json::json!({ label: label })
+            );
+        }
+        for label in ["overlay-", "overlay-x", "main"] {
+            assert_eq!(Surface::parse(label), None);
         }
     }
 }

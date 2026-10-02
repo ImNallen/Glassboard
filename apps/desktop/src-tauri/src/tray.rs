@@ -1,4 +1,8 @@
-use crate::{commands::perform, state::report};
+use crate::{
+    commands::{perform, transition},
+    session::Transition,
+    state::report,
+};
 use std::sync::Mutex;
 use tauri::Manager;
 
@@ -41,13 +45,18 @@ pub(crate) fn create_tray(app: &tauri::App) -> tauri::Result<()> {
             };
             *tray.app_handle().state::<TrayAnchor>().0.lock().unwrap() = Some(rect);
             if open_settings {
-                if let Err(error) = perform(tray.app_handle(), "settings") {
+                if let Err(error) = transition(tray.app_handle(), Transition::Settings) {
                     report(tray.app_handle(), error);
                 }
             }
         })
         .on_menu_event(|app, event| {
-            if let Err(e) = perform(app, event.id.as_ref()) {
+            // Menu item IDs are action wire names.
+            let action = serde_json::from_value(event.id.as_ref().into());
+            if let Err(e) = action
+                .map_err(Into::into)
+                .and_then(|action| perform(app, action))
+            {
                 report(app, e);
             }
         })

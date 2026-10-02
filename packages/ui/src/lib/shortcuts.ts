@@ -1,7 +1,8 @@
+import preferenceDefaults from '../contract/preference-defaults.json';
 import type { ColorMode, Tool } from './drawing';
 import { swatchColor } from './swatches';
 
-export const DEFAULT_SHORTCUT = 'CommandOrControl+Shift+A';
+export const DEFAULT_SHORTCUT = preferenceDefaults.shortcut;
 type KeyEvent = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'> & Partial<Pick<KeyboardEvent, 'code'>>;
 export const platformMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
@@ -32,11 +33,6 @@ export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMod
   { command: 'color-blue', name: 'Blue', colorMode: 'solid', slot: 5, shortcut: 'Digit8' },
 ];
 
-/** The preference change a color choice makes. */
-export function colorChoice(choice: (typeof COLOR_SHORTCUTS)[number], swatches?: readonly string[]): { colorMode: ColorMode; color?: string } {
-  return choice.slot === undefined ? { colorMode: choice.colorMode } : { colorMode: choice.colorMode, color: swatchColor(swatches, choice.slot) };
-}
-
 /** Every in-app binding with its default. The show/hide shortcut is global and lives in `Preferences.shortcut`. */
 export const KEYBINDINGS: readonly { id: string; group: KeybindingGroup; name: string; shortcut: string; description?: string }[] = [
   { id: 'undo', group: 'Drawing', name: 'Undo', shortcut: 'CommandOrControl+KeyZ' },
@@ -53,7 +49,38 @@ export function keybinding(keybindings: Keybindings | undefined, id: string): st
   return keybindings?.[id] ?? KEYBINDINGS.find(binding => binding.id === id)?.shortcut ?? '';
 }
 
-/** The in-app command bound to a key press, if any. */
+/** The label of the shortcut bound to a command, empty when unbound. */
+export function keyLabel(keybindings: Keybindings | undefined, id: string): string { return shortcutLabel(keybinding(keybindings, id)); }
+
+/** The global show/hide shortcut and the in-app bindings, which must not share a shortcut. */
+export type Bindings = { shortcut: string; keybindings: Keybindings };
+/** New bindings, with the names of the commands unbound to make room. */
+export type Rebound = Bindings & { moved: string[] };
+
+function unbind(keybindings: Keybindings, shortcut: string, mac: boolean, except?: string): Omit<Rebound, 'shortcut'> {
+  const taken = KEYBINDINGS.filter(binding => binding.id !== except && sameShortcut(keybinding(keybindings, binding.id), shortcut, mac));
+  return { keybindings: { ...keybindings, ...Object.fromEntries(taken.map(binding => [binding.id, ''])) }, moved: taken.map(binding => binding.name) };
+}
+
+/** Bind `next` to show/hide, unbinding any command that uses it. Undefined when nothing changes. */
+export function rebindToggle(current: Bindings, next: string, mac = platformMac): Rebound | undefined {
+  if (sameShortcut(next, current.shortcut, mac)) return;
+  return { shortcut: next, ...unbind(current.keybindings, next, mac) };
+}
+
+/**
+ * Bind `next` to a command, unbinding any other command that uses it; an empty `next` unbinds the command.
+ * A binding equal to the default is removed from the map. Undefined when nothing changes, `'toggle'` when show/hide owns `next`.
+ */
+export function rebindCommand(current: Bindings, id: string, next: string, mac = platformMac): Rebound | 'toggle' | undefined {
+  if (sameShortcut(next, keybinding(current.keybindings, id), mac)) return;
+  if (next && sameShortcut(next, current.shortcut, mac)) return 'toggle';
+  const { keybindings, moved } = next ? unbind(current.keybindings, next, mac, id) : { keybindings: { ...current.keybindings }, moved: [] };
+  if (sameShortcut(next, keybinding(undefined, id), mac)) delete keybindings[id];
+  else keybindings[id] = next;
+  return { shortcut: current.shortcut, keybindings, moved };
+}
+
 /**
  * The in-app command bound to a key press, if any. An exact match wins, so a binding on the
  * platform's second modifier (Control on macOS, Super on Windows) isn't shadowed by a
@@ -64,10 +91,12 @@ export function commandFor(event: KeyEvent, keybindings: Keybindings | undefined
   return bound(true) ?? bound(false);
 }
 
+/** The preference change a color shortcut makes. */
 export function colorShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac, swatches?: readonly string[]): { colorMode: ColorMode; color?: string } | undefined {
   const command = commandFor(event, keybindings, mac);
   const choice = COLOR_SHORTCUTS.find(choice => choice.command === command);
-  return choice && colorChoice(choice, swatches);
+  if (!choice) return;
+  return choice.slot === undefined ? { colorMode: choice.colorMode } : { colorMode: choice.colorMode, color: swatchColor(swatches, choice.slot) };
 }
 
 export function toolShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac): Tool | undefined {
@@ -117,7 +146,7 @@ export function matchesShortcut(event: KeyEvent, shortcut: string, mac = platfor
   return commandMatches && event.altKey === modifiers.includes('Alt') && event.shiftKey === modifiers.includes('Shift');
 }
 
-// Key codes the native shortcut parser accepts verbatim. Escape cancels recording instead; resetting restores an Escape default.
+// Key codes the native shortcut parser accepts verbatim (contract/toggle-shortcuts.json checks both sides agree). Escape cancels recording instead; resetting restores an Escape default.
 const RECORDABLE = /^(Key[A-Z]|Digit\d|F([1-9]|1\d|2[0-4])|Numpad(\d|Add|Subtract|Multiply|Divide|Decimal|Enter|Equal)|Arrow(Up|Down|Left|Right)|Space|Enter|Tab|Backspace|Delete|Insert|Home|End|Page(Up|Down)|Backquote|Backslash|Bracket(Left|Right)|Comma|Period|Slash|Semicolon|Quote|Minus|Equal)$/;
 export const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Alt', 'Shift', 'CapsLock', 'Fn', 'AltGraph', 'Hyper', 'Super', 'OS']);
 
@@ -154,6 +183,7 @@ function keyName(code: string): string {
 export function formatShortcut(shortcut: string, mac: boolean): string {
   return shortcutKeys(shortcut, mac).join(mac ? '' : '+');
 }
+export function shortcutLabel(shortcut: string) { return formatShortcut(shortcut, platformMac); }
 
 /** The labels of each key in a shortcut, for rendering as separate keycaps. */
 export function shortcutKeys(shortcut: string, mac: boolean): string[] {

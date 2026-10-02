@@ -1,30 +1,29 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { decodeCaptureFrame, getCaptureImage, copyCaptureImage, copyCaptureRegion } from './capture';
+import { decodeCaptureFrame, nativeCapture } from './capture';
 import { invoke } from '@tauri-apps/api/core';
 
-vi.mock('@glassboard/ui/session', () => ({ native: true }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
 
 afterEach(() => { vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 it('copies a plain screenshot using only capture identity and source pixel bounds', async () => {
   const region = { x: 20, y: 41, width: 82, height: 62 };
-  await copyCaptureRegion(42, region);
+  await nativeCapture.copyRegion!(42, region);
   expect(invoke).toHaveBeenCalledExactlyOnceWith('copy_capture_region', { id: 42, region });
 });
 
 it('copies PNG bytes as a binary request with capture identity outside the body', async () => {
   const png = new Uint8Array([137, 80, 78, 71, 0, 255]).buffer;
   const image = { arrayBuffer: async () => png } as Blob;
-  await copyCaptureImage(42, Promise.resolve(image));
+  await nativeCapture.copyImage(42, Promise.resolve(image));
   expect(invoke).toHaveBeenCalledExactlyOnceWith('copy_capture', png, { headers: { 'x-glassboard-capture-id': '42' } });
 });
 
 it('propagates a clipboard failure so the editor can keep the capture open', async () => {
   vi.mocked(invoke).mockRejectedValueOnce(new Error('clipboard unavailable'));
   const image = { arrayBuffer: async () => new ArrayBuffer(8) } as Blob;
-  await expect(copyCaptureImage(42, Promise.resolve(image))).rejects.toThrow('clipboard unavailable');
+  await expect(nativeCapture.copyImage(42, Promise.resolve(image))).rejects.toThrow('clipboard unavailable');
 });
 
 it('reads little-endian dimensions and shares the full-resolution RGBA bytes without a copy', () => {
@@ -58,7 +57,7 @@ it.each([false, true])('loads native frames with the IPC byte-array fallback %s'
   });
   const frame = new Uint8Array([1, 0, 0, 0, 1, 0, 0, 0, 11, 22, 33, 255]);
   vi.mocked(invoke).mockResolvedValueOnce(fallback ? [...frame] : frame.buffer);
-  const image = await getCaptureImage(42) as ImageData;
+  const image = await nativeCapture.getImage(42) as ImageData;
   expect(invoke).toHaveBeenLastCalledWith('get_capture_image', { id: 42 });
   expect(image.width).toBe(1); expect(image.height).toBe(1);
   expect([...image.data]).toEqual([11, 22, 33, 255]);

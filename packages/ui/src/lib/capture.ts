@@ -1,7 +1,10 @@
 import { render, type Point, type Shape } from './drawing';
+import { isEditableTarget } from './selection';
 import { commandFor, keybinding, sameShortcut, type Keybindings } from './shortcuts';
 
 export type CaptureRegion = { x: number; y: number; width: number; height: number };
+/** Where the capture editor gets its frozen screen and sends the copy. Only hosts that crop natively provide `copyRegion`. */
+export type CaptureBackend = { getImage: (id: number) => Promise<ImageData | HTMLImageElement | HTMLCanvasElement>; copyImage: (id: number, image: Promise<Blob>) => Promise<void>; copyRegion?: (id: number, region: CaptureRegion) => Promise<void> };
 
 /** Normalize either drag direction, keeping a selection inside its display. */
 export function captureRegion(from: Point, to: Point, width: number, height: number): CaptureRegion {
@@ -21,7 +24,6 @@ export function capturePixels(region: CaptureRegion, viewport: { width: number; 
 
 /** Compose only screenshot pixels and drawings; editor chrome never enters the export. */
 export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, region: CaptureRegion, shapes: Shape[], viewport = { width: window.innerWidth, height: window.innerHeight }): Promise<Blob> {
-  const started = import.meta.env.DEV ? performance.now() : 0;
   const size = image instanceof HTMLImageElement ? { width: image.naturalWidth, height: image.naturalHeight } : image;
   const source = capturePixels(region, viewport, size);
   if (!source.width || !source.height) return Promise.reject(new Error('Select a region to copy.'));
@@ -36,10 +38,7 @@ export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, re
     fadeSeconds: 0 as const, expiresAt: undefined,
   }));
   if (translated.length) render(ctx, translated, null, source.width / scaleX, source.height / scaleX, scaleX, Date.now(), false);
-  const encodingStarted = import.meta.env.DEV ? performance.now() : 0;
-  if (import.meta.env.DEV) console.debug(`Screenshot composed in ${(encodingStarted - started).toFixed(1)} ms`);
   return new Promise((resolve, reject) => output.toBlob(blob => {
-    if (import.meta.env.DEV) console.debug(`Screenshot PNG encoded in ${(performance.now() - encodingStarted).toFixed(1)} ms`);
     output.width = 0; output.height = 0;
     if (blob) resolve(blob);
     else reject(new Error('Could not encode the image. Try again.'));
@@ -48,10 +47,8 @@ export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, re
 
 export function captureKeydown(event: KeyboardEvent, { copy, cancel, keybindings }: { copy: () => void; cancel: () => void; keybindings?: Keybindings }) {
   if (event.defaultPrevented) return;
-  const target = event.target instanceof Element ? event.target : document.activeElement;
-  const editable = target?.closest('input, textarea, select, [contenteditable="true"]');
   // Copy remains normal text copy while a text editor has focus.
-  if (editable) return;
+  if (isEditableTarget(event.target)) return;
   const command = commandFor(event, keybindings);
   if (command === 'copy') {
     event.preventDefault();

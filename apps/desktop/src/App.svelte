@@ -4,16 +4,21 @@
   import Toolbar from '@glassboard/ui/Toolbar.svelte';
   import Settings from './Settings.svelte';
   import Tutorial from './Tutorial.svelte';
-  import Capture from './Capture.svelte';
-  import { action, defaults, native, savePreferences, shortcutLabel, subscribe, type Session } from '@glassboard/ui/session';
+  import PreviewBackdrop from './PreviewBackdrop.svelte';
+  import Capture from '@glassboard/ui/Capture.svelte';
+  import { previewCapture } from '@glassboard/ui/capture-preview';
+  import { action, defaults, native, savePreferences, subscribe, type Session, type Action } from '@glassboard/ui/session';
+  import { nativeCapture } from './lib/capture';
+  import { parseSurface, windowParts } from './lib/surface';
   import { drawingKeydown } from '@glassboard/ui/keys';
+  import { createErrors } from '@glassboard/ui/errors';
   import { protectSelection } from '@glassboard/ui/selection';
-  const surface = new URLSearchParams(location.search).get('surface');
+  const surface = parseSurface(location.search);
   let session = $state<Session>(structuredClone(defaults));
-  let error = $state('');
-  let errorTimer: ReturnType<typeof setTimeout>;
-  function onerror(e: unknown) { error = String(e); console.error(e); clearTimeout(errorTimer); errorTimer = setTimeout(() => error = '', 8000); }
-  function run(name: string) { action(name).catch(onerror); }
+  let parts = $derived(windowParts(surface, native, session.capture));
+  const errors = createErrors(() => session);
+  const capture = native ? nativeCapture : previewCapture;
+  function run(name: Action) { action(name).catch(errors.report); }
   function keydown(event: KeyboardEvent) {
     if (surface === 'capture' || session.capture) return;
     if (surface === 'tutorial' && event.key === 'Escape') { event.preventDefault(); run(session.mode === 'draw' ? 'hide' : 'dismiss-tutorial'); return; }
@@ -21,29 +26,19 @@
       if (event.key === 'Escape') { event.preventDefault(); run('close-settings'); }
       return;
     }
-    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(onerror), capture: () => run('capture') });
+    drawingKeydown(event, session, { run, save: preferences => savePreferences(preferences).catch(errors.report), capture: () => run('capture') });
   }
   onMount(() => {
     const stopSelectionGuard = protectSelection();
     let disposed = false, stop = () => {};
-    subscribe(value => session = value).then(fn => { if (disposed) fn(); else stop = fn; }).catch(onerror);
-    return () => { disposed = true; stop(); stopSelectionGuard(); clearTimeout(errorTimer); };
+    subscribe(value => session = value).then(fn => { if (disposed) fn(); else stop = fn; }).catch(errors.report);
+    return () => { disposed = true; stop(); stopSelectionGuard(); errors.clear(); };
   });
 </script>
 <svelte:window onkeydown={keydown}/>
-{#if !native && surface !== 'settings' && surface !== 'capture' && !session.capture}
-  <main class="preview-background">
-    <div class="preview-top"><span class="preview-logo">↗ Glassboard</span><span class="preview-badge">BROWSER PREVIEW</span></div>
-    <div class="preview-copy"><span class="eyebrow">A LITTLE CLARITY GOES A LONG WAY</span><h1>Your screen.<br/>Your point.</h1><p>Draw attention to what matters.<br/>Pick a tool below and make your mark.</p><div class="preview-shortcuts"><kbd>{shortcutLabel(session.preferences.shortcut)}</kbd><span>Toggle Glassboard</span><kbd>Shift</kbd><span>Constrain shapes</span></div></div>
-    <div class="preview-footer"><span>Arrows. Shapes. A little emphasis.</span><span>Nothing between you and your point.</span></div>
-  </main>
-  {#if session.mode === 'hidden'}<div class="preview-actions"><button class="preview-restore" onclick={() => run('toggle')}>Start annotating</button></div>{/if}
-{/if}
-{#if !session.capture && (surface === 'overlay' || (!native && surface !== 'settings' && surface !== 'capture'))}<Overlay {session} {onerror}/>{/if}
-{#if !session.capture && (surface === 'toolbar' || (!native && surface !== 'settings' && surface !== 'capture'))}<Toolbar {session} {error} {onerror} oncapture={() => run('capture')}/>{/if}
-
-{#if surface === 'settings'}<Settings {session} {error} {onerror}/>{/if}
-
-{#if !session.capture && (surface === 'tutorial' || (!native && surface !== 'settings' && surface !== 'capture'))}<Tutorial {session} {error} {onerror}/>{/if}
-
-{#if session.capture?.ready && (surface === 'capture' || !native)}{#key session.capture.id}<Capture {session} {onerror}/>{/key}{/if}
+{#if parts.includes('backdrop')}<PreviewBackdrop {session} {run}/>{/if}
+{#if parts.includes('overlay')}<Overlay {session} onerror={errors.report}/>{/if}
+{#if parts.includes('toolbar')}<Toolbar {session} {errors} host={native ? 'window' : 'page'} oncapture={() => run('capture')}/>{/if}
+{#if parts.includes('settings')}<Settings {session} {errors}/>{/if}
+{#if parts.includes('tutorial')}<Tutorial {session} {errors}/>{/if}
+{#if parts.includes('capture')}{#key session.capture?.id}<Capture {session} {...capture}/>{/key}{/if}

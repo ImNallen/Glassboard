@@ -1,114 +1,106 @@
-use crate::{
-    session::Mode,
-    settings_position::Bounds,
-    state::{snapshot, AppState},
-    toolbar_position::{dock_layout, ToolbarPointer, TrackingLayout},
-    Result,
+use super::{
+    geometry::{dock, Rect, ToolbarPointer, TrackingLayout},
+    Surface,
 };
-use std::sync::{Arc, Condvar, Mutex};
-use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize};
+use crate::{state::snapshot, Result};
+use std::sync::{Condvar, Mutex, MutexGuard};
+use tauri::{Emitter, Manager};
 
 /// Logical distance from the dock within which the collapsed toolbar expands.
 const TOOLBAR_REVEAL_MARGIN: f64 = 20.0;
-pub(crate) struct ToolbarExpanded(pub(crate) Mutex<bool>);
-/// Physical window and dock bounds for focus-independent cursor tracking.
-pub(crate) struct ToolbarLayout(pub(crate) Mutex<Option<TrackingLayout>>);
 
-/// Sleep while hidden; mode changes wake tracking immediately.
-#[derive(Clone, Default)]
-pub(crate) struct ToolbarTracking(Arc<(Mutex<bool>, Condvar)>);
-impl ToolbarTracking {
+/// Toolbar window state shared with the cursor-tracking thread.
+#[derive(Default)]
+pub(crate) struct Toolbar {
+    state: Mutex<ToolbarState>,
+    /// Wakes the sleeping tracker when drawing starts.
+    wake: Condvar,
+}
+#[derive(Default)]
+struct ToolbarState {
+    /// The window has grown to make room for an error panel.
+    expanded: bool,
+    /// Physical window and dock bounds for focus-independent cursor tracking.
+    layout: Option<TrackingLayout>,
+    /// Tracking runs only while drawing.
+    active: bool,
+}
+impl Toolbar {
+    fn lock(&self) -> MutexGuard<'_, ToolbarState> {
+        self.state.lock().unwrap()
+    }
     pub(crate) fn set_active(&self, active: bool) {
-        let (state, wake) = &*self.0;
-        let mut previous = state.lock().unwrap();
-        if *previous != active {
-            *previous = active;
-            wake.notify_one();
+        let mut state = self.lock();
+        if state.active != active {
+            state.active = active;
+            self.wake.notify_one();
         }
+    }
+    pub(crate) fn set_expanded(&self, expanded: bool) {
+        self.lock().expanded = expanded;
     }
 }
 
 pub(crate) fn position_toolbar(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
-    if let (Some(overlay), Some(toolbar)) = (
-        app.get_webview_window(&state.active_overlay),
-        app.get_webview_window("toolbar"),
+    if let (Some(overlay), Some(window)) = (
+        state.active_overlay.window(app),
+        Surface::Toolbar.window(app),
     ) {
-        if let Some(monitor) = overlay.current_monitor().map_err(|e| e.to_string())? {
-            let area = monitor.work_area();
-            let work = Bounds {
-                x: area.position.x as f64,
-                y: area.position.y as f64,
-                width: area.size.width as f64,
-                height: area.size.height as f64,
-            };
-            let expanded = *app.state::<ToolbarExpanded>().0.lock().unwrap();
-            let layout = dock_layout(
-                state.preferences.toolbar_position,
-                work,
-                monitor.scale_factor(),
-                expanded,
-            );
-            toolbar
-                .set_position(PhysicalPosition::new(layout.x, layout.y))
-                .map_err(|e| e.to_string())?;
-            toolbar
-                .set_size(PhysicalSize::new(layout.width, layout.height))
-                .map_err(|e| e.to_string())?;
+        if let Some(monitor) = overlay.current_monitor()? {
+            let work = Rect::work_area(&monitor);
+            let scale = monitor.scale_factor();
+            let position = state.preferences.toolbar_position;
+            let toolbar = app.state::<Toolbar>();
+            let layout = dock(position, work, scale, toolbar.lock().expanded);
+            layout.place(&window)?;
             // Popover space must not enlarge the cursor-proximity area: otherwise
             // moving away into the transparent part of the window keeps it open.
-            let dock = dock_layout(
-                state.preferences.toolbar_position,
-                work,
-                monitor.scale_factor(),
-                false,
-            );
-            *app.state::<ToolbarLayout>().0.lock().unwrap() = Some(TrackingLayout {
-                dock,
+            toolbar.lock().layout = Some(TrackingLayout {
+                dock: dock(position, work, scale, false),
                 window: layout,
-                scale: monitor.scale_factor(),
+                scale,
             });
         }
     }
     Ok(())
 }
-/// Cursor position in toolbar CSS pixels, even when the canvas owns keyboard focus.
-fn toolbar_pointer(app: &tauri::AppHandle) -> Option<ToolbarPointer> {
-    if app.state::<AppState>().0.lock().unwrap().mode == Mode::Hidden {
-        return None;
-    }
-    let layout = (*app.state::<ToolbarLayout>().0.lock().unwrap())?;
-    let cursor = app.cursor_position().ok()?;
-    layout.pointer_at(cursor.x, cursor.y, TOOLBAR_REVEAL_MARGIN)
-}
 /// Poll across native windows so hover does not depend on activating the webview.
 pub(crate) fn watch_toolbar_proximity(app: tauri::AppHandle) {
-    let tracking = app.state::<ToolbarTracking>().inner().clone();
     std::thread::spawn(move || {
+        let toolbar = app.state::<Toolbar>();
         let mut tracked = false;
-        let (active, wake) = &*tracking.0;
         loop {
-            let mut running = active.lock().unwrap();
-            while !*running {
+            let mut state = toolbar.lock();
+            while !state.active {
                 if tracked {
-                    let _ =
-                        app.emit_to("toolbar", "toolbar-pointer", Option::<ToolbarPointer>::None);
+                    let _ = app.emit_to(
+                        Surface::Toolbar.label(),
+                        "toolbar-pointer",
+                        Option::<ToolbarPointer>::None,
+                    );
                     tracked = false;
                 }
-                running = wake.wait(running).unwrap();
+                state = toolbar.wake.wait(state).unwrap();
             }
-            drop(running);
-            let pointer = toolbar_pointer(&app);
+            let layout = state.layout;
+            drop(state);
+            // Cursor position in toolbar CSS pixels, even when the canvas owns keyboard focus.
+            let pointer = layout.and_then(|layout| {
+                let cursor = app.cursor_position().ok()?;
+                layout.pointer_at(cursor.x, cursor.y, TOOLBAR_REVEAL_MARGIN)
+            });
             // Repeat nearby samples: revealing/resizing the toolbar can put a
             // button under a stationary cursor without generating pointerenter.
             if pointer.is_some() || tracked {
-                let _ = app.emit_to("toolbar", "toolbar-pointer", pointer);
+                let _ = app.emit_to(Surface::Toolbar.label(), "toolbar-pointer", pointer);
             }
             tracked = pointer.is_some();
-            let running = active.lock().unwrap();
-            if *running {
-                let _ = wake
-                    .wait_timeout(running, std::time::Duration::from_millis(16))
+            let state = toolbar.lock();
+            if state.active {
+                let _ = toolbar
+                    .wake
+                    .wait_timeout(state, std::time::Duration::from_millis(16))
                     .unwrap();
             }
         }

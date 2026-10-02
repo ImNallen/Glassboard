@@ -1,12 +1,9 @@
+use super::geometry::{beside_icon, Rect, SETTINGS_SIZE};
 use crate::{
-    settings_position::{anchored_position, Bounds},
     tray::{TrayAnchor, TRAY_ID},
     Result,
 };
-use tauri::{Manager, PhysicalPosition, PhysicalSize};
-
-pub(super) const SETTINGS_WIDTH: f64 = 380.0;
-pub(super) const SETTINGS_HEIGHT: f64 = 620.0;
+use tauri::Manager;
 
 pub(crate) fn position_settings(
     app: &tauri::AppHandle,
@@ -20,7 +17,7 @@ pub(crate) fn position_settings(
     let icon = rect.map(|rect| {
         let p = rect.position.to_physical::<f64>(1.0);
         let s = rect.size.to_physical::<f64>(1.0);
-        Bounds {
+        Rect {
             x: p.x,
             y: p.y,
             width: s.width,
@@ -33,17 +30,11 @@ pub(crate) fn position_settings(
                 .ok()
                 .flatten()
         })
-        .or(app.primary_monitor().map_err(|e| e.to_string())?)
+        .or(app.primary_monitor()?)
         .ok_or("No display is available for settings")?;
     let scale = monitor.scale_factor();
-    let area = monitor.work_area();
-    let work = Bounds {
-        x: area.position.x as f64,
-        y: area.position.y as f64,
-        width: area.size.width as f64,
-        height: area.size.height as f64,
-    };
-    let icon = icon.unwrap_or(Bounds {
+    let work = Rect::work_area(&monitor);
+    let icon = icon.unwrap_or(Rect {
         x: work.x + work.width - 24.0 * scale,
         y: if cfg!(target_os = "macos") {
             work.y
@@ -53,18 +44,6 @@ pub(crate) fn position_settings(
         width: 0.0,
         height: 0.0,
     });
-    let size = (
-        (SETTINGS_WIDTH * scale).min((work.width - 8.0 * scale).max(scale)),
-        (SETTINGS_HEIGHT * scale).min((work.height - 8.0 * scale).max(scale)),
-    );
-    let (x, y) = anchored_position(icon, work, size, scale);
-    window
-        .set_position(PhysicalPosition::new(x, y))
-        .map_err(|e| e.to_string())?;
-    window
-        .set_size(PhysicalSize::new(
-            size.0.round() as u32,
-            size.1.round() as u32,
-        ))
-        .map_err(|e| e.to_string())
+    let size = work.fit(SETTINGS_SIZE, scale, 8.0, scale);
+    beside_icon(icon, work, size, scale).place(window)
 }

@@ -1,27 +1,12 @@
 /* App-shell styles for the desktop windows. Toolbar, overlay, and the shared color
    variables come from @glassboard/ui/toolbar.css, imported first in main.ts. Keep the
    document transparent; color-scheme is scoped to controls rather than the overlay. */
-:root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--text); background: transparent; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+:root { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: var(--gb-text); background: transparent; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
 body { margin: 0; overflow: hidden; background: transparent; -webkit-user-select: none; user-select: none; }
 button, input { font: inherit; }
 button { cursor: pointer; border: 0; color: inherit; background: none; -webkit-tap-highlight-color: transparent; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
 button:disabled { opacity: .45; cursor: default; }
-.eyebrow { font-size: 9px; font-weight: 600; letter-spacing: 1.8px; color: var(--muted); }
 h2 { margin: 6px 0 0; font-size: 17px; font-weight: 500; letter-spacing: -.35px; }
-kbd { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 4px; background: var(--key-surface); color: var(--secondary-text); }
-.preview-background { min-height: 100vh; padding: 36px 48px; background: #f0f0ec; color: #252a30; background-image: radial-gradient(#424b6110 1px, transparent 1px); background-size: 24px 24px; }
-.preview-top { display: flex; justify-content: space-between; align-items: center; }
-.preview-logo { font-size: 17px; font-weight: 600; letter-spacing: -.5px; }
-.preview-badge { font-size: 9px; letter-spacing: 1.4px; color: #7d8589; border: 1px solid #252a301a; border-radius: 20px; padding: 7px 10px; }
-.preview-copy { margin: 12vh 0 0 8vw; }
-.preview-copy .eyebrow { color: #80897c; }
-h1 { font-size: clamp(50px, 7vw, 96px); font-weight: 500; letter-spacing: -5px; line-height: 1.04; margin: 24px 0; }
-.preview-copy p { color: #848a89; line-height: 1.8; font-size: 15px; }
-.preview-shortcuts { display: flex; align-items: center; gap: 10px; font-size: 10px; color: #919795; margin-top: 28px; }
-.preview-shortcuts kbd { color: #68716f; background: #e5e6e1; border: 1px solid #d9dcd5; }
-.preview-shortcuts span { margin-right: 12px; }
-.preview-footer { position: absolute; bottom: 110px; left: 48px; right: 48px; display: flex; justify-content: space-between; color: #a2a7a2; font-size: 10px; }
-.preview-actions { position: fixed; z-index: 20; bottom: 25px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
-.preview-restore { padding: 14px 20px; border-radius: 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+kbd { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 4px; background: var(--gb-key-surface); color: var(--gb-secondary-text); }
