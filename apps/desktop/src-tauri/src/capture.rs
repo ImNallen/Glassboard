@@ -64,6 +64,28 @@ fn check_permission() -> Result<()> {
     Ok(())
 }
 
+/// The display being captured, found by its origin. The capture window can't
+/// be asked: macOS moves it asynchronously, so right after `set_position` it
+/// still reports its previous frame, and the toolbar would dock against that.
+fn capture_monitor(app: &tauri::AppHandle, origin: (i32, i32)) -> Result<tauri::Monitor> {
+    app.available_monitors()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|monitor| {
+            // XCap reports macOS displays in points and Windows displays in pixels.
+            let scale = if cfg!(target_os = "macos") {
+                monitor.scale_factor()
+            } else {
+                1.0
+            };
+            let position = monitor.position();
+            let x = (position.x as f64 / scale).round() as i32;
+            let y = (position.y as f64 / scale).round() as i32;
+            (x, y) == origin
+        })
+        .ok_or_else(|| "The capture display is unavailable".into())
+}
+
 pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
     #[cfg(debug_assertions)]
     let started = std::time::Instant::now();
@@ -153,10 +175,7 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
                 }
                 // Reuse the native toolbar's work-area layout rather than docking
                 // the embedded capture toolbar against the full display edges.
-                let monitor = window
-                    .current_monitor()
-                    .map_err(|e| e.to_string())?
-                    .ok_or("The capture display is unavailable")?;
+                let monitor = capture_monitor(&app, position)?;
                 let area = monitor.work_area();
                 let work = crate::settings_position::Bounds {
                     x: area.position.x as f64,
@@ -171,7 +190,7 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
                     scale,
                     false,
                 );
-                let origin = window.outer_position().map_err(|e| e.to_string())?;
+                let origin = monitor.position();
                 let dock = layout.in_capture((origin.x, origin.y), scale);
                 *app.state::<CaptureImage>().0.lock().unwrap() = Some((id, Arc::new(data)));
                 {

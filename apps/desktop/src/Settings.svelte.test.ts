@@ -182,3 +182,24 @@ it('turns opening at login on and off from the General tab', async () => {
   await vi.waitFor(() => expect(toggle().getAttribute('aria-checked')).toBe('false'));
   expect(await getAutostart()).toBe(false);
 });
+
+it('opens on keybindings and explains a toggle shortcut another app holds', async () => {
+  const session = $state<Session>({ ...structuredClone(defaults), shortcutUnavailable: true });
+  settings = mount(Settings, { target: document.body, props: { get session() { return session; }, error: '', onerror: vi.fn() } });
+  await tick();
+  expect(document.querySelector('#tab-keybindings')?.getAttribute('aria-selected')).toBe('true');
+  expect(document.querySelector('.note.unavailable')?.textContent).toContain('Another app is using');
+  session.shortcutUnavailable = false;
+  flushSync();
+  expect(document.querySelector('.note.unavailable')).toBeNull();
+});
+
+it('dismisses a session error from the status line', async () => {
+  const onerror = vi.fn();
+  settings = mount(Settings, { target: document.body, props: { session: { ...structuredClone(defaults), error: 'Some settings could not be read.' }, error: '', onerror } });
+  await tick();
+  const dismiss = document.querySelector<HTMLButtonElement>('button[aria-label="Dismiss error"]')!;
+  expect(dismiss.parentElement?.textContent).toContain('Some settings could not be read.');
+  dismiss.click();
+  expect(onerror).toHaveBeenLastCalledWith('');
+});

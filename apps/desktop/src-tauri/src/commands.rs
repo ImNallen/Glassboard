@@ -16,7 +16,7 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_opener::OpenerExt;
 
-const REPOSITORY_URL: &str = "https://github.com/ImNallen/Glassboard";
+pub(crate) const REPOSITORY_URL: &str = "https://github.com/ImNallen/Glassboard";
 
 pub(crate) fn perform(app: &tauri::AppHandle, action: &str) -> Result<()> {
     if action == "capture" {
@@ -228,7 +228,15 @@ pub(crate) fn set_preferences(app: tauri::AppHandle, preferences: Preferences) -
             let _ = app.global_shortcut().unregister(parsed);
             return Err(format!("Could not save preferences: {e}"));
         }
-        if let Err(error) = app.global_shortcut().unregister(old_parsed) {
+        // A saved shortcut that another app already held at launch was never
+        // registered, and Windows refuses to unregister it. Skip it so the user
+        // can always move to a shortcut that works.
+        let unregistered = if app.global_shortcut().is_registered(old_parsed) {
+            app.global_shortcut().unregister(old_parsed)
+        } else {
+            Ok(())
+        };
+        if let Err(error) = unregistered {
             let _ = app.global_shortcut().unregister(parsed);
             if let Err(error) = saves.save_now(old.clone()) {
                 report(&app, format!("Could not restore preferences: {error}"));
@@ -237,7 +245,15 @@ pub(crate) fn set_preferences(app: tauri::AppHandle, preferences: Preferences) -
         }
     }
     let reposition = old.toolbar_position != preferences.toolbar_position;
-    app.state::<AppState>().0.lock().unwrap().preferences = preferences.clone();
+    {
+        let state = app.state::<AppState>();
+        let mut state = state.0.lock().unwrap();
+        state.preferences = preferences.clone();
+        if changed {
+            // The new shortcut registered above, so the toggle works again.
+            state.shortcut_unavailable = false;
+        }
+    }
     if !changed {
         saves.queue(preferences)?;
     }

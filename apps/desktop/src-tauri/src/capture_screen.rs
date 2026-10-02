@@ -28,7 +28,7 @@ pub(crate) fn capture(
             let status = receive.recv().map_err(|e| e.to_string())?;
             if status < 0 {
                 // Preserve capture on systems where compositor synchronization fails.
-                eprintln!("Compositor flush failed ({status:#x}); using capture delay");
+                log::warn!("Compositor flush failed ({status:#x}); using capture delay");
                 std::thread::sleep(std::time::Duration::from_millis(150));
             }
         }

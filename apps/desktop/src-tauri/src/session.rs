@@ -30,6 +30,8 @@ pub(crate) struct Session {
     pub(crate) history_by_overlay: HashMap<String, HistoryAvailability>,
     pub(crate) preferences: Preferences,
     pub(crate) error: Option<String>,
+    /// The toggle shortcut could not be registered, usually because another app holds it.
+    pub(crate) shortcut_unavailable: bool,
     pub(crate) capture: Option<CaptureSession>,
 }
 #[derive(Clone, Copy, Serialize)]
@@ -62,6 +64,7 @@ impl Session {
             history_by_overlay: HashMap::new(),
             preferences,
             error: None,
+            shortcut_unavailable: false,
             capture: None,
         }
     }

@@ -12,7 +12,7 @@ pub(crate) fn publish(app: &tauri::AppHandle) -> Result<()> {
         .map_err(|e| e.to_string())
 }
 pub(crate) fn report(app: &tauri::AppHandle, error: String) {
-    eprintln!("Glassboard: {error}");
+    log::error!("{error}");
     app.state::<AppState>().0.lock().unwrap().error = Some(error);
     let _ = publish(app);
 }
