@@ -55,7 +55,12 @@
         <span class="mode">Annotation mode</span>
       {/if}
     </footer>
-    {#if error || session.error}<p class="error" role="alert">{error || session.error}</p>{/if}
+    {#if session.shortcutUnavailable}
+      <p class="error" role="alert">Another app is using <kbd>{shortcut}</kbd>. <button class="link" disabled={busy} onclick={() => run('settings')}>Choose a different shortcut</button></p>
+    {/if}
+    {#if error || session.error}
+      <p class="error" role="alert">{error || session.error} <button class="link" onclick={() => { onerror(''); if (session.error) run('dismiss-error'); }}>Dismiss</button></p>
+    {/if}
   </aside>
 {/if}
 
@@ -79,4 +84,5 @@
   .secondary:hover { text-decoration: underline; }
   .mode { font-size: 11px; color: var(--muted); }
   .error { margin: 8px 0 0; color: var(--error-text); font-size: 11px; overflow-wrap: anywhere; }
+  .link { padding: 0; font-size: inherit; color: inherit; text-decoration: underline; }
 </style>

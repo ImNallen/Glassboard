@@ -1,10 +1,15 @@
 use crate::{toolbar_position::ToolbarPosition, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use serde_json::{Map, Value};
+use std::{collections::BTreeMap, io::Write, path::Path};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Modifiers, Shortcut};
 
 pub(crate) const DEFAULT_SHORTCUT: &str = "CommandOrControl+Shift+A";
+const FILE_NAME: &str = "preferences.json";
+const BACKUP_NAME: &str = "preferences.json.bak";
+/// Saved files carry this so upgrades apply only to files written before them.
+const FORMAT_VERSION: u64 = 1;
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -19,7 +24,6 @@ pub(crate) enum ColorMode {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Preferences {
     pub(crate) tool: String,
-    #[serde(deserialize_with = "deserialize_color")]
     pub(crate) color: String,
     #[serde(default)]
     pub(crate) color_mode: ColorMode,
@@ -82,38 +86,42 @@ fn is_hex_color(color: &str) -> bool {
         && color.starts_with('#')
         && color.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
 }
-// Upgrade saved palette colors while retaining all other preferences.
-fn deserialize_color<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> std::result::Result<String, D::Error> {
-    let color = String::deserialize(deserializer)?;
-    Ok(match color.as_str() {
-        "#efa5a5" | "#ff3355" => "#f46b78".into(),
-        "#efb895" | "#ff8a1f" | "#e8cf91" | "#f5ff00" => "#f2c85b".into(),
-        "#c6d99c" | "#a3ff12" | "#9fd5b5" | "#00f58a" => "#4dcaa0".into(),
-        "#98d3cf" | "#00f0ff" => "#4fc5d5".into(),
-        "#9fc5e8" | "#3388ff" => "#669df0".into(),
-        "#afb5e5" | "#7855ff" | "#c9ace0" | "#c43cff" => "#a184e8".into(),
-        "#e1a9cf" | "#ff33cc" => "#e580b5".into(),
+// Palette colors from before saved files had a version, mapped to their replacements.
+fn upgraded_color(color: &str) -> &str {
+    match color {
+        "#efa5a5" | "#ff3355" => "#f46b78",
+        "#efb895" | "#ff8a1f" | "#e8cf91" | "#f5ff00" => "#f2c85b",
+        "#c6d99c" | "#a3ff12" | "#9fd5b5" | "#00f58a" => "#4dcaa0",
+        "#98d3cf" | "#00f0ff" => "#4fc5d5",
+        "#9fc5e8" | "#3388ff" => "#669df0",
+        "#afb5e5" | "#7855ff" | "#c9ace0" | "#c43cff" => "#a184e8",
+        "#e1a9cf" | "#ff33cc" => "#e580b5",
         _ => color,
-    })
+    }
 }
 impl Preferences {
-    pub(crate) fn load(app: &tauri::AppHandle) -> Self {
-        app.path()
-            .app_config_dir()
-            .ok()
-            .and_then(|dir| std::fs::read(dir.join("preferences.json")).ok())
-            .and_then(|bytes| serde_json::from_slice::<Self>(&bytes).ok())
-            .filter(|preferences| preferences.validate().is_ok())
-            .unwrap_or_default()
+    /// Loads saved preferences, with a message for the user when any had to be reset.
+    pub(crate) fn load(app: &tauri::AppHandle) -> (Self, Option<String>) {
+        match app.path().app_config_dir() {
+            Ok(dir) => load_from(&dir),
+            Err(error) => {
+                log::error!("Could not find the preferences folder: {error}");
+                (Self::default(), None)
+            }
+        }
     }
 
     pub(crate) fn save(&self, app: &tauri::AppHandle) -> Result<()> {
         let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        let bytes = serde_json::to_vec_pretty(self).map_err(|e| e.to_string())?;
-        std::fs::write(dir.join("preferences.json"), bytes).map_err(|e| e.to_string())
+        self.save_to(&dir)
+    }
+
+    fn save_to(&self, dir: &Path) -> Result<()> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let mut saved = serde_json::to_value(self).map_err(|e| e.to_string())?;
+        saved["version"] = FORMAT_VERSION.into();
+        let bytes = serde_json::to_vec_pretty(&saved).map_err(|e| e.to_string())?;
+        write_atomically(&dir.join(FILE_NAME), &bytes).map_err(|e| e.to_string())
     }
 
     pub(crate) fn validate(&self) -> Result<Shortcut> {
@@ -160,6 +168,116 @@ impl Preferences {
         }
         Ok(shortcut)
     }
+}
+
+fn load_from(dir: &Path) -> (Preferences, Option<String>) {
+    const SOME_RESET: &str = "Some settings could not be read and were reset to their defaults.";
+    const ALL_RESET: &str = "Your settings could not be read, so Glassboard is using the defaults.";
+    let path = dir.join(FILE_NAME);
+    let backup = dir.join(BACKUP_NAME);
+    let (preferences, problem, backed_up) = match std::fs::read(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return (Preferences::default(), None)
+        }
+        Err(error) => {
+            log::error!("Could not read {}: {error}", path.display());
+            // Move the unreadable file aside so saving the defaults cannot replace it.
+            (
+                Preferences::default(),
+                ALL_RESET,
+                std::fs::rename(&path, &backup),
+            )
+        }
+        Ok(bytes) => {
+            let (preferences, problem) = match serde_json::from_slice::<Value>(&bytes) {
+                Ok(Value::Object(mut saved)) => {
+                    upgrade(&mut saved);
+                    if let Some(preferences) = parse(&saved) {
+                        return (preferences, None);
+                    }
+                    let (preferences, reset) = recover(saved);
+                    log::warn!("Reset unreadable preferences: {reset:?}");
+                    (preferences, SOME_RESET)
+                }
+                _ => {
+                    log::warn!(
+                        "Reset all preferences: {} is not a JSON object",
+                        path.display()
+                    );
+                    (Preferences::default(), ALL_RESET)
+                }
+            };
+            (preferences, problem, write_atomically(&backup, &bytes))
+        }
+    };
+    if let Err(error) = backed_up {
+        log::error!("Could not back up {}: {error}", path.display());
+        return (preferences, Some(problem.into()));
+    }
+    // Replace the damaged file with what was recovered, so the next launch starts clean.
+    if let Err(error) = preferences.save_to(dir) {
+        log::error!("Could not save recovered preferences: {error}");
+    }
+    (
+        preferences,
+        Some(format!(
+            "{problem} The original file was kept as {BACKUP_NAME}."
+        )),
+    )
+}
+
+fn upgrade(saved: &mut Map<String, Value>) {
+    let version = saved.get("version").and_then(Value::as_u64).unwrap_or(0);
+    if version < 1 {
+        if let Some(Value::String(color)) = saved.get_mut("color") {
+            *color = upgraded_color(color).into();
+        }
+    }
+}
+
+/// Rebuilds preferences one saved field at a time, so a single unreadable
+/// field (from a damaged file or a newer version) resets only that field.
+/// Returns the fields that were reset.
+fn recover(saved: Map<String, Value>) -> (Preferences, Vec<String>) {
+    let Ok(Value::Object(mut kept)) = serde_json::to_value(Preferences::default()) else {
+        return (
+            Preferences::default(),
+            saved.into_iter().map(|(field, _)| field).collect(),
+        );
+    };
+    let mut reset = Vec::new();
+    for (field, value) in saved {
+        let previous = kept.insert(field.clone(), value);
+        if parse(&kept).is_none() {
+            match previous {
+                Some(previous) => kept.insert(field.clone(), previous),
+                None => kept.remove(&field),
+            };
+            reset.push(field);
+        }
+    }
+    (parse(&kept).unwrap_or_default(), reset)
+}
+
+fn parse(fields: &Map<String, Value>) -> Option<Preferences> {
+    serde_json::from_value::<Preferences>(Value::Object(fields.clone()))
+        .ok()
+        .filter(|preferences| preferences.validate().is_ok())
+}
+
+/// Writes beside the destination and renames into place, so a crash or power
+/// loss mid-save leaves the previous file intact instead of a truncated one.
+fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let temporary = path.with_extension("tmp");
+    let written = std::fs::File::create(&temporary).and_then(|mut file| {
+        file.write_all(bytes)?;
+        file.sync_all()
+    });
+    let result = written.and_then(|()| std::fs::rename(&temporary, path));
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -383,6 +501,126 @@ mod tests {
             assert_eq!(loaded.toolbar_position, position);
             assert!(loaded.validate().is_ok());
         }
+    }
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "glassboard-preferences-{name}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+    #[test]
+    fn missing_preferences_load_defaults_without_a_warning() {
+        let dir = scratch_dir("missing");
+        let (preferences, warning) = load_from(&dir);
+        assert!(preferences == Preferences::default());
+        assert!(warning.is_none());
+    }
+    #[test]
+    fn saved_preferences_replace_the_file_and_load_back() {
+        let dir = scratch_dir("saved");
+        Preferences::default().save_to(&dir).unwrap();
+        let preferences = Preferences {
+            tool: "pen".into(),
+            ..Preferences::default()
+        };
+        preferences.save_to(&dir).unwrap();
+        let (loaded, warning) = load_from(&dir);
+        assert!(loaded == preferences);
+        assert!(warning.is_none());
+        let files: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(files, [FILE_NAME]);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn damaged_preferences_are_backed_up_and_repaired_once() {
+        let dir = scratch_dir("truncated");
+        std::fs::create_dir_all(&dir).unwrap();
+        let truncated = br##"{"tool":"pen","color":"#68a"##;
+        std::fs::write(dir.join(FILE_NAME), truncated).unwrap();
+        let (preferences, warning) = load_from(&dir);
+        assert!(preferences == Preferences::default());
+        assert!(warning.unwrap().contains(BACKUP_NAME));
+        assert_eq!(std::fs::read(dir.join(BACKUP_NAME)).unwrap(), truncated);
+        let (reloaded, warning) = load_from(&dir);
+        assert!(reloaded == preferences);
+        assert!(warning.is_none(), "the next launch starts clean");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn one_invalid_field_resets_only_that_field() {
+        let dir = scratch_dir("field");
+        std::fs::create_dir_all(&dir).unwrap();
+        let saved = r##"{"tool":"pencil","color":"#123abc","shortcut":"Alt+KeyG",
+            "keybindings":{"undo":"CommandOrControl+KeyU"},"toolbarPosition":"left",
+            "autoFadeSeconds":4,"tutorialCompleted":true}"##;
+        std::fs::write(dir.join(FILE_NAME), saved).unwrap();
+        let (preferences, warning) = load_from(&dir);
+        assert!(warning.is_some());
+        assert_eq!(preferences.tool, Preferences::default().tool);
+        assert_eq!(preferences.auto_fade_seconds, 0);
+        assert_eq!(preferences.color, "#123abc");
+        assert_eq!(preferences.shortcut, "Alt+KeyG");
+        assert_eq!(preferences.keybindings["undo"], "CommandOrControl+KeyU");
+        assert_eq!(preferences.toolbar_position, ToolbarPosition::Left);
+        assert!(preferences.tutorial_completed);
+        let (_, reset) = recover(serde_json::from_str(saved).unwrap());
+        assert_eq!(reset, ["autoFadeSeconds", "tool"]);
+        let (reloaded, warning) = load_from(&dir);
+        assert!(reloaded == preferences);
+        assert!(warning.is_none(), "the recovered fields were saved");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn unreadable_preferences_are_moved_aside_before_defaults_are_saved() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch_dir("unreadable");
+        let custom = Preferences {
+            tool: "pen".into(),
+            ..Preferences::default()
+        };
+        custom.save_to(&dir).unwrap();
+        let original = std::fs::read(dir.join(FILE_NAME)).unwrap();
+        let path = dir.join(FILE_NAME);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        if std::fs::read(&path).is_ok() {
+            // Running as root, which can read the file anyway.
+            return;
+        }
+        let (preferences, warning) = load_from(&dir);
+        assert!(preferences == Preferences::default());
+        assert!(warning.unwrap().contains(BACKUP_NAME));
+        let backup = dir.join(BACKUP_NAME);
+        std::fs::set_permissions(&backup, std::fs::Permissions::from_mode(0o600)).unwrap();
+        assert_eq!(std::fs::read(&backup).unwrap(), original);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn palette_upgrades_apply_only_to_files_saved_before_versions() {
+        let dir = scratch_dir("legacy");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            r##"{"tool":"pen","color":"#3388ff","shortcut":"CommandOrControl+Shift+A"}"##,
+        )
+        .unwrap();
+        let (legacy, warning) = load_from(&dir);
+        assert_eq!(legacy.color, "#669df0");
+        assert!(warning.is_none());
+        // A color the user picks now is kept, both from the webview and from disk.
+        let picked: Preferences = serde_json::from_str(
+            r##"{"tool":"pen","color":"#3388ff","shortcut":"CommandOrControl+Shift+A"}"##,
+        )
+        .unwrap();
+        assert_eq!(picked.color, "#3388ff");
+        picked.save_to(&dir).unwrap();
+        assert_eq!(load_from(&dir).0.color, "#3388ff");
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn color_modes_survive_saving_and_loading() {

@@ -84,6 +84,17 @@ On first launch, a short tutorial walks you through drawing and switching back t
 - Windows support, fullscreen apps, Stage Manager, and mixed-DPI setups still need more testing.
 - The macOS build uses private APIs for transparency, so it can't be distributed through the Mac App Store.
 
+## Troubleshooting
+
+Glassboard keeps a log of errors, which is helpful to attach when you
+[report an issue](https://github.com/ImNallen/Glassboard/issues):
+
+- macOS: `~/Library/Logs/dev.glassboard.desktop/`
+- Windows: `%LOCALAPPDATA%\dev.glassboard.desktop\logs\`
+
+If your settings can't be read, Glassboard keeps the ones it can, resets the rest, and
+saves the original file as `preferences.json.bak` next to `preferences.json`.
+
 ## Development
 
 The repository is an npm workspace:

@@ -7,6 +7,7 @@ mod preference_saves;
 mod preferences;
 mod session;
 mod settings_position;
+mod startup_error;
 mod state;
 mod toolbar_position;
 mod tray;
@@ -34,13 +35,29 @@ use windows::{
 type Result<T> = std::result::Result<T, String>;
 
 fn main() {
-    tauri::Builder::default()
+    // Release builds have no console, so record panics in the log before the
+    // default hook prints them and the process unwinds or aborts.
+    let default_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        log::error!("{info}\n{}", std::backtrace::Backtrace::force_capture());
+        default_hook(info);
+    }));
+    let app = tauri::Builder::default()
         // Registered first so a second launch exits before creating windows,
         // a tray icon, or a competing global shortcut.
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
             let handle = app.clone();
             let _ = app.run_on_main_thread(move || reopen(&handle));
         }))
+        // Writes to ~/Library/Logs/dev.glassboard.desktop on macOS and
+        // %LOCALAPPDATA%\dev.glassboard.desktop\logs on Windows.
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .max_file_size(1_000_000)
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
+                .build(),
+        )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         // Login items use a macOS Launch Agent and the Windows Run registry key.
@@ -97,67 +114,101 @@ fn main() {
             copy_capture_region
         ])
         .setup(|app| {
-            let preferences = Preferences::load(app.handle());
-            app.manage(AppState(Mutex::new(Session::new(preferences))));
-            app.manage(PreferenceSaves::start(app.handle().clone()));
-            #[cfg(target_os = "macos")]
-            {
-                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                // The default Hide menu item consumes Cmd+H before the webview
-                // can select Highlighter. Keep the other standard menu actions.
-                let menu = tauri::menu::Menu::default(app.handle())?;
-                let hide_label = tauri::menu::PredefinedMenuItem::hide(app, None)?.text()?;
-                for item in menu.items()? {
-                    if let Some(submenu) = item.as_submenu() {
-                        for item in submenu.items()? {
-                            if let Some(predefined) = item.as_predefined_menuitem() {
-                                if predefined.text()? == hide_label {
-                                    submenu.remove(predefined)?;
-                                }
-                            }
+            if let Err(error) = setup(app) {
+                // Tauri panics on a setup error, which closes the app silently.
+                startup_error::exit(&error.to_string());
+            }
+            Ok(())
+        })
+        .build(tauri::generate_context!());
+    let app = app.unwrap_or_else(|error| startup_error::exit(&error.to_string()));
+    app.run(|app, event| {
+        if matches!(
+            event,
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+        ) {
+            if let Err(error) = app.state::<PreferenceSaves>().flush() {
+                log::error!("Could not save preferences on exit: {error}");
+            }
+        }
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { .. } = event {
+            reopen(app);
+        }
+    });
+}
+
+fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    log::info!(
+        "Starting Glassboard {} on {} {}",
+        app.package_info().version,
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    );
+    // Problems found while starting are shown together once the windows exist.
+    let mut problems = Vec::new();
+    let (preferences, warning) = Preferences::load(app.handle());
+    problems.extend(warning);
+    app.manage(AppState(Mutex::new(Session::new(preferences))));
+    app.manage(PreferenceSaves::start(app.handle().clone()));
+    #[cfg(target_os = "macos")]
+    {
+        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        // The default Hide menu item consumes Cmd+H before the webview
+        // can select Highlighter. Keep the other standard menu actions.
+        let menu = tauri::menu::Menu::default(app.handle())?;
+        let hide_label = tauri::menu::PredefinedMenuItem::hide(app, None)?.text()?;
+        for item in menu.items()? {
+            if let Some(submenu) = item.as_submenu() {
+                for item in submenu.items()? {
+                    if let Some(predefined) = item.as_predefined_menuitem() {
+                        if predefined.text()? == hide_label {
+                            submenu.remove(predefined)?;
                         }
                     }
                 }
-                app.set_menu(menu)?;
             }
-            app.manage(CaptureImage(Mutex::new(None)));
-            app.manage(TrayAnchor(Mutex::new(None)));
-            app.manage(ToolbarExpanded(Mutex::new(false)));
-            app.manage(ToolbarLayout(Mutex::new(None)));
-            app.manage(ToolbarTracking::default());
-            windows::create_windows(app)?;
-            tray::create_tray(app)?;
-            let handle = app.handle();
-            if let Err(e) = register_toggle(handle, &snapshot(handle).preferences.shortcut) {
-                report(handle, e);
-            }
-            select_cursor_monitor(handle);
-            position_toolbar(handle).map_err(std::io::Error::other)?;
-            apply_windows(handle).map_err(std::io::Error::other)?;
-            if snapshot(handle).tutorial.is_some() {
-                if let Some(tutorial) = app.get_webview_window("tutorial") {
-                    tutorial.set_focus()?;
-                }
-            }
-            watch_toolbar_proximity(handle.clone());
-            Ok(())
-        })
-        .build(tauri::generate_context!())
-        .expect("Could not start Glassboard")
-        .run(|app, event| {
-            if matches!(
-                event,
-                tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
-            ) {
-                if let Err(error) = app.state::<PreferenceSaves>().flush() {
-                    eprintln!("Could not save preferences on exit: {error}");
-                }
-            }
-            #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Reopen { .. } = event {
-                reopen(app);
-            }
-        });
+        }
+        app.set_menu(menu)?;
+    }
+    app.manage(CaptureImage(Mutex::new(None)));
+    app.manage(TrayAnchor(Mutex::new(None)));
+    app.manage(ToolbarExpanded(Mutex::new(false)));
+    app.manage(ToolbarLayout(Mutex::new(None)));
+    app.manage(ToolbarTracking::default());
+    windows::create_windows(app)?;
+    tray::create_tray(app)?;
+    let handle = app.handle();
+    if let Err(error) = register_toggle(handle, &snapshot(handle).preferences.shortcut) {
+        log::error!("{error}");
+        app.state::<AppState>()
+            .0
+            .lock()
+            .unwrap()
+            .shortcut_unavailable = true;
+    }
+    select_cursor_monitor(handle);
+    // The app still works with a misplaced window, so these are not fatal.
+    problems.extend(position_toolbar(handle).err());
+    problems.extend(apply_windows(handle).err());
+    if snapshot(handle).tutorial.is_some() {
+        if let Some(tutorial) = app.get_webview_window("tutorial") {
+            problems.extend(tutorial.set_focus().err().map(|e| e.to_string()));
+        }
+    }
+    let session = snapshot(handle);
+    // The tutorial explains problems itself. Otherwise nothing is on screen
+    // at launch, so open Settings to explain them.
+    if (!problems.is_empty() || session.shortcut_unavailable) && session.tutorial.is_none() {
+        if let Err(error) = perform(handle, "settings") {
+            log::error!("Could not open settings: {error}");
+        }
+    }
+    if !problems.is_empty() {
+        report(handle, problems.join(" "));
+    }
+    watch_toolbar_proximity(handle.clone());
+    Ok(())
 }
 
 // Reopening the app (from the Dock, or by launching it again while it runs)

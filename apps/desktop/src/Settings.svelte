@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Copy, EyeOff, Keyboard, Palette, Power, Redo2, RotateCcw, Scan, SlidersHorizontal, Trash2, Undo2, X } from '@lucide/svelte';
+  import { untrack } from 'svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
   import { action, getAutostart, mac, native, savePreferences, setAutostart, shortcutLabel, type Preferences, type Session, type ToolbarPosition } from '@glassboard/ui/session';
   import { COLOR_SHORTCUTS, DEFAULT_SHORTCUT, KEYBINDING_GROUPS, KEYBINDINGS, keybinding, sameShortcut, TOOL_SHORTCUTS, type Keybindings } from '@glassboard/ui/shortcuts';
@@ -40,7 +41,13 @@
     choice.slot !== undefined ? { background: swatchColor(preferences.swatches, choice.slot), name: swatchName(preferences.swatches, choice.slot) }
       : { background: choice.colorMode === 'rainbow' ? rainbowPreview(preferences.rainbowColors) : shiftingPreview(preferences.cycleColors), name: choice.name }])));
   const run = (name: string) => action(name).catch(onerror);
-  $effect(() => { if (windowVisible) { notice = ''; onerror(''); } });
+  $effect(() => {
+    if (!windowVisible) return;
+    notice = ''; onerror('');
+    // Open where the unavailable shortcut can be replaced.
+    if (untrack(() => session.shortcutUnavailable)) tab = 'keybindings';
+  });
+  function dismissError() { onerror(''); if (session.error) run('dismiss-error'); }
   $effect(() => () => clearTimeout(noticeTimer));
 
   function select(next: Tab) {
@@ -188,6 +195,7 @@
               </ShortcutRecorder>
             </div>
           </div>
+          {#if session.shortcutUnavailable}<p class="note unavailable" role="alert">Another app is using {shortcutLabel(preferences.shortcut)}, so it can’t turn on drawing. Record a different shortcut.</p>{/if}
         </section>
 
         {#each KEYBINDING_GROUPS as group}
@@ -212,7 +220,7 @@
     </div>
 
     <div class="status" aria-live="polite">
-      {#if error || session.error}<p class="error" role="alert">{error || session.error}</p>
+      {#if error || session.error}<p class="error" role="alert">{error || session.error}<button class="dismiss" aria-label="Dismiss error" onclick={dismissError}><X size={12}/></button></p>
       {:else if hint}<p>{hint}</p>
       {:else if notice}<p>{notice}</p>{/if}
     </div>
@@ -291,7 +299,10 @@
 
   .status { padding: 0 16px; font-size: 11px; line-height: 1.4; color: var(--muted); }
   .status p { margin: 0 0 9px; }
-  .status .error { color: var(--error-text); overflow-wrap: anywhere; }
+  .status .error { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; color: var(--error-text); overflow-wrap: anywhere; }
+  .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--muted); }
+  .status .dismiss:hover { background: var(--hover); color: var(--strong-text); }
+  .note.unavailable { color: var(--error-text); }
   footer { display: flex; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--divider); }
   footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--secondary-text); }
   footer button:hover { background: var(--hover); color: var(--strong-text); }
