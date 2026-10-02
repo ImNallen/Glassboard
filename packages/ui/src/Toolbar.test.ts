@@ -3,7 +3,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
 import Toolbar from './Toolbar.svelte';
-import { defaults, expandToolbar, shortcutLabel, toolbarPointer, type Session, type ToolbarPosition } from './lib/session';
+import { createErrors } from './lib/errors.svelte';
+import { defaults, expandToolbar, toolbarPointer, type Session, type ToolbarPosition } from './lib/session';
+import { shortcutLabel } from './lib/shortcuts';
 
 vi.mock('./lib/session', async importOriginal => ({
   ...await importOriginal<typeof import('./lib/session')>(),
@@ -27,7 +29,7 @@ async function setup(position: ToolbarPosition = 'bottom') {
   const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: 'draw',
     preferences: { ...defaults.preferences, toolbarPosition: position } });
   const current = fromStore(store);
-  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, error: '', onerror: vi.fn() } });
+  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, errors: createErrors(() => current.current), host: 'page' } });
   await tick();
   return store;
 }
@@ -141,11 +143,39 @@ it('shows and updates unfocused tooltips from native cursor samples without a cl
 it('stays open when pinned, even after the tutorial and with the cursor away', async () => {
   const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: null });
   const current = fromStore(store);
-  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, error: '', onerror: vi.fn(), pinned: true } });
+  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, errors: createErrors(() => current.current), host: 'page', pinned: true } });
   await tick();
   await vi.advanceTimersByTimeAsync(300);
   expect(document.querySelector('.toolbar-host')?.classList.contains('collapsed')).toBe(false);
   window.dispatchEvent(new MouseEvent('mouseout'));
   await vi.advanceTimersByTimeAsync(300);
   expect(document.querySelector('.toolbar-host')?.classList.contains('collapsed')).toBe(false);
+});
+
+it.each([['window', true], ['page', true], ['capture', false]] as const)('in a %s host, follows the native cursor and window size: %s', async (host, native) => {
+  const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: null });
+  const current = fromStore(store);
+  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, errors: createErrors(() => current.current), host } });
+  await tick();
+  expect(vi.mocked(toolbarPointer).mock.calls.length > 0).toBe(native);
+  expect(vi.mocked(expandToolbar).mock.calls.length > 0).toBe(native);
+  expect(Boolean(document.querySelector('.fade-button'))).toBe(native);
+});
+
+it('reveals on a nearby pointer in a page, but leaves that to the native window otherwise', async () => {
+  for (const host of ['page', 'window'] as const) {
+    const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: null });
+    const current = fromStore(store);
+    toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, errors: createErrors(() => current.current), host } });
+    await tick();
+    await vi.advanceTimersByTimeAsync(300);
+    const toolbarHost = document.querySelector('.toolbar-host')!;
+    expect(toolbarHost.classList.contains('collapsed')).toBe(true);
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, clientY: 0 }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(toolbarHost.classList.contains('collapsed')).toBe(host === 'window');
+    await unmount(toolbar);
+    toolbar = undefined;
+    document.body.replaceChildren();
+  }
 });

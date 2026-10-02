@@ -1,6 +1,5 @@
+import preferenceDefaults from '../../contract/preference-defaults.json';
 export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'highlighter' | 'text' | 'eraser';
-/** Tools that create shapes; the eraser only removes them. */
-export const DRAWING_TOOLS: readonly Tool[] = ['pen', 'arrow', 'rectangle', 'ellipse', 'highlighter', 'text'];
 /** Freehand tools append points as the pointer moves instead of anchoring a start and end. */
 export const FREEHAND_TOOLS: readonly Tool[] = ['pen', 'highlighter'];
 export type ColorMode = 'solid' | 'rainbow' | 'cycle';
@@ -36,23 +35,9 @@ type DrawingStyle = {
 export function shapeOpacity(shape: Shape, now: number): number {
   return shape.expiresAt === undefined ? 1 : Math.max(0, Math.min(1, (shape.expiresAt - now) / FADE_MS));
 }
-export const PALETTE = [
-  ['#f46b78', 'Coral red'], ['#f2c85b', 'Warm yellow'], ['#4dcaa0', 'Mint green'],
-  ['#4fc5d5', 'Aqua'], ['#669df0', 'Sky blue'], ['#a184e8', 'Violet'],
-  ['#e580b5', 'Pink'],
-] as const;
 /** The default colors for both Rainbow and Shifting; users can replace either list. */
-export const CYCLE_COLORS = PALETTE.map(([color]) => color);
+export const CYCLE_COLORS: readonly string[] = preferenceDefaults.cycleColors;
 export function cycleColor(index: number, colors: readonly string[] = CYCLE_COLORS): string { return colors[index % colors.length]; }
-/** A swatch showing a rainbow's colors all the way around. */
-export function rainbowPreview(colors: readonly string[] = CYCLE_COLORS): string { return `conic-gradient(${[...colors, colors[0]].join(', ')})`; }
-export const RAINBOW_PREVIEW = rainbowPreview();
-/** A swatch showing three colors spread across the Shifting sequence, starting at `index`. */
-export function shiftingPreview(colors: readonly string[] = CYCLE_COLORS, index = 0): string {
-  const [a, b, c] = [0, 1, 2].map(step => cycleColor(index + Math.round(step * colors.length / 3), colors));
-  return `conic-gradient(${a} 0deg 120deg, ${b} 120deg 240deg, ${c} 240deg 360deg)`;
-}
-
 export function createShape(style: DrawingStyle, cycleIndex: number, start: Point): Shape {
   return {
     id: crypto.randomUUID(),

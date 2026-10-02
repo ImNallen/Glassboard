@@ -1,7 +1,10 @@
-use super::settings::{SETTINGS_HEIGHT, SETTINGS_WIDTH};
+use super::{
+    geometry::{SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE},
+    Surface,
+};
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
-fn configure_overlay(window: &tauri::WebviewWindow, toolbar: bool) -> tauri::Result<()> {
+fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::Result<()> {
     #[cfg(target_os = "macos")]
     {
         use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
@@ -12,54 +15,47 @@ fn configure_overlay(window: &tauri::WebviewWindow, toolbar: bool) -> tauri::Res
             NSWindowCollectionBehavior::CanJoinAllSpaces
                 | NSWindowCollectionBehavior::FullScreenAuxiliary,
         );
-        native.setLevel(if toolbar { 26 } else { 25 });
+        // Every other surface floats above the drawing.
+        native.setLevel(match surface {
+            Surface::Overlay(_) => 25,
+            _ => 26,
+        });
     }
     #[cfg(not(target_os = "macos"))]
-    let _ = (window, toolbar);
+    let _ = (window, surface);
     Ok(())
 }
 pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
     for (index, monitor) in app.available_monitors()?.iter().enumerate() {
-        let window = window_builder(
-            app,
-            &format!("overlay-{index}"),
-            "overlay",
-            "Glassboard annotations",
-        )
-        .build()?;
+        let surface = Surface::Overlay(index);
+        let window = window_builder(app, surface, "Glassboard annotations").build()?;
         window.set_size(*monitor.size())?;
         window.set_position(*monitor.position())?;
-        configure_overlay(&window, false)?;
+        configure_overlay(&window, surface)?;
     }
-    for (label, title, width, height) in [
-        ("capture", "Glassboard Capture", 800.0, 600.0),
-        ("toolbar", "Glassboard", 744.0, 76.0),
-        (
-            "settings",
-            "Glassboard Settings",
-            SETTINGS_WIDTH,
-            SETTINGS_HEIGHT,
-        ),
-        ("tutorial", "Welcome to Glassboard", 400.0, 330.0),
+    for (surface, title, (width, height)) in [
+        (Surface::Capture, "Glassboard Capture", (800.0, 600.0)),
+        (Surface::Toolbar, "Glassboard", TOOLBAR_SIZE),
+        (Surface::Settings, "Glassboard Settings", SETTINGS_SIZE),
+        (Surface::Tutorial, "Welcome to Glassboard", TUTORIAL_SIZE),
     ] {
-        let window = window_builder(app, label, label, title)
+        let window = window_builder(app, surface, title)
             .inner_size(width, height)
             .build()?;
-        configure_overlay(&window, true)?;
+        configure_overlay(&window, surface)?;
     }
     Ok(())
 }
 
 fn window_builder<'a>(
     app: &'a tauri::App,
-    label: &str,
-    surface: &str,
+    surface: Surface,
     title: &str,
 ) -> WebviewWindowBuilder<'a, tauri::Wry, tauri::App> {
     WebviewWindowBuilder::new(
         app,
-        label,
-        WebviewUrl::App(format!("index.html?surface={surface}").into()),
+        surface.label(),
+        WebviewUrl::App(format!("index.html?surface={}", surface.url()).into()),
     )
     .title(title)
     // Drawing and controls should work on the click that activates their window.

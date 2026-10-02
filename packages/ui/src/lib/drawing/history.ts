@@ -105,10 +105,6 @@ export class DrawingHistory {
     if (this.shapes.length) this.commit([]);
   }
 
-  remove(id: string): boolean {
-    return this.removeAll([id]);
-  }
-
   /** Remove several shapes as a single undo step. */
   removeAll(ids: Iterable<string>): boolean {
     const removed = new Set(ids);

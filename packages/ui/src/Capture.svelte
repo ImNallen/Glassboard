@@ -3,12 +3,14 @@
   import { Copy } from '@lucide/svelte';
   import Overlay from '@glassboard/ui/Overlay.svelte';
   import Toolbar from '@glassboard/ui/Toolbar.svelte';
-  import { action, mac, native, savePreferences, shortcutLabel, type Session, type Preferences } from '@glassboard/ui/session';
+  import { action, native, savePreferences, type Session, type Preferences, type Action } from '@glassboard/ui/session';
   import { drawingKeydown } from '@glassboard/ui/keys';
-  import { keybinding, toolShortcut } from '@glassboard/ui/shortcuts';
-  import { annotatedCapture, captureKeydown, capturePixels, copiesOnClipboardEvent, captureRegion, type CaptureRegion } from '@glassboard/ui/capture';
+  import { isEditableTarget } from '@glassboard/ui/selection';
+  import { keyLabel, platformMac, toolShortcut } from '@glassboard/ui/shortcuts';
+  import { annotatedCapture, captureKeydown, capturePixels, copiesOnClipboardEvent, captureRegion, type CaptureBackend, type CaptureRegion } from '@glassboard/ui/capture';
+  import { createErrors } from '@glassboard/ui/errors';
 
-  let { session, onerror, getImage, copyImage, copyRegion }: { session: Session; onerror: (error: unknown) => void; getImage: (id: number) => Promise<ImageData | HTMLImageElement | HTMLCanvasElement>; copyImage: (id: number, image: Promise<Blob>) => Promise<void>; copyRegion?: (id: number, region: CaptureRegion) => Promise<void> } = $props();
+  let { session, getImage, copyImage, copyRegion }: { session: Session } & CaptureBackend = $props();
   // The parent keys this editor by capture id.
   const id = (() => session.capture!.id)();
   let image: HTMLCanvasElement;
@@ -26,11 +28,12 @@
   let overlay = $state<Overlay>();
   let disposed = false;
   let toolbarDock = $derived(session.capture?.toolbarDock);
-  let copyKey = $derived(shortcutLabel(keybinding(session.preferences.keybindings, 'copy')));
+  let copyKey = $derived(keyLabel(session.preferences.keybindings, 'copy'));
   let editingSession = $derived<Session>({ ...session, mode: 'draw', tutorial: null, settingsOpen: false,
     activeOverlay: 'capture', preferences: { ...session.preferences, autoFadeSeconds: 0 } });
-  const run = (name: string) => action(name).catch(onerror);
-  function fail(cause: unknown) { error = String(cause); }
+  // Owned here, not by the host window, so a new capture starts without the last one's error.
+  const errors = createErrors(() => editingSession);
+  const run = (name: Action) => action(name).catch(errors.report);
   function cancel() {
     if (busy) return;
     if (choosingRegion) {
@@ -77,7 +80,7 @@
         await copyImage(id, annotatedCapture(image, region, shapes));
       }
       if (!native && !disposed && session.capture?.id === id) await action('cancel-capture');
-    } catch (cause) { if (!disposed) fail(cause); }
+    } catch (cause) { if (!disposed) error = String(cause); }
     finally { busy = false; }
   }
   function save(preferences: Preferences) {
@@ -86,18 +89,16 @@
   function keydown(event: KeyboardEvent) {
     captureKeydown(event, { copy, cancel, keybindings: session.preferences.keybindings });
     if (event.defaultPrevented || dragging || busy) return;
-    const choosingTool = Boolean(toolShortcut(event, session.preferences.keybindings, mac));
+    const choosingTool = Boolean(toolShortcut(event, session.preferences.keybindings, platformMac));
     drawingKeydown(event, editingSession, { run, capture: reselect, save: preferences => save(preferences).then(() => {
       if (choosingTool) chooseDrawingTool();
-    }).catch(fail) });
+    }).catch(errors.report) });
   }
   function copied(event: ClipboardEvent) {
-    const target = event.target instanceof Element ? event.target : document.activeElement;
-    if (target?.closest('input, textarea, [contenteditable="true"]') || !copiesOnClipboardEvent(session.preferences.keybindings)) return;
+    if (isEditableTarget(event.target) || !copiesOnClipboardEvent(session.preferences.keybindings)) return;
     event.preventDefault(); copy();
   }
   onMount(() => {
-    const started = import.meta.env.DEV ? performance.now() : 0;
     getImage(id).then(value => {
       if (disposed) return;
       image.width = value instanceof HTMLImageElement ? value.naturalWidth : value.width;
@@ -107,9 +108,8 @@
       if (value instanceof HTMLImageElement || value instanceof HTMLCanvasElement) context.drawImage(value, 0, 0);
       else context.putImageData(value, 0, 0);
       loaded = true;
-      if (import.meta.env.DEV) console.debug(`Screenshot editor pixels loaded in ${(performance.now() - started).toFixed(1)} ms`);
-    }).catch(cause => { if (!disposed) fail(cause); });
-    return () => { disposed = true; image.width = 0; image.height = 0; };
+    }).catch(cause => { if (!disposed) error = String(cause); });
+    return () => { disposed = true; errors.clear(); image.width = 0; image.height = 0; };
   });
 </script>
 
@@ -123,13 +123,13 @@
     </div>
   {:else if region}
     <div class="selection finished" style:left={`${region.x}px`} style:top={`${region.y}px`} style:width={`${region.width}px`} style:height={`${region.height}px`}></div>
-    <Overlay bind:this={overlay} session={editingSession} onerror={fail} bounds={region} showGlow={false}/>
+    <Overlay bind:this={overlay} session={editingSession} onerror={errors.report} bounds={region} showGlow={false}/>
   {/if}
-  <div hidden={choosingRegion && !error} class:busy class:native-dock={Boolean(toolbarDock)} class="capture-tools"
+  <div hidden={choosingRegion && !error && !errors.reported} class:busy class:native-dock={Boolean(toolbarDock)} class="capture-tools"
     style:left={toolbarDock ? `${toolbarDock.x}px` : undefined} style:top={toolbarDock ? `${toolbarDock.y}px` : undefined}
     style:width={toolbarDock ? `${toolbarDock.width}px` : undefined} style:height={toolbarDock ? `${toolbarDock.height}px` : undefined}
     style:--toolbar-viewport-width={toolbarDock ? `${toolbarDock.width}px` : undefined} style:--toolbar-viewport-height={toolbarDock ? `${toolbarDock.height}px` : undefined}>
-    <Toolbar session={editingSession} error="" onerror={fail} onsave={save} onchoose={chooseDrawingTool} oncapture={reselect} selectingCapture={selecting} pinned embedded capture/>
+    <Toolbar session={editingSession} {errors} onsave={save} onchoose={chooseDrawingTool} oncapture={reselect} selectingCapture={selecting} host="capture" pinned/>
   </div>
   {#if region && !dragging}
     <div class="capture-actions" role="group" aria-label="Capture controls">
@@ -168,11 +168,11 @@
   .capture-actions { position: fixed; z-index: 20; top: 18px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); }
   /* Keep the shared control independent of the host page's button/kbd defaults. */
   .capture-actions button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border-radius: 8px; font: 600 12px/normal -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 0 10px; appearance: none; border: 0; box-shadow: none; cursor: pointer; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
-  .capture-actions button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .capture-actions button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .capture-actions button:disabled { opacity: .45; cursor: default; }
   .copy { background: #a3e9d1; color: #143d33; }
   .copy:hover:not(:disabled) { background: #b9f0dc; }
   .copy kbd { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 4px; background: #143d331a; color: inherit; }
-  .capture-error { position: fixed; z-index: 25; top: 86px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--error-text); padding: 12px 16px; font-size: 13px; }
+  .capture-error { position: fixed; z-index: 25; top: 86px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px); border: 1px solid var(--gb-border); border-radius: 10px; background: var(--gb-surface); color: var(--gb-error-text); padding: 12px 16px; font-size: 13px; }
   @media (max-width: 760px) { .copy kbd { display: none; } .capture-actions button { padding: 0 8px; } }
 </style>

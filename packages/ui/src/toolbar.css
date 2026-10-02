@@ -1,68 +1,68 @@
 /* Styles for the annotation toolbar and overlay. The color variables follow the OS
-   appearance through the live media query; every rule is scoped to the toolbar so
-   the stylesheet can sit on top of any host page. */
+   appearance through the live media query and carry a --gb- prefix, and every rule is
+   scoped to the toolbar, so the stylesheet can sit on top of any host page. */
 :root {
-  --surface: #f7f8fa;
-  --text: #252a33;
-  --strong-text: #141820;
-  --secondary-text: #49515e;
-  --muted: #606a79;
-  --icon: #505968;
-  --border: #20293824;
-  --divider: #2029381a;
-  --hover: #2029380c;
-  --selected: #dce2eb;
-  --selected-border: #20293820;
-  --subtle-surface: #ffffff80;
-  --key-surface: #e8ecf1;
-  --input-surface: #ffffff;
-  --save-surface: #dce3ed;
-  --swatch-border: #18213138;
-  --focus-ring: #3564c5;
-  --error-surface: #fce5e2;
-  --error-text: #8a2924;
-  --shadow: #18213124;
+  --gb-surface: #f7f8fa;
+  --gb-text: #252a33;
+  --gb-strong-text: #141820;
+  --gb-secondary-text: #49515e;
+  --gb-muted: #606a79;
+  --gb-icon: #505968;
+  --gb-border: #20293824;
+  --gb-divider: #2029381a;
+  --gb-hover: #2029380c;
+  --gb-selected: #dce2eb;
+  --gb-selected-border: #20293820;
+  --gb-subtle-surface: #ffffff80;
+  --gb-key-surface: #e8ecf1;
+  --gb-input-surface: #ffffff;
+  --gb-save-surface: #dce3ed;
+  --gb-swatch-border: #18213138;
+  --gb-focus-ring: #3564c5;
+  --gb-error-surface: #fce5e2;
+  --gb-error-text: #8a2924;
+  --gb-shadow: #18213124;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: #25272c;
-    --text: #e9e9ed;
-    --strong-text: #ffffff;
-    --secondary-text: #c4c8d0;
-    --muted: #a1a8b5;
-    --icon: #bdbfc8;
-    --border: #ffffff1a;
-    --divider: #ffffff13;
-    --hover: #ffffff0d;
-    --selected: #454952;
-    --selected-border: #ffffff20;
-    --subtle-surface: #ffffff04;
-    --key-surface: #ffffff08;
-    --input-surface: #1c1e23;
-    --save-surface: #454c5a;
-    --swatch-border: #ffffff24;
-    --focus-ring: #a0b9ff;
-    --error-surface: #6a3434;
-    --error-text: #ffe5e1;
-    --shadow: #00000033;
+    --gb-surface: #25272c;
+    --gb-text: #e9e9ed;
+    --gb-strong-text: #ffffff;
+    --gb-secondary-text: #c4c8d0;
+    --gb-muted: #a1a8b5;
+    --gb-icon: #bdbfc8;
+    --gb-border: #ffffff1a;
+    --gb-divider: #ffffff13;
+    --gb-hover: #ffffff0d;
+    --gb-selected: #454952;
+    --gb-selected-border: #ffffff20;
+    --gb-subtle-surface: #ffffff04;
+    --gb-key-surface: #ffffff08;
+    --gb-input-surface: #1c1e23;
+    --gb-save-surface: #454c5a;
+    --gb-swatch-border: #ffffff24;
+    --gb-focus-ring: #a0b9ff;
+    --gb-error-surface: #6a3434;
+    --gb-error-text: #ffe5e1;
+    --gb-shadow: #00000033;
   }
 }
 
-.toolbar-host { color-scheme: light dark; position: fixed; z-index: 10; bottom: 12px; left: 50%; transform: translateX(-50%); width: fit-content; max-width: calc(var(--toolbar-viewport-width, 100vw) - 24px); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; color: var(--text); -webkit-font-smoothing: antialiased; }
+.toolbar-host { color-scheme: light dark; position: fixed; z-index: 10; bottom: 12px; left: 50%; transform: translateX(-50%); width: fit-content; max-width: calc(var(--toolbar-viewport-width, 100vw) - 24px); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 16px; color: var(--gb-text); -webkit-font-smoothing: antialiased; }
 .toolbar-host, .toolbar-host * { box-sizing: border-box; }
 .toolbar-host button { font: inherit; cursor: pointer; border: 0; color: inherit; background: none; -webkit-tap-highlight-color: transparent; }
-.toolbar-host button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.toolbar-host button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
 .toolbar-host button:disabled { opacity: .45; cursor: default; }
-.toolbar-host kbd { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 4px; background: var(--key-surface); color: var(--secondary-text); }
+.toolbar-host kbd { font: inherit; font-size: 11px; padding: 3px 5px; border-radius: 4px; background: var(--gb-key-surface); color: var(--gb-secondary-text); }
 .concealed { visibility: hidden; pointer-events: none; }
-.toolbar { transition: opacity .1s ease-out, transform .1s ease-out; overflow-x: auto; scrollbar-width: none; display: flex; align-items: center; height: 52px; border: 1px solid var(--border); border-radius: 15px; background: var(--surface); box-shadow: 0 4px 10px var(--shadow); }
+.toolbar { transition: opacity .1s ease-out, transform .1s ease-out; overflow-x: auto; scrollbar-width: none; display: flex; align-items: center; height: 52px; border: 1px solid var(--gb-border); border-radius: 15px; background: var(--gb-surface); box-shadow: 0 4px 10px var(--gb-shadow); }
 .toolbar::-webkit-scrollbar { display: none; }
 .collapsed .toolbar { opacity: 0; transform: translateY(6px); pointer-events: none; }
 .vertical.collapsed .toolbar { transform: none; }
 .left.collapsed .toolbar { transform: translateX(-6px); }
 .right.collapsed .toolbar { transform: translateX(6px); }
-.pill { position: absolute; z-index: 5; left: 50%; bottom: 2px; transform: translateX(-50%); width: 40px; height: 6px; padding: 0; border-radius: 3px; background: var(--surface); box-shadow: 0 0 0 1px var(--border), 0 1px 3px var(--shadow); opacity: 0; pointer-events: none; transition: opacity .18s ease .06s, transform .18s ease; }
+.pill { position: absolute; z-index: 5; left: 50%; bottom: 2px; transform: translateX(-50%); width: 40px; height: 6px; padding: 0; border-radius: 3px; background: var(--gb-surface); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 3px var(--gb-shadow); opacity: 0; pointer-events: none; transition: opacity .18s ease .06s, transform .18s ease; }
 .collapsed .pill { opacity: 1; pointer-events: auto; }
 .collapsed .pill:hover { transform: translateX(-50%) scaleY(1.3); }
 .vertical .pill { left: 2px; right: auto; top: 50%; bottom: auto; transform: translateY(-50%); width: 6px; height: 40px; }
@@ -80,15 +80,15 @@
 .vertical .error-banner { top: 0; bottom: auto; width: 300px; max-height: 100%; overflow-y: auto; }
 .left .error-banner { left: calc(100% + 10px); }
 .right .error-banner { right: calc(100% + 10px); }
-.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 34px; padding: 0; border-radius: 8px; flex-shrink: 0; color: var(--icon); transition: background .12s, color .12s, opacity .12s; }
+.icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 34px; padding: 0; border-radius: 8px; flex-shrink: 0; color: var(--gb-icon); transition: background .12s, color .12s, opacity .12s; }
 .icon-button:disabled { opacity: .3; }
-.icon-button:hover:not(:disabled) { background: var(--hover); color: var(--strong-text); }
-.icon-button.active { background: var(--selected); color: var(--strong-text); box-shadow: inset 0 0 0 1px var(--selected-border); }
+.icon-button:hover:not(:disabled) { background: var(--gb-hover); color: var(--gb-strong-text); }
+.icon-button.active { background: var(--gb-selected); color: var(--gb-strong-text); box-shadow: inset 0 0 0 1px var(--gb-selected-border); }
 .tool-row { flex-shrink: 0; min-width: max-content; display: flex; align-items: center; gap: 2px; padding: 8px; }
 .toolbar-colors { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .color-choice { width: 26px; height: 30px; }
 .tool-group { display: flex; gap: 2px; }
-.divider { width: 1px; height: 20px; margin: 0 4px; background: var(--divider); flex-shrink: 0; }
-.color-dot { height: 18px; width: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--swatch-border); }
-.error-banner { position: absolute; bottom: 62px; z-index: 20; width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 8px; background: var(--error-surface); color: var(--error-text); font-size: 11px; }
+.divider { width: 1px; height: 20px; margin: 0 4px; background: var(--gb-divider); flex-shrink: 0; }
+.color-dot { height: 18px; width: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
+.error-banner { position: absolute; bottom: 62px; z-index: 20; width: 100%; display: flex; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 8px; background: var(--gb-error-surface); color: var(--gb-error-text); font-size: 11px; }
 .fade-button { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }

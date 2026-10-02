@@ -1,0 +1,13 @@
+{
+  "tool": "arrow",
+  "color": "#f46b78",
+  "colorMode": "rainbow",
+  "shortcut": "CommandOrControl+Shift+A",
+  "keybindings": {},
+  "swatches": ["#000000", "#ffffff", "#4dcaa0", "#f2c85b", "#f46b78", "#669df0"],
+  "rainbowColors": ["#f46b78", "#f2c85b", "#4dcaa0", "#4fc5d5", "#669df0", "#a184e8", "#e580b5"],
+  "cycleColors": ["#f46b78", "#f2c85b", "#4dcaa0", "#4fc5d5", "#669df0", "#a184e8", "#e580b5"],
+  "toolbarPosition": "bottom",
+  "autoFadeSeconds": 0,
+  "tutorialCompleted": false
+}

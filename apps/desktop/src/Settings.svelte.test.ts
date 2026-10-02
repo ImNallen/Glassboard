@@ -2,22 +2,24 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import Settings from './Settings.svelte';
-import { defaults, getAutostart, savePreferences, subscribe, type Session } from '@glassboard/ui/session';
+import { createPreviewSession, defaults, savePreferences, subscribe, useSession, type Session } from '@glassboard/ui/session';
+import { getAutostart } from './lib/autostart';
+import { createErrors } from '@glassboard/ui/errors';
 
 let settings: ReturnType<typeof mount> | undefined;
 let stop = () => {};
 afterEach(async () => {
+  vi.restoreAllMocks();
   if (settings) await unmount(settings);
   settings = undefined;
   stop();
-  await savePreferences(structuredClone(defaults.preferences));
   document.body.replaceChildren();
 });
 
 async function setup(tab = 'keybindings') {
   let session = $state<Session>(structuredClone(defaults));
   stop = await subscribe(value => session = value);
-  settings = mount(Settings, { target: document.body, props: { get session() { return session; }, error: '', onerror: vi.fn() } });
+  settings = mount(Settings, { target: document.body, props: { get session() { return session; }, errors: createErrors(() => session) } });
   await tick();
   document.querySelector<HTMLButtonElement>(`#tab-${tab}`)!.click();
   flushSync();
@@ -185,7 +187,7 @@ it('turns opening at login on and off from the General tab', async () => {
 
 it('opens on keybindings and explains a toggle shortcut another app holds', async () => {
   const session = $state<Session>({ ...structuredClone(defaults), shortcutUnavailable: true });
-  settings = mount(Settings, { target: document.body, props: { get session() { return session; }, error: '', onerror: vi.fn() } });
+  settings = mount(Settings, { target: document.body, props: { get session() { return session; }, errors: createErrors(() => session) } });
   await tick();
   expect(document.querySelector('#tab-keybindings')?.getAttribute('aria-selected')).toBe('true');
   expect(document.querySelector('.note.unavailable')?.textContent).toContain('Another app is using');
@@ -194,12 +196,11 @@ it('opens on keybindings and explains a toggle shortcut another app holds', asyn
   expect(document.querySelector('.note.unavailable')).toBeNull();
 });
 
-it('dismisses a session error from the status line', async () => {
-  const onerror = vi.fn();
-  settings = mount(Settings, { target: document.body, props: { session: { ...structuredClone(defaults), error: 'Some settings could not be read.' }, error: '', onerror } });
-  await tick();
-  const dismiss = document.querySelector<HTMLButtonElement>('button[aria-label="Dismiss error"]')!;
-  expect(dismiss.parentElement?.textContent).toContain('Some settings could not be read.');
-  dismiss.click();
-  expect(onerror).toHaveBeenLastCalledWith('');
+it('dismisses a backend error from the status line', async () => {
+  useSession(createPreviewSession({ error: 'Some settings could not be read.' }));
+  await setup();
+  const status = () => document.querySelector('.status [role="alert"]');
+  expect(status()?.textContent).toContain('Some settings could not be read.');
+  document.querySelector<HTMLButtonElement>('button[aria-label="Dismiss error"]')!.click();
+  await vi.waitFor(() => expect(status()).toBeNull());
 });

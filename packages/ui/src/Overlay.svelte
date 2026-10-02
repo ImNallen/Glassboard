@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, textFont, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { gradientStrip } from './lib/swatches';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
   let canvas: HTMLCanvasElement;
@@ -31,7 +32,7 @@
     if (!editor || session.preferences.colorMode !== 'rainbow') return '';
     const colors = session.preferences.rainbowColors;
     const start = Math.floor(editor.hue / 360 * colors.length);
-    return `linear-gradient(90deg, ${colors.map((_, i) => cycleColor(start + i, colors)).join(', ')})`;
+    return gradientStrip(colors.map((_, i) => cycleColor(start + i, colors)));
   });
   function syncHistory(advanceCycle = false) {
     if (annotationSession < 0) return;
@@ -210,7 +211,7 @@
 {#if editor}
   <textarea bind:this={textarea} bind:value={() => editor?.text ?? '', value => { if (editor) editor.text = value; }} class="text-editor" class:rainbow={Boolean(editorGradient)} class:concealed={session.mode === 'hidden'}
     style:left={`${editor.origin.x}px`} style:top={`${editor.origin.y}px`} style:width={`${editorSize.width}px`} style:height={`${editorSize.height}px`}
-    style:font-size={`${editorFontSize}px`} style:line-height={`${editorLineHeight}px`} style:color={editorGradient ? 'transparent' : editorColor} style:background-image={editorGradient || 'none'}
+    style:font={textFont(editorWidth)} style:line-height={`${editorLineHeight}px`} style:color={editorGradient ? 'transparent' : editorColor} style:background-image={editorGradient || 'none'}
     rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Annotation text. Enter commits, Shift+Enter adds a line, Escape cancels."
     onkeydown={editorKeydown} onblur={event => { if (event.target === textarea) commitText(); }} onpointerdown={event => event.stopPropagation()}></textarea>
 {/if}
@@ -232,6 +233,6 @@
   canvas.text-tool { cursor: text; }
   canvas.eraser-tool { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%23000' stroke-width='3'/%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E") 11 11, cell; }
   .concealed { visibility: hidden; }
-  .text-editor { position: fixed; z-index: 2; margin: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 600; white-space: pre; caret-color: #3564c5; text-shadow: 0 1px 3px rgba(25, 30, 40, .18); -webkit-user-select: text; user-select: text; }
+  .text-editor { position: fixed; z-index: 2; margin: 0; padding: 0; border: 0; outline: 0; resize: none; overflow: hidden; background: transparent; white-space: pre; caret-color: #3564c5; text-shadow: 0 1px 3px rgba(25, 30, 40, .18); -webkit-user-select: text; user-select: text; }
   .text-editor.rainbow { -webkit-background-clip: text; background-clip: text; text-shadow: none; }
 </style>

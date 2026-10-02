@@ -3,12 +3,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
 import Capture from './Capture.svelte';
-import SharedCapture from '@glassboard/ui/Capture.svelte';
 import { action, defaults, savePreferences, subscribe, type Session } from '@glassboard/ui/session';
-import { annotatedCapture } from '@glassboard/ui/capture';
-import { copyCaptureImage, getCaptureImage } from './lib/capture';
+import { annotatedCapture, type CaptureBackend } from '@glassboard/ui/capture';
 
-vi.mock('./lib/capture', () => ({ getCaptureImage: vi.fn().mockResolvedValue({ width: 2560, height: 1600, data: new Uint8ClampedArray(0) }), copyCaptureImage: vi.fn(), copyCaptureRegion: vi.fn() }));
+const getCaptureImage: CaptureBackend['getImage'] = vi.fn(), copyCaptureImage: CaptureBackend['copyImage'] = vi.fn();
 vi.mock('@glassboard/ui/capture', async original => ({ ...await original<typeof import('@glassboard/ui/capture')>(), annotatedCapture: vi.fn().mockResolvedValue(new Blob(['image'], { type: 'image/png' })) }));
 vi.mock('@glassboard/ui/drawing', async original => ({ ...await original<typeof import('@glassboard/ui/drawing')>(), render: vi.fn() }));
 
@@ -16,6 +14,7 @@ let component: ReturnType<typeof mount> | undefined;
 let stop = () => {};
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getCaptureImage).mockResolvedValue({ width: 2560, height: 1600, data: new Uint8ClampedArray(0) } as ImageData);
   vi.mocked(copyCaptureImage).mockResolvedValue(undefined);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ putImageData: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(), measureText: () => ({ width: 120 }) } as unknown as CanvasRenderingContext2D);
   vi.stubGlobal('requestAnimationFrame', () => 1);
@@ -25,7 +24,6 @@ afterEach(async () => {
   if (component) await unmount(component);
   component = undefined;
   stop();
-  await action('cancel-capture');
   document.body.replaceChildren();
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
@@ -51,10 +49,7 @@ async function setup(copyRegion?: (id: number, region: { x: number; y: number; w
   let session = structuredClone(defaults);
   stop = await subscribe(value => { session = value; store.set(value); });
   const current = fromStore(store);
-  const props = { get session() { return current.current; }, onerror: vi.fn() };
-  component = copyRegion
-    ? mount(SharedCapture, { target: document.body, props: { ...props, get session() { return current.current; }, getImage: getCaptureImage, copyImage: copyCaptureImage, copyRegion } })
-    : mount(Capture, { target: document.body, props });
+  component = mount(Capture, { target: document.body, props: { get session() { return current.current; }, getImage: getCaptureImage, copyImage: copyCaptureImage, copyRegion } });
   await tick(); await tick();
   flushSync();
   if (initialSelection) select([100, 100], [600, 400]);

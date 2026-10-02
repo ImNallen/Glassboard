@@ -1,16 +1,18 @@
 <script lang="ts">
   import { Copy, EyeOff, Keyboard, Palette, Power, Redo2, RotateCcw, Scan, SlidersHorizontal, Trash2, Undo2, X } from '@lucide/svelte';
   import { untrack } from 'svelte';
+  import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
-  import { action, getAutostart, mac, native, savePreferences, setAutostart, shortcutLabel, type Preferences, type Session, type ToolbarPosition } from '@glassboard/ui/session';
-  import { COLOR_SHORTCUTS, DEFAULT_SHORTCUT, KEYBINDING_GROUPS, KEYBINDINGS, keybinding, sameShortcut, TOOL_SHORTCUTS, type Keybindings } from '@glassboard/ui/shortcuts';
-  import { AUTO_FADE_OPTIONS, rainbowPreview, shiftingPreview } from '@glassboard/ui/drawing';
-  import { swatchColor, swatchName } from '@glassboard/ui/swatches';
+  import { action, native, savePreferences, type Preferences, type Session, type ToolbarPosition, type Action } from '@glassboard/ui/session';
+  import { COLOR_SHORTCUTS, DEFAULT_SHORTCUT, KEYBINDING_GROUPS, KEYBINDINGS, keybinding, platformMac, rebindCommand, rebindToggle, sameShortcut, shortcutLabel, TOOL_SHORTCUTS } from '@glassboard/ui/shortcuts';
+  import { AUTO_FADE_OPTIONS } from '@glassboard/ui/drawing';
+  import { rainbowPreview, shiftingPreview, swatchColor, swatchName } from '@glassboard/ui/swatches';
   import { TOOL_ICONS } from '@glassboard/ui/tool-icons';
+  import type { Errors } from '@glassboard/ui/errors';
   import ColorSettings from './ColorSettings.svelte';
-  import GitHubIcon from './GitHubIcon.svelte';
   import ShortcutRecorder from './ShortcutRecorder.svelte';
-  let { session, error, onerror }: { session: Session; error: string; onerror: (error: unknown) => void } = $props();
+  import { getAutostart, setAutostart } from './lib/autostart';
+  let { session, errors }: { session: Session; errors: Errors } = $props();
   type Tab = 'general' | 'colors' | 'keybindings';
   const TABS: readonly { id: Tab; label: string; icon: typeof Keyboard }[] = [
     { id: 'general', label: 'General', icon: SlidersHorizontal },
@@ -20,8 +22,8 @@
   const POSITIONS: readonly { id: ToolbarPosition; label: string }[] = [{ id: 'left', label: 'Left' }, { id: 'bottom', label: 'Bottom' }, { id: 'right', label: 'Right' }];
   const ICONS: Record<string, typeof Keyboard> = { undo: Undo2, redo: Redo2, hide: EyeOff, capture: Scan, copy: Copy, ...Object.fromEntries(TOOL_SHORTCUTS.map(tool => [tool.command, TOOL_ICONS[tool.id]])) };
   const REPOSITORY_URL = 'https://github.com/ImNallen/Glassboard';
-  const GLOBAL_HINT = `Include ${mac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels.`;
-  const LOCAL_HINT = `Press a key or combination. Esc cancels, ${mac ? '⌫' : 'Backspace'} clears.`;
+  const GLOBAL_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels.`;
+  const LOCAL_HINT = `Press a key or combination. Esc cancels, ${platformMac ? '⌫' : 'Backspace'} clears.`;
   let tab = $state<Tab>('general');
   let panel = $state<HTMLDivElement>();
   let busy = $state(false);
@@ -30,24 +32,23 @@
   let noticeTimer: ReturnType<typeof setTimeout>;
   let windowVisible = $derived(session.settingsOpen || !native);
   let preferences = $derived(session.preferences);
-  let customized = $derived(Object.keys(preferences.keybindings).length > 0 || !sameShortcut(preferences.shortcut, DEFAULT_SHORTCUT, mac));
+  let customized = $derived(Object.keys(preferences.keybindings).length > 0 || !sameShortcut(preferences.shortcut, DEFAULT_SHORTCUT, platformMac));
   let fade = $derived(preferences.autoFadeSeconds);
   // Read from the OS each time settings opens, since it can be changed in System Settings.
   let autostart = $state<boolean | null>(null);
   let switchingAutostart = $state(false);
-  $effect(() => { if (windowVisible) getAutostart().then(enabled => autostart = enabled).catch(onerror); });
+  $effect(() => { if (windowVisible) getAutostart().then(enabled => autostart = enabled).catch(errors.report); });
   // Color rows in Keybindings show each swatch's current color and name.
   let swatches = $derived(Object.fromEntries(COLOR_SHORTCUTS.map(choice => [choice.command,
     choice.slot !== undefined ? { background: swatchColor(preferences.swatches, choice.slot), name: swatchName(preferences.swatches, choice.slot) }
       : { background: choice.colorMode === 'rainbow' ? rainbowPreview(preferences.rainbowColors) : shiftingPreview(preferences.cycleColors), name: choice.name }])));
-  const run = (name: string) => action(name).catch(onerror);
+  const run = (name: Action) => action(name).catch(errors.report);
   $effect(() => {
     if (!windowVisible) return;
-    notice = ''; onerror('');
+    notice = ''; errors.clear();
     // Open where the unavailable shortcut can be replaced.
     if (untrack(() => session.shortcutUnavailable)) tab = 'keybindings';
   });
-  function dismissError() { onerror(''); if (session.error) run('dismiss-error'); }
   $effect(() => () => clearTimeout(noticeTimer));
 
   function select(next: Tab) {
@@ -63,47 +64,36 @@
     document.getElementById(`tab-${next}`)?.focus();
   }
   async function update(patch: Partial<Preferences>, message = '') {
-    busy = true; notice = ''; onerror('');
+    busy = true; notice = ''; errors.clear();
     clearTimeout(noticeTimer);
     try {
       await savePreferences({ ...session.preferences, ...patch });
       notice = message;
       if (message) noticeTimer = setTimeout(() => notice = '', 4000);
     }
-    catch (e) { onerror(e); }
+    catch (e) { errors.report(e); }
     finally { busy = false; }
   }
-  /** Unbind every other command using `shortcut`, returning their names. */
-  function release(keybindings: Keybindings, shortcut: string, except?: string) {
-    return KEYBINDINGS.filter(binding => binding.id !== except && sameShortcut(keybinding(keybindings, binding.id), shortcut, mac))
-      .map(binding => { keybindings[binding.id] = ''; return binding.name; });
-  }
   function setToggle(next: string) {
-    if (sameShortcut(next, preferences.shortcut, mac)) return;
-    const keybindings = { ...preferences.keybindings };
-    const moved = release(keybindings, next);
-    update({ shortcut: next, keybindings }, moved.length ? `Unbound ${moved.join(', ')} to make room.` : 'Shortcut saved.');
+    const result = rebindToggle(preferences, next);
+    if (result) update({ shortcut: result.shortcut, keybindings: result.keybindings }, result.moved.length ? `Unbound ${result.moved.join(', ')} to make room.` : 'Shortcut saved.');
   }
   function setBinding(id: string, next: string) {
-    if (sameShortcut(next, keybinding(preferences.keybindings, id), mac)) return;
-    if (next && sameShortcut(next, preferences.shortcut, mac)) { onerror(`${shortcutLabel(next)} is already used to toggle Glassboard.`); return; }
-    const keybindings = { ...preferences.keybindings };
-    const moved = next ? release(keybindings, next, id) : [];
-    if (sameShortcut(next, KEYBINDINGS.find(binding => binding.id === id)!.shortcut, mac)) delete keybindings[id];
-    else keybindings[id] = next;
-    update({ keybindings }, moved.length ? `Moved ${shortcutLabel(next)} from ${moved.join(', ')}.` : '');
+    const result = rebindCommand(preferences, id, next);
+    if (result === 'toggle') errors.report(`${shortcutLabel(next)} is already used to toggle Glassboard.`);
+    else if (result) update({ keybindings: result.keybindings }, result.moved.length ? `Moved ${shortcutLabel(next)} from ${result.moved.join(', ')}.` : '');
   }
   /** Native webviews don't open links themselves; Rust opens the fixed URL behind each action. */
-  function openLink(event: MouseEvent, name: string) {
+  function openLink(event: MouseEvent, name: Action) {
     if (!native) return;
     event.preventDefault();
     run(name);
   }
   async function toggleAutostart() {
     if (autostart === null) return;
-    switchingAutostart = true; onerror('');
+    switchingAutostart = true; errors.clear();
     try { autostart = await setAutostart(!autostart); }
-    catch (e) { onerror(e); }
+    catch (e) { errors.report(e); }
     finally { switchingAutostart = false; }
   }
   const fadeNote = (seconds: number) => seconds === 0 ? 'Marks stay until you return to work.' : `Marks fade ${seconds} seconds after you draw them.`;
@@ -155,7 +145,7 @@
           <h2 id="startup-title">Startup</h2>
           <div class="list">
             <div class="row">
-              <span class="row-label" id="autostart-label">{mac ? 'Open at login' : 'Start with Windows'}<small>Glassboard waits in the {mac ? 'menu bar' : 'tray'} until you need it</small></span>
+              <span class="row-label" id="autostart-label">{platformMac ? 'Open at login' : 'Start with Windows'}<small>Glassboard waits in the {platformMac ? 'menu bar' : 'tray'} until you need it</small></span>
               <button class="switch" role="switch" aria-checked={autostart === true} aria-labelledby="autostart-label"
                 disabled={autostart === null || switchingAutostart} onclick={toggleAutostart}><span></span></button>
             </div>
@@ -189,7 +179,7 @@
           <div class="list">
             <div class="row binding">
               <ShortcutRecorder label="Toggle Glassboard" shortcut={preferences.shortcut} fallback={DEFAULT_SHORTCUT} physical active={windowVisible} disabled={busy}
-                onchange={setToggle} {onerror} onrecord={recording => hint = recording ? GLOBAL_HINT : ''}>
+                onchange={setToggle} {errors} onrecord={recording => hint = recording ? GLOBAL_HINT : ''}>
                 <span class="row-icon"><Logo size={14}/></span>
                 <span class="row-label">Toggle Glassboard</span>
               </ShortcutRecorder>
@@ -207,7 +197,7 @@
                 {@const swatch = swatches[binding.id]}
                 <div class="row binding">
                   <ShortcutRecorder label={swatch?.name ?? binding.name} shortcut={keybinding(preferences.keybindings, binding.id)} fallback={binding.shortcut} clearable active={windowVisible} disabled={busy}
-                    onchange={next => setBinding(binding.id, next)} {onerror} onrecord={recording => hint = recording ? LOCAL_HINT : ''}>
+                    onchange={next => setBinding(binding.id, next)} {errors} onrecord={recording => hint = recording ? LOCAL_HINT : ''}>
                     <span class="row-icon">{#if swatch}<span class="swatch" style:background={swatch.background}></span>{:else if Icon}<Icon size={15} strokeWidth={1.9}/>{/if}</span>
                     <span class="row-label">{swatch?.name ?? binding.name}{#if binding.description}<small>{binding.description}</small>{/if}</span>
                   </ShortcutRecorder>
@@ -220,7 +210,7 @@
     </div>
 
     <div class="status" aria-live="polite">
-      {#if error || session.error}<p class="error" role="alert">{error || session.error}<button class="dismiss" aria-label="Dismiss error" onclick={dismissError}><X size={12}/></button></p>
+      {#if errors.message}<p class="error" role="alert">{errors.message}<button class="dismiss" aria-label="Dismiss error" onclick={errors.dismiss}><X size={12}/></button></p>
       {:else if hint}<p>{hint}</p>
       {:else if notice}<p>{notice}</p>{/if}
     </div>
@@ -234,76 +224,76 @@
 
 <style>
   .settings-window { color-scheme: light dark; padding: 8px; width: 100%; height: 100vh; }
-  .settings { --keycap: #ffffff; --raised: #ffffff; --reset: #d33d3d; display: flex; flex-direction: column; height: 100%; overflow: hidden; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 2px 7px var(--shadow); }
+  .settings { --keycap: #ffffff; --raised: #ffffff; --reset: #d33d3d; display: flex; flex-direction: column; height: 100%; overflow: hidden; border: 1px solid var(--gb-border); border-radius: 14px; background: var(--gb-surface); box-shadow: 0 2px 7px var(--gb-shadow); }
   @media (prefers-color-scheme: dark) { .settings { --keycap: #3a3d44; --raised: #3d4048; --reset: #ff6b6b; } }
 
   header { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 0 16px; }
-  .brand { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; letter-spacing: -.2px; color: var(--strong-text); }
-  .version { margin-left: 1px; padding: 2px 6px; border-radius: 999px; background: color-mix(in srgb, var(--text) 7%, transparent); font-size: 10px; font-weight: 500; letter-spacing: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .brand { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; letter-spacing: -.2px; color: var(--gb-strong-text); }
+  .version { margin-left: 1px; padding: 2px 6px; border-radius: 999px; background: color-mix(in srgb, var(--gb-text) 7%, transparent); font-size: 10px; font-weight: 500; letter-spacing: 0; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
   .header-actions { display: flex; gap: 2px; }
-  .icon-link { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--muted); }
-  .icon-link:hover { background: var(--hover); color: var(--strong-text); }
-  .icon-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+  .icon-link { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--gb-muted); }
+  .icon-link:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
+  .icon-link:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
 
-  .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+  .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--gb-text) 6%, transparent); }
   .tabs { margin: 14px 14px 0; }
-  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--secondary-text); transition: background .12s, color .12s, box-shadow .12s; }
-  .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--strong-text); }
-  .tabs button[aria-selected="true"], .segmented button.chosen { background: var(--raised); color: var(--strong-text); box-shadow: 0 0 0 1px var(--selected-border), 0 1px 2px var(--shadow); }
+  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s; }
+  .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--gb-strong-text); }
+  .tabs button[aria-selected="true"], .segmented button.chosen { background: var(--raised); color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
   .segmented button { font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
   .panel { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px 12px; scrollbar-width: thin; }
   /* Section styles are shared with tab components such as ColorSettings. */
   .panel :global(.group + .group) { margin-top: 20px; }
-  .panel :global(h2) { margin: 0 0 8px 2px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
-  .note { margin: 8px 2px 0; font-size: 11px; color: var(--muted); }
+  .panel :global(h2) { margin: 0 0 8px 2px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--gb-muted); }
+  .note { margin: 8px 2px 0; font-size: 11px; color: var(--gb-muted); }
 
   .positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .position { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px 9px; border-radius: 10px; border: 1px solid var(--divider); background: var(--subtle-surface); font-size: 11.5px; color: var(--secondary-text); transition: border-color .12s, background .12s, color .12s; }
-  .position:hover:not(:disabled) { background: var(--hover); color: var(--strong-text); }
-  .position.chosen { border-color: var(--focus-ring); box-shadow: inset 0 0 0 1px var(--focus-ring); color: var(--strong-text); }
-  .screen { position: relative; width: 58px; height: 38px; border-radius: 6px; border: 1px solid var(--border); background: var(--input-surface); }
-  .screen span { position: absolute; border-radius: 2px; background: var(--muted); opacity: .55; transition: background .12s, opacity .12s; }
+  .position { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px 9px; border-radius: 10px; border: 1px solid var(--gb-divider); background: var(--gb-subtle-surface); font-size: 11.5px; color: var(--gb-secondary-text); transition: border-color .12s, background .12s, color .12s; }
+  .position:hover:not(:disabled) { background: var(--gb-hover); color: var(--gb-strong-text); }
+  .position.chosen { border-color: var(--gb-focus-ring); box-shadow: inset 0 0 0 1px var(--gb-focus-ring); color: var(--gb-strong-text); }
+  .screen { position: relative; width: 58px; height: 38px; border-radius: 6px; border: 1px solid var(--gb-border); background: var(--gb-input-surface); }
+  .screen span { position: absolute; border-radius: 2px; background: var(--gb-muted); opacity: .55; transition: background .12s, opacity .12s; }
   .screen.bottom span { left: 50%; bottom: 4px; width: 26px; height: 4px; translate: -50% 0; }
   .screen.left span, .screen.right span { top: 50%; width: 4px; height: 20px; translate: 0 -50%; }
   .screen.left span { left: 4px; }
   .screen.right span { right: 4px; }
-  .chosen .screen span { background: var(--focus-ring); opacity: 1; }
+  .chosen .screen span { background: var(--gb-focus-ring); opacity: 1; }
 
-  .list { overflow: hidden; border: 1px solid var(--divider); border-radius: 10px; background: var(--subtle-surface); }
+  .list { overflow: hidden; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
   .row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 5px 6px 5px 12px; }
-  .row + .row { border-top: 1px solid var(--divider); }
+  .row + .row { border-top: 1px solid var(--gb-divider); }
   /* The recorder button fills binding rows so the whole row is clickable. */
   .row.binding { position: relative; padding: 0; }
-  .row-icon { display: grid; place-items: center; width: 16px; flex-shrink: 0; color: var(--icon); }
-  .swatch { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--swatch-border); }
-  .row-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--text); }
-  .row-label small { display: block; margin-top: 1px; font-size: 10.5px; color: var(--muted); }
-  .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--border), 0 1px 1px var(--shadow); font-size: 11.5px; font-weight: 500; }
-  .button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-  .switch { position: relative; flex-shrink: 0; width: 34px; height: 20px; margin-right: 4px; padding: 0; border-radius: 10px; background: color-mix(in srgb, var(--text) 18%, transparent); transition: background .16s; }
+  .row-icon { display: grid; place-items: center; width: 16px; flex-shrink: 0; color: var(--gb-icon); }
+  .swatch { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
+  .row-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--gb-text); }
+  .row-label small { display: block; margin-top: 1px; font-size: 10.5px; color: var(--gb-muted); }
+  .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; }
+  .button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
+  .switch { position: relative; flex-shrink: 0; width: 34px; height: 20px; margin-right: 4px; padding: 0; border-radius: 10px; background: color-mix(in srgb, var(--gb-text) 18%, transparent); transition: background .16s; }
   .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate .16s ease; }
-  .switch[aria-checked="true"] { background: var(--focus-ring); }
+  .switch[aria-checked="true"] { background: var(--gb-focus-ring); }
   .switch[aria-checked="true"] span { translate: 14px 0; }
   .switch:disabled { opacity: .5; }
   @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
-  .button:hover { color: var(--strong-text); box-shadow: 0 0 0 1px var(--selected-border), 0 1px 2px var(--shadow); }
+  .button:hover { color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
 
   .panel :global(.intro) { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 2px 16px; }
-  .panel :global(.intro p) { margin: 0; font-size: 11.5px; color: var(--muted); }
-  .panel :global(.text-button) { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 4px 6px; margin-right: 5px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--secondary-text); }
-  .panel :global(.text-button:hover:not(:disabled)) { background: var(--hover); color: var(--strong-text); }
+  .panel :global(.intro p) { margin: 0; font-size: 11.5px; color: var(--gb-muted); }
+  .panel :global(.text-button) { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 4px 6px; margin-right: 5px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--gb-secondary-text); }
+  .panel :global(.text-button:hover:not(:disabled)) { background: var(--gb-hover); color: var(--gb-strong-text); }
   .panel :global(.reset-all) { color: var(--reset); }
   .panel :global(.reset-all:hover:not(:disabled)) { background: color-mix(in srgb, var(--reset) 14%, transparent); color: var(--reset); }
-  .panel :global(.reset-all:disabled) { color: var(--muted); }
+  .panel :global(.reset-all:disabled) { color: var(--gb-muted); }
 
-  .status { padding: 0 16px; font-size: 11px; line-height: 1.4; color: var(--muted); }
+  .status { padding: 0 16px; font-size: 11px; line-height: 1.4; color: var(--gb-muted); }
   .status p { margin: 0 0 9px; }
-  .status .error { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; color: var(--error-text); overflow-wrap: anywhere; }
-  .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--muted); }
-  .status .dismiss:hover { background: var(--hover); color: var(--strong-text); }
-  .note.unavailable { color: var(--error-text); }
-  footer { display: flex; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--divider); }
-  footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--secondary-text); }
-  footer button:hover { background: var(--hover); color: var(--strong-text); }
+  .status .error { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; color: var(--gb-error-text); overflow-wrap: anywhere; }
+  .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--gb-muted); }
+  .status .dismiss:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
+  .note.unavailable { color: var(--gb-error-text); }
+  footer { display: flex; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--gb-divider); }
+  footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--gb-secondary-text); }
+  footer button:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
 </style>

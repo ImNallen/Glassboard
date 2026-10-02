@@ -79,18 +79,18 @@ for size in (16, 32):
     render(avatar, size).save(BRAND / f"favicon-{size}.png")
 render(avatar, 256).save(BRAND / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48)])
 
-# Ship the same generated artwork in native bundles and the browser preview.
+# Ship the same generated artwork in native bundles, the browser preview, and the website.
 native_icons = ROOT / "apps" / "desktop" / "src-tauri" / "icons"
-public = ROOT / "apps" / "desktop" / "public"
 native_icons.mkdir(parents=True, exist_ok=True)
-public.mkdir(parents=True, exist_ok=True)
 for extension in ("png", "icns", "ico"):
     shutil.copyfile(BRAND / f"app-icon.{extension}", native_icons / f"icon.{extension}")
 # Tauri's macOS tray implementation displays images at 18 logical points.
 render(black, 36).save(native_icons / "tray-template.png")
 render(app, 32).save(native_icons / "tray.png")
-for name in ("favicon.svg", "favicon.ico"):
-    shutil.copyfile(BRAND / name, public / name)
+for public in (ROOT / "apps" / "desktop" / "public", ROOT / "apps" / "web" / "public"):
+    public.mkdir(parents=True, exist_ok=True)
+    for name in ("favicon.svg", "favicon.ico"):
+        shutil.copyfile(BRAND / name, public / name)
 
 # A review sheet made from the same source assets, with small icons at actual size.
 sheet = Image.new("RGB", (1200, 720), "#F6F8F7")

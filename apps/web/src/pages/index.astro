@@ -3,7 +3,7 @@ import '@fontsource-variable/familjen-grotesk';
 import '../styles/global.css';
 import TryIt from '../components/TryIt.svelte';
 import Showcase from '../components/Showcase.svelte';
-import GitHubIcon from '../components/GitHubIcon.astro';
+import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
 import appIcon from '../../../../assets/brand/app-icon.svg';
 
 const title = 'Glassboard';
@@ -33,7 +33,7 @@ const repo = 'https://github.com/ImNallen/Glassboard';
     <header class="wrap top">
       <a class="brand" href="/"><img src={appIcon.src} width="28" height="28" alt="" />Glassboard</a>
       <nav aria-label="Site">
-        <a href={repo}><GitHubIcon />GitHub</a>
+        <a href={repo}><GitHubIcon size={18} />GitHub</a>
       </nav>
     </header>
 

@@ -1,5 +1,5 @@
+use super::Surface;
 use crate::state::report;
-use tauri::Manager;
 use windows_sys::Win32::Foundation::HWND;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
@@ -10,20 +10,23 @@ pub(super) fn raise_controls(app: &tauri::AppHandle) {
     let handle = app.clone();
     // Keep native ordering on the window thread, after any queued focus/show requests.
     if let Err(error) = app.run_on_main_thread(move || {
-        for label in ["toolbar", "tutorial", "settings"] {
-            let Some(window) = handle.get_webview_window(label) else {
+        for surface in [Surface::Toolbar, Surface::Tutorial, Surface::Settings] {
+            let Some(window) = surface.window(&handle) else {
                 continue;
             };
             let result = (|| -> crate::Result<()> {
-                if !window.is_visible().map_err(|e| e.to_string())? {
+                if !window.is_visible()? {
                     return Ok(());
                 }
-                let hwnd = window.hwnd().map_err(|e| e.to_string())?;
+                let hwnd = window.hwnd()?;
                 // SAFETY: Tauri owns this live HWND and we are on its window thread.
-                unsafe { raise_without_activation(hwnd.0) }.map_err(|e| e.to_string())
+                Ok(unsafe { raise_without_activation(hwnd.0) }?)
             })();
             if let Err(error) = result {
-                report(&handle, format!("Could not raise {label}: {error}"));
+                report(
+                    &handle,
+                    format!("Could not raise {}: {error}", surface.label()),
+                );
             }
         }
     }) {

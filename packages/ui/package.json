@@ -11,9 +11,11 @@
     "./shortcuts": "./src/lib/shortcuts.ts",
     "./selection": "./src/lib/selection.ts",
     "./keys": "./src/lib/keys.ts",
+    "./errors": "./src/lib/errors.svelte.ts",
     "./Overlay.svelte": "./src/Overlay.svelte",
     "./Toolbar.svelte": "./src/Toolbar.svelte",
     "./Logo.svelte": "./src/Logo.svelte",
+    "./GitHubIcon.svelte": "./src/GitHubIcon.svelte",
     "./toolbar.css": "./src/toolbar.css",
     "./capture": "./src/lib/capture.ts",
     "./Capture.svelte": "./src/Capture.svelte",
@@ -28,7 +30,6 @@
   },
   "dependencies": {
     "@lucide/svelte": "^1.48.0",
-    "@tauri-apps/api": "^2.12.0",
     "svelte": "^5.57.1"
   },
   "devDependencies": {

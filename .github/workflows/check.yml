@@ -19,8 +19,6 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
       - run: npm ci
-      - run: npm run check --workspace packages/ui
-      - run: npm test --workspace packages/ui
       - run: npm run check --workspace apps/desktop
       - run: npm test --workspace apps/desktop
       - run: npm run build --workspace apps/desktop

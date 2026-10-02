@@ -8,11 +8,10 @@ pub(crate) fn snapshot(app: &tauri::AppHandle) -> Session {
     app.state::<AppState>().0.lock().unwrap().clone()
 }
 pub(crate) fn publish(app: &tauri::AppHandle) -> Result<()> {
-    app.emit("session", snapshot(app))
-        .map_err(|e| e.to_string())
+    Ok(app.emit("session", snapshot(app))?)
 }
-pub(crate) fn report(app: &tauri::AppHandle, error: String) {
+pub(crate) fn report(app: &tauri::AppHandle, error: impl std::fmt::Display) {
     log::error!("{error}");
-    app.state::<AppState>().0.lock().unwrap().error = Some(error);
+    app.state::<AppState>().0.lock().unwrap().error = Some(error.to_string());
     let _ = publish(app);
 }
