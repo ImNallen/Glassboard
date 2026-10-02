@@ -33,6 +33,9 @@ pub(super) fn crop(image: &RgbaImage, region: CaptureRegion) -> Result<RgbaImage
     {
         return Err("The selected capture region is invalid".into());
     }
+    if u64::from(region.width) * u64::from(region.height) * 4 > MAX_IMAGE_BYTES as u64 {
+        return Err("The capture is too large to copy".into());
+    }
     Ok(
         image::imageops::crop_imm(image, region.x, region.y, region.width, region.height)
             .to_image(),
@@ -136,6 +139,25 @@ mod tests {
         ] {
             assert!(serde_json::from_str::<CaptureRegion>(json).is_err());
         }
+    }
+
+    #[test]
+    fn crop_rejects_regions_larger_than_the_image_limit() {
+        // Zeroed buffers are mapped lazily, so this source costs almost nothing until read.
+        let source = RgbaImage::new(8193, 8193);
+        let region = CaptureRegion {
+            x: 0,
+            y: 0,
+            width: 8193,
+            height: 8193,
+        };
+        assert_eq!(
+            crop(&source, region)
+                .err()
+                .map(|e| e.to_string())
+                .as_deref(),
+            Some("The capture is too large to copy")
+        );
     }
 
     #[test]
