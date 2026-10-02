@@ -11,7 +11,7 @@
   let { preferences, onsave }: { preferences: Preferences; onsave: (patch: Partial<Preferences>, message?: string) => void } = $props();
   type Sequence = { key: 'rainbowColors' | 'cycleColors'; name: string; command: string; description: string; dot: (colors: readonly string[]) => string; strip: (colors: readonly string[]) => string };
   /** A color the toolbar offers. A swatch is a list of one color, so swatches and sequences edit the same way. */
-  type Entry = { name: string; command: string; colors: readonly string[]; defaults: readonly string[]; dot: (colors: readonly string[]) => string; sequence?: Sequence; save: (colors: string[], select?: number) => void };
+  type Entry = { label: string; name: string; command: string; colors: readonly string[]; defaults: readonly string[]; dot: (colors: readonly string[]) => string; sequence?: Sequence; save: (colors: string[], select?: number) => void };
   const SEQUENCES: readonly Sequence[] = [
     { key: 'rainbowColors', name: 'Rainbow', command: 'color-rainbow', description: 'Each mark blends through these colors.', dot: rainbowPreview, strip: colors => gradientStrip([...colors, colors[0]]) },
     { key: 'cycleColors', name: 'Shifting', command: 'color-cycle', description: 'Each new mark takes the next color.', dot: shiftingPreview, strip: bandStrip },
@@ -30,9 +30,9 @@
   let dropped = false;
   let swatches = $derived(DEFAULT_SWATCHES.map((_, slot) => swatchColor(preferences.swatches, slot)));
   let entries = $derived<Entry[]>([
-    ...SEQUENCES.map(sequence => ({ name: sequence.name, command: sequence.command, colors: preferences[sequence.key], defaults: CYCLE_COLORS, dot: sequence.dot, sequence,
+    ...SEQUENCES.map(sequence => ({ label: sequence.name, name: sequence.name, command: sequence.command, colors: preferences[sequence.key], defaults: CYCLE_COLORS, dot: sequence.dot, sequence,
       save: (next: string[], select: number = index) => { draft = null; chip = select; onsave({ [sequence.key]: next }); } })),
-    ...SLOTS.map(({ slot, command }) => ({ name: swatchName(preferences.swatches, slot), command, colors: [swatches[slot]], defaults: [DEFAULT_SWATCHES[slot].color], dot: ([color]: readonly string[]) => color,
+    ...SLOTS.map(({ slot, command }) => ({ label: DEFAULT_SWATCHES[slot].name, name: swatchName(preferences.swatches, slot), command, colors: [swatches[slot]], defaults: [DEFAULT_SWATCHES[slot].color], dot: ([color]: readonly string[]) => color,
       save: ([color]: string[]) => saveSwatches(swatches.map((previous, i) => i === slot ? color : previous)) })),
   ]);
   let entry = $derived(entries[editing]);
@@ -49,6 +49,14 @@
   $effect(() => { if (draft && sameColor(draft, current)) draft = null; });
 
   function choose(at: number) { editing = at; chip = 0; draft = null; }
+  function slotKeydown(event: KeyboardEvent, at: number) {
+    const step = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : event.key === 'ArrowUp' ? -4 : event.key === 'ArrowDown' ? 4 : 0;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : step ? (at + step + entries.length) % entries.length : at;
+    if (next === at) return;
+    event.preventDefault();
+    choose(next);
+    if (event.currentTarget instanceof HTMLElement) event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-entry="${next}"]`)?.focus();
+  }
   /** Save swatches; a selected solid color follows its swatch so the toolbar keeps it chosen. */
   function saveSwatches(next: string[], patch: Partial<Preferences> = {}, message?: string) {
     const following = preferences.colorMode === 'solid' ? swatches.findIndex(color => sameColor(color, preferences.color)) : -1;
@@ -121,25 +129,26 @@
   }
 </script>
 
-<div class="intro">
-  <p>Pick a theme, then tweak any color.</p>
-  <button class="text-button reset-all" disabled={!customized} onclick={() => saveColors(themeColors(COLOR_THEMES[0], defaultSwatches()), 'Colors reset.')}>Reset all<RotateCcw size={12}/></button>
-</div>
-
+<div class="color-settings">
 <section class="group" aria-labelledby="theme-title">
-  <h2 id="theme-title">Theme</h2>
+  <div class="theme-heading">
+    <h2 id="theme-title">Theme</h2>
+    <button class="text-button reset-all" disabled={!customized} onclick={() => saveColors(themeColors(COLOR_THEMES[0], defaultSwatches()), 'Colors reset.')}>Reset all<RotateCcw size={12}/></button>
+  </div>
   <ThemePicker themes={COLOR_THEMES} selected={matchTheme(preferences)} custom={{ colors: preferences.rainbowColors, swatches: themed }}
     onselect={theme => saveColors(themeColors(theme, swatches), `${theme.name} theme applied.`)}/>
 </section>
 
 <section class="group" aria-labelledby="toolbar-title">
-  <h2 id="toolbar-title">Toolbar</h2>
+  <h2 id="toolbar-title">Toolbar colors</h2>
+  <p class="toolbar-note">Select a color to edit. Changes save automatically.</p>
   <div class="toolbar-preview" role="radiogroup" aria-labelledby="toolbar-title">
     {#each entries as item, i}
-      {#if i === SEQUENCES.length}<span class="divider" aria-hidden="true"></span>{/if}
       <button class="slot" class:editing={editing === i} role="radio" aria-checked={editing === i}
-        aria-label={`${item.name}, key ${keyLabel(preferences.keybindings, item.command) || 'not set'}`} onclick={() => choose(i)}>
-        <span class="dot" style:background={item.dot(editing === i ? shownList : item.colors)}></span><span class="key">{keyLabel(preferences.keybindings, item.command)}</span>
+        aria-label={`${item.label}, key ${keyLabel(preferences.keybindings, item.command) || 'not set'}`} tabindex={editing === i ? 0 : -1} data-entry={i}
+        onclick={() => choose(i)} onkeydown={event => slotKeydown(event, i)}>
+        <span class="dot" style:background={item.dot(editing === i ? shownList : item.colors)}></span>
+        <span class="slot-label">{item.label}</span><span class="key">{keyLabel(preferences.keybindings, item.command) || 'None'}</span>
       </button>
     {/each}
   </div>
@@ -148,7 +157,7 @@
 <section class="group" aria-labelledby="edit-title">
   <div class="edit-heading">
     <h2 id="edit-title">{entry.name}</h2>
-    <button class="reset" disabled={sameColors(entry.colors, entry.defaults)} title="Reset to default" aria-label={`Reset ${entry.name} to default`} onclick={reset}><RotateCcw size={12} strokeWidth={2.2}/></button>
+    <button class="reset" disabled={sameColors(entry.colors, entry.defaults)} title="Reset to default" aria-label={`Reset ${entry.name} to default`} onclick={reset}><RotateCcw size={12} strokeWidth={2.2}/>Reset</button>
   </div>
 
   {#if entry.sequence}
@@ -164,17 +173,19 @@
             onpointerup={dragEnd} onpointercancel={() => drag = null}></button>
         {/each}
       </div>
-      <button class="add" disabled={list.length >= SEQUENCE_LIMITS.max} title="Add a color" aria-label="Add a color" onclick={add}><Plus size={14} strokeWidth={2.2}/></button>
     </div>
     <div class="chip-actions">
-      <span>Drag to reorder · {list.length} of {SEQUENCE_LIMITS.max}</span>
-      <button class="text-button" disabled={list.length <= SEQUENCE_LIMITS.min} onclick={() => remove()}>Remove color</button>
+      <span>{list.length} of {SEQUENCE_LIMITS.max} colors</span>
+      <div class="sequence-actions">
+        <button class="text-button add" disabled={list.length >= SEQUENCE_LIMITS.max} aria-label="Add a color" onclick={add}><Plus size={12} strokeWidth={2.2}/>Add color</button>
+        <button class="text-button" disabled={list.length <= SEQUENCE_LIMITS.min} onclick={() => remove()}>Remove color</button>
+      </div>
     </div>
-
-    <h3>Color {index + 1}</h3>
+    <p class="reorder-hint" title="Use arrow keys to select a color, Alt + arrow keys to reorder, or Delete to remove.">Drag colors to reorder.</p>
   {/if}
 
-  <div class="presets" role="group" aria-label="Suggested colors">
+  <h3 id="quick-colors-title">Quick colors{#if entry.sequence}<span>Color {index + 1}</span>{/if}</h3>
+  <div class="presets" role="group" aria-labelledby="quick-colors-title">
     {#each SWATCH_PRESETS as preset}
       <button class="preset" class:chosen={sameColor(preset, shown)} aria-pressed={sameColor(preset, shown)} title={preset.toUpperCase()}
         aria-label={`Use ${preset.toUpperCase()}`} style:background={preset} onclick={() => { draft = null; setColor(preset); }}></button>
@@ -185,23 +196,32 @@
   {/key}
 </section>
 
+</div>
+
 <style>
-  .toolbar-preview { display: flex; align-items: flex-start; justify-content: center; gap: 2px; padding: 8px 8px 5px; border: 1px solid var(--gb-border); border-radius: 14px; background: var(--gb-surface); box-shadow: 0 2px 6px var(--gb-shadow); }
-  .slot { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 36px; padding: 5px 0 3px; border-radius: 9px; transition: background .12s, box-shadow .12s; }
+  .color-settings > section.group + section.group { margin-top: 12px; }
+  .theme-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .theme-heading h2 { margin-bottom: 0; }
+  .toolbar-note { margin: 0 2px 8px; font-size: 11px; line-height: 1.4; color: var(--gb-muted); }
+  .toolbar-preview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .slot { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 52px; padding: 6px 2px; border: 1px solid var(--gb-divider); border-radius: 9px; background: var(--gb-subtle-surface); transition: background .12s, border-color .12s; }
   .slot:hover { background: var(--gb-hover); }
-  .slot.editing { background: var(--gb-selected); box-shadow: inset 0 0 0 1px var(--gb-selected-border); }
-  .dot { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: background .12s; }
-  .key { height: 13px; font-size: 10px; font-weight: 500; line-height: 13px; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
-  .editing .key { color: var(--gb-strong-text); }
-  .divider { align-self: center; width: 1px; height: 22px; margin: 0 4px 14px; background: var(--gb-divider); }
+  .slot.editing { background: var(--gb-selected); border-color: var(--gb-focus-ring); box-shadow: inset 0 0 0 1px var(--gb-focus-ring); }
+  .slot:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
+  .dot { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: background .12s; }
+  .slot-label { font-size: 10.5px; font-weight: 500; color: var(--gb-secondary-text); }
+  .editing .slot-label { color: var(--gb-strong-text); }
+  .key { position: absolute; top: 4px; right: 4px; min-width: 13px; max-width: calc(100% - 8px); padding: 1px 3px; overflow: hidden; text-overflow: ellipsis; border-radius: 4px; background: var(--keycap); box-shadow: 0 0 0 1px var(--gb-border); font-size: 9px; line-height: 12px; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
 
   .edit-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .edit-heading h2 { margin-bottom: 0; }
-  .reset { display: grid; place-items: center; width: 22px; height: 22px; margin-right: 7px; border-radius: 6px; color: var(--reset); transition: background .12s; }
+  .reset { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px; color: var(--reset); font-size: 11px; transition: background .12s; }
   .reset:hover:not(:disabled) { background: color-mix(in srgb, var(--reset) 14%, transparent); }
   .reset:disabled { color: var(--gb-muted); opacity: .35; }
   .note { margin: -2px 2px 10px; font-size: 11px; color: var(--gb-muted); }
-  h3 { margin: 16px 2px 8px; font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--gb-muted); }
+  h3 { display: flex; align-items: center; justify-content: space-between; margin: 8px 2px; font-size: 10px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--gb-muted); }
+
+  h3 span { font-weight: 400; letter-spacing: 0; text-transform: none; }
 
   .sequence-preview { height: 10px; margin-bottom: 10px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
   .chips { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
@@ -210,13 +230,12 @@
   .chip:hover { transform: scale(1.1); }
   .chip.selected { box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring); }
   .chip.dragging { transform: scale(1.18); cursor: grabbing; box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring), 0 4px 10px var(--gb-shadow); }
-  .add { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; color: var(--gb-secondary-text); box-shadow: inset 0 0 0 1px var(--gb-border); border: 1px dashed transparent; }
-  .add:hover:not(:disabled) { background: var(--gb-hover); color: var(--gb-strong-text); }
-  .chip-actions { display: flex; align-items: center; justify-content: space-between; margin: 6px 2px 0; font-size: 10.5px; color: var(--gb-muted); }
-  .chip-actions .text-button { margin-right: -6px; }
+  .chip-actions { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 6px 2px 0; font-size: 10.5px; color: var(--gb-muted); }
+  .sequence-actions { display: flex; align-items: center; }
+  .chip-actions .text-button { margin-right: 0; font-size: 10.5px; }
+  .reorder-hint { margin: 4px 2px 0; font-size: 10px; color: var(--gb-muted); }
 
-
-  .presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; margin-bottom: 14px; padding: 10px; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
+  .presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 10px; padding: 8px; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
   .preset { justify-self: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: transform .12s, box-shadow .12s; }
   .preset:hover { transform: scale(1.1); }
   .preset.chosen { box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring); }

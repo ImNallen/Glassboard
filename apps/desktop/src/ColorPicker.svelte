@@ -10,6 +10,8 @@
   let hsv = $state<Hsv>(hexToHsv(initial));
   let hex = $state(initial.toUpperCase());
   let dragging = $state(false);
+  let invalidHex = $state(false);
+  const id = $props.id();
   let field: HTMLDivElement;
   let current = $derived(hsvToHex(hsv));
   // Follow outside changes, keeping the hue for grays where the color alone can't say it.
@@ -20,11 +22,13 @@
       const parsed = hexToHsv(next);
       hsv = parsed.s && parsed.v ? parsed : { ...parsed, h: hsv.h };
       hex = next.toUpperCase();
+      invalidHex = false;
     });
   });
   function set(next: Partial<Hsv>, commit: boolean) {
     hsv = { ...hsv, ...next };
     hex = current.toUpperCase();
+    invalidHex = false;
     (commit ? onchange : oninput)(current);
   }
   function pick(event: PointerEvent, commit = false) {
@@ -44,37 +48,51 @@
   }
   function commitHex() {
     const parsed = parseHexColor(hex);
-    if (!parsed) { hex = current.toUpperCase(); return; }
+    if (!parsed) { invalidHex = true; return; }
     const next = hexToHsv(parsed);
     hsv = next.s && next.v ? next : { ...next, h: hsv.h };
     hex = parsed.toUpperCase();
+    invalidHex = false;
     onchange(parsed);
   }
 </script>
 
-<div class="picker">
-  <div bind:this={field} class="field" style:--hue={`hsl(${hsv.h} 100% 50%)`} role="slider" tabindex="0"
-    aria-label={`${label} saturation and brightness`} aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`}
-    aria-valuenow={Math.round(hsv.s * 100)} aria-valuemin={0} aria-valuemax={100}
-    onpointerdown={event => { dragging = true; field.setPointerCapture(event.pointerId); pick(event); }}
-    onpointermove={event => { if (dragging) pick(event); }}
-    onpointerup={event => { if (!dragging) return; dragging = false; pick(event, true); }}
-    onpointercancel={() => { dragging = false; onchange(current); }}
-    onkeydown={fieldKeydown}>
-    <span class="thumb" style:left={`${hsv.s * 100}%`} style:top={`${(1 - hsv.v) * 100}%`} style:background={current}></span>
+<details class="custom-color">
+  <summary>Custom color<span class="summary-color"><span class="preview" style:background={current} aria-hidden="true"></span>{current.toUpperCase()}</span></summary>
+  <div class="picker">
+    <div bind:this={field} class="field" style:--hue={`hsl(${hsv.h} 100% 50%)`} role="slider" tabindex="0"
+      aria-label={`${label} saturation and brightness`} aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`}
+      aria-valuenow={Math.round(hsv.s * 100)} aria-valuemin={0} aria-valuemax={100}
+      onpointerdown={event => { dragging = true; field.setPointerCapture(event.pointerId); pick(event); }}
+      onpointermove={event => { if (dragging) pick(event); }}
+      onpointerup={event => { if (!dragging) return; dragging = false; pick(event, true); }}
+      onpointercancel={() => { dragging = false; onchange(current); }}
+      onkeydown={fieldKeydown}>
+      <span class="thumb" style:left={`${hsv.s * 100}%`} style:top={`${(1 - hsv.v) * 100}%`} style:background={current}></span>
+    </div>
+    <label class="hue-label"><span>Hue</span>
+      <input class="hue" type="range" min="0" max="359" step="1" aria-label={`${label} hue`} value={Math.round(hsv.h)}
+        oninput={event => set({ h: Number(event.currentTarget.value) }, false)} onchange={() => onchange(current)}/>
+    </label>
+    <label class="hex">
+      <span class="preview" style:background={current} aria-hidden="true"></span>
+      <span class="hex-label">Hex</span>
+      <input type="text" spellcheck="false" autocomplete="off" maxlength="7" aria-label={`${label} hex code`} aria-invalid={invalidHex} aria-describedby={invalidHex ? `${id}-hex-error` : undefined} bind:value={hex} oninput={() => invalidHex = false}
+        onkeydown={event => { if (event.key === 'Enter') { event.preventDefault(); commitHex(); } }} onblur={commitHex}/>
+    </label>
+    {#if invalidHex}<p class="hex-error" id={`${id}-hex-error`} role="alert">Use 3 or 6 hex digits, like #5856D6.</p>{/if}
   </div>
-  <input class="hue" type="range" min="0" max="359" step="1" aria-label={`${label} hue`} value={Math.round(hsv.h)}
-    oninput={event => set({ h: Number(event.currentTarget.value) }, false)} onchange={() => onchange(current)}/>
-  <label class="hex">
-    <span class="preview" style:background={current} aria-hidden="true"></span>
-    <span class="hex-label">Hex</span>
-    <input type="text" spellcheck="false" autocomplete="off" maxlength="7" aria-label={`${label} hex code`} bind:value={hex}
-      onkeydown={event => { if (event.key === 'Enter') { event.preventDefault(); commitHex(); } }} onblur={commitHex}/>
-  </label>
-</div>
+</details>
 
 <style>
-  .picker { display: flex; flex-direction: column; gap: 10px; }
+  .custom-color { border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
+  summary { padding: 10px; cursor: pointer; font-size: 11.5px; font-weight: 500; color: var(--gb-secondary-text); }
+  summary:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; border-radius: 9px; }
+  .summary-color { display: inline-flex; align-items: center; gap: 6px; float: right; font-size: 10.5px; font-weight: 400; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
+  .summary-color .preview { width: 14px; height: 14px; border-radius: 4px; }
+  .hue-label { display: flex; flex-direction: column; gap: 6px; font-size: 10.5px; color: var(--gb-muted); }
+  .hex-error { margin: -4px 0 0; font-size: 10.5px; color: var(--gb-error-text); }
+  .picker { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 10px; }
   .field { position: relative; height: 104px; border-radius: 8px; cursor: crosshair; touch-action: none; box-shadow: inset 0 0 0 1px var(--gb-swatch-border);
     background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, var(--hue)); }
   .field:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
