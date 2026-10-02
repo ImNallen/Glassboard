@@ -36,7 +36,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           projectPath: apps/desktop
-          tauriScript: npm run tauri --
+          tauriScript: npm run tauri
           args: ${{ matrix.args }}
           tagName: v__VERSION__
           releaseName: Glassboard v__VERSION__
