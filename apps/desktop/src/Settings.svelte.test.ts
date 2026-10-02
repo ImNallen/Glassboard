@@ -75,10 +75,59 @@ it('replaces a swatch with a preset, keeping a selected swatch selected, and res
   expect(session().preferences.swatches[4]).toBe('#5856d6');
   expect(session().preferences.color).toBe('#5856d6');
   expect(document.querySelector('#edit-title')?.textContent).toBe('#5856D6');
+  const red = document.querySelector<HTMLButtonElement>('button[aria-label^="Red,"]')!;
+  expect(red.textContent).toContain('Red');
+  expect(red.getAttribute('aria-checked')).toBe('true');
   button('Reset #5856D6 to default').click();
   await tick();
   expect(session().preferences.swatches[4]).toBe('#f46b78');
   expect(session().preferences.color).toBe('#f46b78');
+});
+
+it('selects toolbar colors with arrow keys and keeps one keyboard stop', async () => {
+  await setup('colors');
+  const targets = [...document.querySelectorAll<HTMLButtonElement>('.slot')];
+  targets[2].focus();
+  targets[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+  flushSync();
+  expect(document.activeElement).toBe(targets[3]);
+  expect(targets[3].getAttribute('aria-checked')).toBe('true');
+  expect(document.querySelector('#edit-title')?.textContent).toBe('White');
+  expect(targets.filter(target => target.tabIndex === 0)).toEqual([targets[3]]);
+  targets[3].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }));
+  flushSync();
+  expect(document.activeElement).toBe(targets[7]);
+  expect(document.querySelector('#edit-title')?.textContent).toBe('Blue');
+  targets[7].dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true }));
+  flushSync();
+  expect(document.activeElement).toBe(targets[0]);
+  expect(document.querySelector('#edit-title')?.textContent).toBe('Rainbow');
+});
+
+it('keeps invalid hex input visible without saving, then saves a corrected color', async () => {
+  const session = await setup('colors');
+  const disclosure = document.querySelector<HTMLDetailsElement>('.custom-color')!;
+  expect(disclosure.open).toBe(false);
+  disclosure.open = true;
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="Black hex code"]')!;
+  const original = session().preferences.swatches[0];
+  input.value = '#oops';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new FocusEvent('blur'));
+  await tick();
+  expect(input.value).toBe('#oops');
+  expect(input.getAttribute('aria-invalid')).toBe('true');
+  expect(document.querySelector('.hex-error')?.textContent).toContain('3 or 6 hex digits');
+  expect(session().preferences.swatches[0]).toBe(original);
+  input.value = '#abc';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+  await tick();
+  expect(session().preferences.swatches[0]).toBe('#aabbcc');
+  expect(input.value).toBe('#AABBCC');
+  expect(input.getAttribute('aria-invalid')).toBe('false');
+  expect(document.querySelector('.hex-error')).toBeNull();
+  expect(document.querySelector<HTMLButtonElement>('button[aria-label^="Black,"]')?.textContent).toContain('Black');
 });
 
 it('edits the Rainbow list: adding, reordering, removing, and reset', async () => {
@@ -94,7 +143,7 @@ it('edits the Rainbow list: adding, reordering, removing, and reset', async () =
   document.querySelector<HTMLButtonElement>('.chip.selected')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true }));
   await tick();
   expect(session().preferences.rainbowColors[0]).toBe(added);
-  for (let i = 0; i < 8; i++) { click('.chip-actions button'); await tick(); }
+  for (let i = 0; i < 8; i++) { click('.chip-actions button:not(.add)'); await tick(); }
   expect(session().preferences.rainbowColors).toHaveLength(2);
   expect(session().preferences.cycleColors).toHaveLength(7);
   click('button[aria-label="Reset Rainbow to default"]');
@@ -137,7 +186,7 @@ it('applies a theme from the dropdown to Rainbow, Shifting, and keys 5–8, keep
   document.querySelector<HTMLButtonElement>('button[aria-label="Use #000000"]')!.click();
   await tick();
   expect(trigger.getAttribute('aria-label')).toBe('Theme: Neon');
-  document.querySelector<HTMLButtonElement>('button[aria-label^="#00FF9C,"]')!.click();
+  document.querySelector<HTMLButtonElement>('button[aria-label^="Green,"]')!.click();
   flushSync();
   document.querySelector<HTMLButtonElement>('button[aria-label="Use #000000"]')!.click();
   await tick();
