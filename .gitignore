@@ -5,3 +5,4 @@ apps/desktop/src-tauri/gen/
 .astro/
 .DS_Store
 *.local
+*.p12
