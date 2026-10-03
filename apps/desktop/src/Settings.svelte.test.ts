@@ -234,6 +234,15 @@ it('turns opening at login on and off from the General tab', async () => {
   expect(await getAutostart()).toBe(false);
 });
 
+it('checks for updates from the header without a message when nothing is new', async () => {
+  await setup('general');
+  const button = () => document.querySelector<HTMLButtonElement>('header button[aria-label="Check for updates"]')!;
+  expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
+  button().click();
+  await vi.waitFor(() => expect(button().title).toBe('You have the latest version.'));
+  expect(document.querySelector('.status')!.textContent).toBe('');
+});
+
 it('opens on keybindings and explains a toggle shortcut another app holds', async () => {
   const session = $state<Session>({ ...structuredClone(defaults), shortcutUnavailable: true });
   settings = mount(Settings, { target: document.body, props: { get session() { return session; }, errors: createErrors(() => session) } });

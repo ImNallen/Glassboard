@@ -69,7 +69,7 @@ export function createPreviewSession(initial: Partial<Session> = {}): SessionBac
         case 'undo': case 'redo': case 'clear': drawingSubscribers.forEach(fn => fn(action)); return;
         case 'clear-all': drawingSubscribers.forEach(fn => fn('clear')); return;
         case 'capture': beginCapture(); break;
-        case 'open-github': case 'report-issue': case 'quit': throw new Error(`${action} needs the desktop app`);
+        case 'open-github': case 'report-issue': case 'check-for-updates': case 'install-update': case 'quit': throw new Error(`${action} needs the desktop app`);
         default: transition(action);
       }
       publish();

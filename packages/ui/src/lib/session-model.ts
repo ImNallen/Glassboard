@@ -13,7 +13,7 @@ export type ToolbarPointer = { near: boolean; x: number; y: number };
 /** Actions the session state machine owns; `contract/transitions.json` replays each on both sides. */
 export type Transition = 'toggle' | 'show' | 'hide' | 'cancel-capture' | 'tutorial-start' | 'replay-tutorial' | 'dismiss-tutorial' | 'settings' | 'close-settings' | 'dismiss-error';
 /** The `action` command vocabulary, matching Rust's `commands::Action`. */
-export type Action = Transition | 'capture' | 'undo' | 'redo' | 'clear' | 'clear-all' | 'open-github' | 'report-issue' | 'quit';
+export type Action = Transition | 'capture' | 'undo' | 'redo' | 'clear' | 'clear-all' | 'open-github' | 'report-issue' | 'check-for-updates' | 'install-update' | 'quit';
 export const defaults: Session = { mode: 'hidden', annotationSession: 0, tutorial: 'welcome', settingsOpen: false, activeOverlay: 'overlay-0', cycleIndex: 0, historyByOverlay: {}, capture: null, preferences: defaultPreferences, error: null, shortcutUnavailable: false };
 type Unsubscribe = () => void;
 /** What every surface needs from the app: the desktop implements it over Tauri IPC, the browser preview in memory. */
