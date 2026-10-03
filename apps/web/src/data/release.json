@@ -1,0 +1,7 @@
+{
+  "version": "0.1.0",
+  "assets": {
+    "macos": "Glassboard_0.1.0_universal.dmg",
+    "windows": "Glassboard_0.1.0_x64-setup.exe"
+  }
+}

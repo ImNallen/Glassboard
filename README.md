@@ -14,6 +14,29 @@ and nothing is sent over the network.
 
 [glassboard.dev](https://glassboard.dev) has a live demo you can draw on in the browser.
 
+## Download and install
+
+Download Glassboard for **macOS** or **Windows** at [glassboard.dev](https://glassboard.dev).
+The macOS download supports Apple silicon and Intel. The Windows installer is for
+64-bit Intel and AMD PCs.
+
+- **macOS:** open the DMG, drag Glassboard into Applications, then open it from Applications.
+- **Windows:** run the setup EXE, finish installation, then launch Glassboard.
+
+The macOS app is signed and notarized. The Windows installer is currently unsigned,
+so Windows may show an **Unknown publisher** or SmartScreen warning. Download only
+from the Glassboard release linked on the site. Follow your organization's policy
+if installation is blocked.
+
+On first launch, the tutorial walks you through drawing and switching back to work.
+Press **Cmd+Shift+A** on macOS or **Ctrl+Shift+A** on Windows to start drawing.
+While drawing, use **Cmd+S** or **Ctrl+S** to capture a region, then **Cmd+C** or
+**Ctrl+C** to copy it.
+
+See the [installation guide](https://glassboard.dev/install/) for screenshot
+permissions and first-use instructions, or browse the
+[GitHub releases](https://github.com/ImNallen/Glassboard/releases).
+
 ## Features
 
 - **Draw over anything:** arrow, pen, square, circle, text, highlighter, and eraser, with undo and redo.
@@ -44,9 +67,9 @@ On Windows, use **Ctrl** wherever **Cmd** appears.
 Hold **Shift** while dragging to snap arrows to 45° or draw perfect squares and circles.
 To open settings, click the menu bar or system tray icon.
 
-## Getting started
+## Build from source
 
-Glassboard is currently built from source. You'll need:
+For development or a local build, you'll need:
 
 - Node.js 22.12 or newer
 - Rust (stable)
@@ -67,8 +90,6 @@ npm run desktop tauri build
 
 On macOS this creates `Glassboard.app` and a `.dmg`; on Windows, a setup `.exe`. You'll
 find them in `apps/desktop/src-tauri/target/release/bundle/`.
-
-On first launch, a short tutorial walks you through drawing and switching back to work.
 
 > **macOS screenshot permission:** screen capture needs the **Screen Recording**
 > permission, which Glassboard requests the first time you take a screenshot. If you
@@ -121,6 +142,8 @@ cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 
 The browser preview is good for UI work, but the overlay, global shortcut, and native
 screenshots only work in the Tauri app. Check native changes on both macOS and Windows.
+
+For the release and website deployment steps, see [Publish a release](docs/releases.md).
 
 ## License
 
