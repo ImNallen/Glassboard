@@ -1,0 +1,79 @@
+---
+import '@fontsource-variable/familjen-grotesk';
+import '../styles/global.css';
+import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
+import appIcon from '../../../../assets/brand/app-icon.svg';
+import { release } from '../lib/release.mjs';
+
+const base = import.meta.env.BASE_URL;
+const repo = 'https://github.com/ImNallen/Glassboard';
+const macos = release.downloads[0];
+const windows = release.downloads[1];
+const description = 'Install Glassboard on macOS or Windows, then start drawing over your screen.';
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e0e" media="(prefers-color-scheme: dark)" />
+    <meta property="og:title" content="Install Glassboard" />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={Astro.url} />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <link rel="icon" href={`${base}favicon.ico`} sizes="any" />
+    <link rel="canonical" href={Astro.url} />
+    <title>Install Glassboard</title>
+  </head>
+  <body>
+    <header class="wrap top">
+      <a class="brand" href={base}><img src={appIcon.src} width="28" height="28" alt="" />Glassboard</a>
+      <nav aria-label="Site">
+        <a href={repo}><GitHubIcon size={18} />GitHub</a>
+      </nav>
+    </header>
+    <main class="wrap install">
+      <p class="eyebrow">Version {release.version}</p>
+      <h1>Make your point.</h1>
+      <p class="lede">Install Glassboard, press a shortcut, and draw over any app. Everything stays on your machine.</p>
+      <div class="install-grid">
+        <section aria-labelledby="macos">
+          <h2 id="macos">Install on macOS</h2>
+          <a class="button primary" href={macos.url}>Download for macOS <span aria-hidden="true">↓</span></a>
+          <p class="release-detail">Apple silicon and Intel · .dmg</p>
+          <ol>
+            <li>Open the downloaded DMG.</li>
+            <li>Drag Glassboard into Applications.</li>
+            <li>Open Glassboard from Applications and follow the short tutorial.</li>
+          </ol>
+          <p class="note">The macOS app is signed with a Developer ID and notarized by Apple.</p>
+          <h3>Allow screenshots</h3>
+          <p class="note">Glassboard asks for Screen Recording permission the first time you capture a screenshot. Allow Glassboard in System Settings → Privacy &amp; Security → Screen Recording. Your macOS version may call this Screen &amp; System Audio Recording.</p>
+          <p class="note">Restart Glassboard if macOS asks you to. Screen capture stays on your machine and does not record video or audio.</p>
+        </section>
+        <section aria-labelledby="windows">
+          <h2 id="windows">Install on Windows</h2>
+          <a class="button primary" href={windows.url}>Download for Windows <span aria-hidden="true">↓</span></a>
+          <p class="release-detail">64-bit Intel and AMD · .exe</p>
+          <ol>
+            <li>Open the downloaded setup EXE.</li>
+            <li>Follow the installer, then launch Glassboard.</li>
+            <li>Follow the short tutorial to make your first drawing.</li>
+          </ol>
+          <p class="note">The Windows installer is currently unsigned. Windows may show an “Unknown publisher” or SmartScreen warning. Check that you downloaded it from the Glassboard GitHub release linked here. If your device blocks installation, follow your organization's policy or contact your administrator.</p>
+          <p class="note">Windows support and mixed-DPI displays still need more testing. <a href={`${repo}/issues`}>Report an issue</a> if something does not work.</p>
+        </section>
+      </div>
+      <section class="first-drawing" aria-labelledby="first-drawing">
+        <h2 id="first-drawing">Your first drawing</h2>
+        <p>Press <kbd>Cmd+Shift+A</kbd> on macOS or <kbd>Ctrl+Shift+A</kbd> on Windows to draw over your screen. Press the shortcut again to clear your drawings and get back to work.</p>
+        <p>While drawing, press <kbd>Cmd+S</kbd> or <kbd>Ctrl+S</kbd> to capture a region. Annotate it, then press <kbd>Cmd+C</kbd> or <kbd>Ctrl+C</kbd> to copy it. Press <kbd>Esc</kbd> to cancel.</p>
+        <p>Open settings from the menu bar or system tray icon to change the global shortcut.</p>
+        <p class="note"><a href={release.notesUrl}>Release notes</a> · <a href={`${repo}#shortcuts`}>All shortcuts</a> · <a href={`${repo}#build-from-source`}>Build from source</a></p>
+      </section>
+    </main>
+  </body>
+</html>
