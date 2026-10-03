@@ -27,6 +27,7 @@ jobs:
           workspaces: apps/desktop/src-tauri
       - run: npm ci
       - uses: tauri-apps/tauri-action@v1
+        id: tauri
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -41,3 +42,16 @@ jobs:
           tagName: v__VERSION__
           releaseName: Glassboard v__VERSION__
           releaseDraft: true
+      - if: matrix.os == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
+          TAG: v${{ steps.tauri.outputs.appVersion }}
+        run: |
+          dmg=$(jq -er '.[] | select(endswith(".dmg"))' <<< "$ARTIFACT_PATHS")
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
+          xcrun stapler staple "$dmg"
+          gh release upload "$TAG" "$dmg" --clobber
