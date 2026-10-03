@@ -5,6 +5,12 @@ import Settings from './Settings.svelte';
 import { createPreviewSession, defaults, savePreferences, subscribe, useSession, type Session } from '@glassboard/ui/session';
 import { getAutostart } from './lib/autostart';
 import { createErrors } from '@glassboard/ui/errors';
+import { watchUpdates, type UpdateStatus } from './lib/updates';
+
+vi.mock('./lib/updates', async original => {
+  const updates = await original<typeof import('./lib/updates')>();
+  return { ...updates, watchUpdates: vi.fn(updates.watchUpdates) };
+});
 
 let settings: ReturnType<typeof mount> | undefined;
 let stop = () => {};
@@ -232,6 +238,30 @@ it('turns opening at login on and off from the General tab', async () => {
   toggle().click();
   await vi.waitFor(() => expect(toggle().getAttribute('aria-checked')).toBe('false'));
   expect(await getAutostart()).toBe(false);
+});
+
+it('checks for updates from the header without a message when nothing is new', async () => {
+  await setup('general');
+  const button = () => document.querySelector<HTMLButtonElement>('header button[aria-label="Check for updates"]')!;
+  expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
+  button().click();
+  await vi.waitFor(() => expect(button().title).toBe('You have the latest version.'));
+  expect(document.querySelector('.status')!.textContent).toBe('');
+});
+
+it('shows why an install started from the tray failed, but not a background check failure', async () => {
+  let emit: (status: UpdateStatus) => void = () => {};
+  vi.mocked(watchUpdates).mockImplementationOnce(async fn => { emit = fn; fn({ state: 'ready', version: '0.2.0' }); return () => {}; });
+  await setup('general');
+  const status = () => document.querySelector('.status')!.textContent;
+  emit({ state: 'installing', version: '0.2.0' });
+  emit({ state: 'failed', message: 'Move Glassboard to Applications to install updates.' });
+  flushSync();
+  expect(status()).toBe('Move Glassboard to Applications to install updates.');
+  emit({ state: 'checking' });
+  emit({ state: 'failed', message: "Couldn't reach GitHub to check for updates." });
+  flushSync();
+  expect(status()).toBe('');
 });
 
 it('opens on keybindings and explains a toggle shortcut another app holds', async () => {

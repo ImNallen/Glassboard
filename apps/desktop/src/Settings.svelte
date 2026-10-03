@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Copy, EyeOff, Keyboard, Palette, Power, Redo2, RotateCcw, Scan, SlidersHorizontal, Trash2, Undo2, X } from '@lucide/svelte';
+  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Palette, Power, Redo2, RefreshCw, RotateCcw, Scan, SlidersHorizontal, Trash2, Undo2, X } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
@@ -12,6 +12,7 @@
   import ColorSettings from './ColorSettings.svelte';
   import ShortcutRecorder from './ShortcutRecorder.svelte';
   import { getAutostart, setAutostart } from './lib/autostart';
+  import { checkForUpdates, installUpdate, updateDetail, updateLabel, watchUpdates, type UpdateStatus } from './lib/updates';
   let { session, errors }: { session: Session; errors: Errors } = $props();
   type Tab = 'general' | 'colors' | 'keybindings';
   const TABS: readonly { id: Tab; label: string; icon: typeof Keyboard }[] = [
@@ -38,6 +39,20 @@
   let autostart = $state<boolean | null>(null);
   let switchingAutostart = $state(false);
   $effect(() => { if (windowVisible) getAutostart().then(enabled => autostart = enabled).catch(errors.report); });
+  let updateStatus = $state<UpdateStatus>({ state: 'idle' });
+  // Background check failures stay in the button's tooltip. A check the user started, or any install
+  // (Settings or the tray, which opens Settings when it fails), shows its failure until the next update step.
+  let awaitingOutcome = false;
+  let updateFailure = $state('');
+  $effect(() => {
+    const stop = watchUpdates(next => {
+      const requested = awaitingOutcome || untrack(() => updateStatus.state) === 'installing';
+      updateStatus = next;
+      if (['up-to-date', 'ready', 'failed'].includes(next.state)) awaitingOutcome = false;
+      updateFailure = next.state === 'failed' && requested ? next.message : '';
+    }).catch(errors.report);
+    return () => { stop.then(unlisten => unlisten?.()); };
+  });
   // Color rows in Keybindings show each swatch's current color and name.
   let swatches = $derived(Object.fromEntries(COLOR_SHORTCUTS.map(choice => [choice.command,
     choice.slot !== undefined ? { background: swatchColor(preferences.swatches, choice.slot), name: swatchName(preferences.swatches, choice.slot) }
@@ -89,6 +104,11 @@
     event.preventDefault();
     run(name);
   }
+  function updateClick() {
+    errors.clear();
+    awaitingOutcome = true;
+    (updateStatus.state === 'ready' ? installUpdate() : checkForUpdates()).catch(error => { awaitingOutcome = false; errors.report(error); });
+  }
   async function toggleAutostart() {
     if (autostart === null) return;
     switchingAutostart = true; errors.clear();
@@ -104,6 +124,16 @@
     <header>
       <span class="brand"><Logo size={18}/>Glassboard<span class="version">v{__APP_VERSION__}</span></span>
       <div class="header-actions">
+        {#if updateStatus.state !== 'disabled'}
+          <button class="icon-link update" class:ready={updateStatus.state === 'ready'} aria-busy={updateStatus.state === 'checking' || updateStatus.state === 'downloading' || updateStatus.state === 'installing'}
+            title={updateDetail(updateStatus)} aria-label={updateLabel(updateStatus)} onclick={updateClick}>
+            {#if updateStatus.state === 'ready'}<CircleArrowUp size={15}/>
+            {:else if updateStatus.state === 'downloading' && updateStatus.percent !== null}
+              <svg class="progress" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" pathLength="100"/><circle class="done" cx="8" cy="8" r="6.5" pathLength="100" stroke-dasharray={`${updateStatus.percent} 100`}/></svg>
+            {:else if updateStatus.state === 'downloading' || updateStatus.state === 'installing'}<span class="spin"><LoaderCircle size={15}/></span>
+            {:else}<span class:spin={updateStatus.state === 'checking'}><RefreshCw size={14}/></span>{/if}
+          </button>
+        {/if}
         <a class="icon-link" href={REPOSITORY_URL} target="_blank" rel="noreferrer" title="Glassboard on GitHub" aria-label="Glassboard on GitHub"
           onclick={event => openLink(event, 'open-github')}><GitHubIcon/></a>
         <button class="icon-link" title="Close" aria-label="Close settings" onclick={() => run('close-settings')}><X size={15}/></button>
@@ -212,6 +242,7 @@
     <div class="status" aria-live="polite">
       {#if errors.message}<p class="error" role="alert">{errors.message}<button class="dismiss" aria-label="Dismiss error" onclick={errors.dismiss}><X size={12}/></button></p>
       {:else if hint}<p>{hint}</p>
+      {:else if updateFailure}<p>{updateFailure}</p>
       {:else if notice}<p>{notice}</p>{/if}
     </div>
 
@@ -234,6 +265,14 @@
   .icon-link { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--gb-muted); }
   .icon-link:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .icon-link:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
+  .update.ready { color: var(--gb-focus-ring); }
+  .update span { display: grid; }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { rotate: 360deg; } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; opacity: .5; } }
+  .progress { rotate: -90deg; }
+  .progress circle { fill: none; stroke: color-mix(in srgb, currentColor 25%, transparent); stroke-width: 2; }
+  .progress circle.done { stroke: var(--gb-focus-ring); stroke-linecap: round; transition: stroke-dasharray .2s; }
 
   .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--gb-text) 6%, transparent); }
   .tabs { margin: 14px 14px 0; }

@@ -3,12 +3,39 @@
 The maintainer reviews, commits, and pushes repository changes. Agents leave edits
 in the working tree, as required by [AGENTS.md](../AGENTS.md).
 
+## Keep the updater key
+
+Installed copies of Glassboard check GitHub once a day for a newer release. They
+install an update only if its signature matches the public key in
+[`tauri.conf.json`](../apps/desktop/src-tauri/tauri.conf.json). The first public
+release must include the updater. Copies installed without it never update themselves.
+
+The private key is `~/.tauri/glassboard-updater.key`. Its password is in
+`~/.tauri/glassboard-updater.key.password`. Back up both offline. If either is
+lost, no new release can reach existing installs, and every user must reinstall
+by hand. To rotate the key, ship a release signed with the old key that carries
+the new public key.
+
+The Release workflow reads both from repository secrets. To set them:
+
+```sh
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/glassboard-updater.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD < ~/.tauri/glassboard-updater.key.password
+```
+
+Only the workflow creates update packages. It passes
+[`tauri.release.conf.json`](../apps/desktop/src-tauri/tauri.release.conf.json),
+which turns them on. A local `tauri build` without that file needs no key.
+
 ## Prepare the installers
 
 1. Review and commit the intended desktop release changes, then push them to GitHub.
 2. Run the **Release** workflow from the intended revision.
 3. Wait for both the macOS and Windows jobs to finish successfully. The macOS job
    must finish notarizing and stapling the DMG, then replace the uploaded draft asset.
+   The `updater-manifest` job must also pass. It confirms that the draft's
+   `latest.json` names this version and signs an update for Apple silicon, Intel,
+   and Windows. Do not publish a draft that fails it.
 4. Open the draft release and confirm it contains both installers. For v0.1.0, these are:
    - `Glassboard_0.1.0_universal.dmg`
    - `Glassboard_0.1.0_x64-setup.exe`
@@ -43,6 +70,71 @@ have performed it and record the OS version and architecture alongside the resul
 - [ ] macOS: test the Screen Recording permission prompt, denial, and recovery.
 - [ ] Both platforms: open settings and quit from the menu bar or system tray.
 - [ ] Both platforms: test multiple displays and different display scales. Record remaining limitations in the release notes.
+- [ ] Both platforms: before the first public release, complete the updater rehearsal below.
+- [ ] Both platforms: after each later release, update the previous public release from Settings and confirm the new version starts.
+
+## Rehearse an update
+
+Rehearse on each platform with a throwaway key and a local server. The real key
+stays in CI.
+
+1. Create a test key:
+
+   ```sh
+   npm run desktop tauri signer generate -- -w /tmp/gb-test.key -p test
+   ```
+
+2. Write `/tmp/gb-test.conf.json`. It replaces the public key and endpoint, and
+   turns on update packages. The separate identifier keeps the rehearsal away from
+   your real preferences, logs, and running copy:
+
+   ```json
+   {
+     "identifier": "dev.glassboard.rehearsal",
+     "bundle": { "createUpdaterArtifacts": true },
+     "plugins": { "updater": {
+       "pubkey": "<contents of /tmp/gb-test.key.pub>",
+       "endpoints": ["http://127.0.0.1:8765/latest.json"],
+       "dangerousInsecureTransportProtocol": true
+     } }
+   }
+   ```
+
+3. Build the current version and install it into Applications, or run its setup on Windows:
+
+   ```sh
+   export TAURI_SIGNING_PRIVATE_KEY=/tmp/gb-test.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD=test
+   npm run desktop tauri build -- --config /tmp/gb-test.conf.json
+   ```
+
+4. Raise the version in `apps/desktop/package.json` by one patch and build again.
+   Do not commit the change. Copy the update package and its `.sig` file into
+   `/tmp/gb-serve`. On macOS the package is `Glassboard.app.tar.gz`. On Windows it
+   is the `-setup.exe`.
+5. Write `/tmp/gb-serve/latest.json` with the new version and one platform entry,
+   such as `darwin-aarch64` or `windows-x86_64`. Its `url` points at the served
+   package, and its `signature` is the contents of the `.sig` file. Then serve it:
+
+   ```sh
+   python3 -m http.server 8765 -d /tmp/gb-serve
+   ```
+
+6. Change one character of the signature in `latest.json`. Open the installed app,
+   open Settings, and select **Check for updates** next to the GitHub icon. The
+   status line reports a signature mismatch. Restore the signature.
+7. Stop the server and select **Check for updates** again. The status line reports
+   that GitHub is unreachable, without the red error style. Start the server again.
+8. On macOS, quit the installed app and open the old build from its mounted DMG.
+   Select **Check for updates**, then the highlighted install icon.
+   The status line asks you to move Glassboard to Applications. Quit that copy.
+9. Open the installed app and select **Check for updates**. The icon becomes a
+   progress ring while the update downloads, then a highlighted install icon. The
+   tray menu shows **Restart to update**.
+10. Change the toolbar position, then select **Restart to update** in the tray.
+    Confirm that the new version starts once, keeps the toolbar position, and
+    responds to the drawing shortcut. On Windows, confirm that no stale tray icon
+    remains.
+11. Revert the version change.
 
 ## Deploy the website
 

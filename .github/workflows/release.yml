@@ -35,10 +35,12 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/desktop
           tauriScript: npm run tauri
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config src-tauri/tauri.release.conf.json
           tagName: v__VERSION__
           releaseName: Glassboard v__VERSION__
           releaseDraft: true
@@ -55,3 +57,17 @@ jobs:
           xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           xcrun stapler staple "$dmg"
           gh release upload "$TAG" "$dmg" --clobber
+  # Both platforms write latest.json on the draft, and a lost write would strand one of them.
+  updater-manifest:
+    needs: desktop
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(jq -er .version apps/desktop/package.json)
+          gh release download "v$version" --pattern latest.json
+          jq -e --arg v "$version" '.version == $v and ([.platforms["darwin-aarch64"], .platforms["darwin-x86_64"], .platforms["windows-x86_64"]] | all(.url != null and (.signature // "") != ""))' latest.json

@@ -31,6 +31,8 @@ pub(crate) enum Action {
     ClearAll,
     OpenGithub,
     ReportIssue,
+    CheckForUpdates,
+    InstallUpdate,
     Quit,
     #[serde(untagged)]
     Session(Transition),
@@ -45,6 +47,14 @@ pub(crate) fn perform(app: &tauri::AppHandle, action: Action) -> Result<()> {
         }
         Action::OpenGithub => open(REPOSITORY_URL.into()),
         Action::ReportIssue => open(format!("{REPOSITORY_URL}/issues/new")),
+        Action::CheckForUpdates => {
+            crate::updates::check(app);
+            Ok(())
+        }
+        Action::InstallUpdate => {
+            crate::updates::install(app);
+            Ok(())
+        }
         Action::Quit => {
             app.exit(0);
             Ok(())
@@ -275,6 +285,8 @@ mod tests {
     fn actions_keep_their_wire_names() {
         let parse = |name: &str| serde_json::from_value::<Action>(name.into());
         assert_eq!(parse("clear-all").unwrap(), Action::ClearAll);
+        assert_eq!(parse("check-for-updates").unwrap(), Action::CheckForUpdates);
+        assert_eq!(parse("install-update").unwrap(), Action::InstallUpdate);
         assert_eq!(
             parse("cancel-capture").unwrap(),
             Action::Session(Transition::CancelCapture)

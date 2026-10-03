@@ -9,6 +9,7 @@ mod session;
 mod startup_error;
 mod state;
 mod tray;
+mod updates;
 mod windows;
 
 use capture::{copy_capture, copy_capture_region, get_capture_image};
@@ -59,6 +60,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         // Login items use a macOS Launch Agent and the Windows Run registry key.
         .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             // Native activation (including clicking another display) can raise a
             // transparent drawing window above the toolbar before a drawing command.
@@ -106,7 +108,8 @@ fn main() {
             expand_toolbar,
             get_capture_image,
             copy_capture,
-            copy_capture_region
+            copy_capture_region,
+            updates::get_update
         ])
         .setup(|app| {
             if let Err(error) = setup(app) {
@@ -146,6 +149,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     problems.extend(warning);
     app.manage(AppState(Mutex::new(Session::new(preferences))));
     app.manage(PreferenceSaves::start(app.handle().clone()));
+    updates::start(app);
     #[cfg(target_os = "macos")]
     {
         app.set_activation_policy(tauri::ActivationPolicy::Accessory);
