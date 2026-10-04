@@ -4,7 +4,7 @@
   import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
   import { action, native, savePreferences, type Preferences, type Session, type ToolbarPosition, type Action } from '@glassboard/ui/session';
-  import { COLOR_SHORTCUTS, DEFAULT_SHORTCUT, KEYBINDING_GROUPS, KEYBINDINGS, keybinding, platformMac, rebindCommand, rebindToggle, sameShortcut, shortcutLabel, TOOL_SHORTCUTS } from '@glassboard/ui/shortcuts';
+  import { COLOR_SHORTCUTS, DEFAULT_CAPTURE_SHORTCUT, DEFAULT_SHORTCUT, type GlobalCommand, KEYBINDING_GROUPS, KEYBINDINGS, keybinding, platformMac, rebindCommand, rebindGlobal, sameShortcut, shortcutLabel, TOOL_SHORTCUTS } from '@glassboard/ui/shortcuts';
   import { AUTO_FADE_OPTIONS } from '@glassboard/ui/drawing';
   import { rainbowPreview, shiftingPreview, swatchColor, swatchName } from '@glassboard/ui/swatches';
   import { TOOL_ICONS } from '@glassboard/ui/tool-icons';
@@ -24,6 +24,8 @@
   const ICONS: Record<string, typeof Keyboard> = { undo: Undo2, redo: Redo2, hide: EyeOff, capture: Scan, copy: Copy, ...Object.fromEntries(TOOL_SHORTCUTS.map(tool => [tool.command, TOOL_ICONS[tool.id]])) };
   const REPOSITORY_URL = 'https://github.com/ImNallen/Glassboard';
   const GLOBAL_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels.`;
+  const CAPTURE_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels, ${platformMac ? '⌫' : 'Backspace'} clears.`;
+  const GLOBAL_PURPOSES: Record<GlobalCommand, string> = { toggle: 'toggle Glassboard', capture: 'take a screenshot' };
   const LOCAL_HINT = `Press a key or combination. Esc cancels, ${platformMac ? '⌫' : 'Backspace'} clears.`;
   let tab = $state<Tab>('general');
   let panel = $state<HTMLDivElement>();
@@ -33,7 +35,8 @@
   let noticeTimer: ReturnType<typeof setTimeout>;
   let windowVisible = $derived(session.settingsOpen || !native);
   let preferences = $derived(session.preferences);
-  let customized = $derived(Object.keys(preferences.keybindings).length > 0 || !sameShortcut(preferences.shortcut, DEFAULT_SHORTCUT, platformMac));
+  let customized = $derived(Object.keys(preferences.keybindings).length > 0 || !sameShortcut(preferences.shortcut, DEFAULT_SHORTCUT, platformMac)
+    || !sameShortcut(preferences.captureShortcut, DEFAULT_CAPTURE_SHORTCUT, platformMac));
   let fade = $derived(preferences.autoFadeSeconds);
   // Read from the OS each time settings opens, since it can be changed in System Settings.
   let autostart = $state<boolean | null>(null);
@@ -61,8 +64,8 @@
   $effect(() => {
     if (!windowVisible) return;
     notice = ''; errors.clear();
-    // Open where the unavailable shortcut can be replaced.
-    if (untrack(() => session.shortcutUnavailable)) tab = 'keybindings';
+    // Open where an unavailable shortcut can be replaced.
+    if (untrack(() => session.unavailableShortcuts.length)) tab = 'keybindings';
   });
   $effect(() => () => clearTimeout(noticeTimer));
 
@@ -89,13 +92,14 @@
     catch (e) { errors.report(e); }
     finally { busy = false; }
   }
-  function setToggle(next: string) {
-    const result = rebindToggle(preferences, next);
-    if (result) update({ shortcut: result.shortcut, keybindings: result.keybindings }, result.moved.length ? `Unbound ${result.moved.join(', ')} to make room.` : 'Shortcut saved.');
+  function setGlobal(command: GlobalCommand, next: string) {
+    const result = rebindGlobal(preferences, command, next);
+    if (typeof result === 'string') errors.report(`${shortcutLabel(next)} is already used to ${GLOBAL_PURPOSES[result]}.`);
+    else if (result) update({ shortcut: result.shortcut, captureShortcut: result.captureShortcut, keybindings: result.keybindings }, result.moved.length ? `Unbound ${result.moved.join(', ')} to make room.` : next ? 'Shortcut saved.' : '');
   }
   function setBinding(id: string, next: string) {
     const result = rebindCommand(preferences, id, next);
-    if (result === 'toggle') errors.report(`${shortcutLabel(next)} is already used to toggle Glassboard.`);
+    if (typeof result === 'string') errors.report(`${shortcutLabel(next)} is already used to ${GLOBAL_PURPOSES[result]}.`);
     else if (result) update({ keybindings: result.keybindings }, result.moved.length ? `Moved ${shortcutLabel(next)} from ${result.moved.join(', ')}.` : '');
   }
   /** Native webviews don't open links themselves; Rust opens the fixed URL behind each action. */
@@ -201,7 +205,7 @@
       {:else}
         <div class="intro">
           <p>Click a row, then press new keys.</p>
-          <button class="text-button reset-all" disabled={busy || !customized} onclick={() => update({ shortcut: DEFAULT_SHORTCUT, keybindings: {} }, 'All keybindings reset.')}>Reset all<RotateCcw size={12}/></button>
+          <button class="text-button reset-all" disabled={busy || !customized} onclick={() => update({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: {} }, 'All keybindings reset.')}>Reset all<RotateCcw size={12}/></button>
         </div>
 
         <section class="group" aria-labelledby="keys-global">
@@ -209,13 +213,21 @@
           <div class="list">
             <div class="row binding">
               <ShortcutRecorder label="Toggle Glassboard" shortcut={preferences.shortcut} fallback={DEFAULT_SHORTCUT} physical active={windowVisible} disabled={busy}
-                onchange={setToggle} {errors} onrecord={recording => hint = recording ? GLOBAL_HINT : ''}>
+                onchange={next => setGlobal('toggle', next)} {errors} onrecord={recording => hint = recording ? GLOBAL_HINT : ''}>
                 <span class="row-icon"><Logo size={14}/></span>
                 <span class="row-label">Toggle Glassboard</span>
               </ShortcutRecorder>
             </div>
+            <div class="row binding">
+              <ShortcutRecorder label="Take screenshot" shortcut={preferences.captureShortcut} fallback={DEFAULT_CAPTURE_SHORTCUT} physical clearable active={windowVisible} disabled={busy}
+                onchange={next => setGlobal('capture', next)} {errors} onrecord={recording => hint = recording ? CAPTURE_HINT : ''}>
+                <span class="row-icon"><Scan size={15} strokeWidth={1.9}/></span>
+                <span class="row-label">Take screenshot</span>
+              </ShortcutRecorder>
+            </div>
           </div>
-          {#if session.shortcutUnavailable}<p class="note unavailable" role="alert">Another app is using {shortcutLabel(preferences.shortcut)}, so it can’t turn on drawing. Record a different shortcut.</p>{/if}
+          {#if session.unavailableShortcuts.includes('toggle')}<p class="note unavailable" role="alert">Another app is using {shortcutLabel(preferences.shortcut)}, so it can’t turn on drawing. Record a different shortcut.</p>{/if}
+          {#if session.unavailableShortcuts.includes('capture')}<p class="note unavailable" role="alert">Another app is using {shortcutLabel(preferences.captureShortcut)}, so it can’t take screenshots. Record a different shortcut.</p>{/if}
         </section>
 
         {#each KEYBINDING_GROUPS as group}

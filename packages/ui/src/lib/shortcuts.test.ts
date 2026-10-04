@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colorShortcut, commandFor, DEFAULT_SHORTCUT, formatShortcut, heldModifiers, KEYBINDINGS, keybinding, keyLabel, matchesShortcut, normalizeShortcut, rebindCommand, rebindToggle, recordShortcut, sameShortcut, shortcutKeys, toolShortcut } from './shortcuts';
+import { colorShortcut, commandFor, DEFAULT_CAPTURE_SHORTCUT, DEFAULT_SHORTCUT, formatShortcut, heldModifiers, KEYBINDINGS, keybinding, keyLabel, matchesShortcut, normalizeShortcut, rebindCommand, rebindGlobal, recordShortcut, sameShortcut, shortcutKeys, toolShortcut } from './shortcuts';
 
 describe('color shortcuts', () => {
   const event = { key: '1', metaKey: false, ctrlKey: false, altKey: false, shiftKey: false };
@@ -155,20 +155,35 @@ describe('keybindings', () => {
 });
 
 describe('rebinding', () => {
-  const current = { shortcut: DEFAULT_SHORTCUT, keybindings: { redo: '' } };
-  it('moves the show/hide shortcut, unbinding the command that used it', () => {
-    expect(rebindToggle(current, 'Shift+CmdOrCtrl+KeyA', true)).toBeUndefined();
-    expect(rebindToggle(current, 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: 'CommandOrControl+KeyZ', keybindings: { redo: '', undo: '' }, moved: ['Undo'] });
+  const current = { shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: { redo: '' } };
+  it('moves a global shortcut, unbinding the command that used it', () => {
+    expect(rebindGlobal(current, 'toggle', 'Shift+CmdOrCtrl+KeyA', true)).toBeUndefined();
+    expect(rebindGlobal(current, 'toggle', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: 'CommandOrControl+KeyZ', captureShortcut: 'Super+Control+Shift+KeyS', keybindings: { redo: '', undo: '' }, moved: ['Undo'] });
+    expect(rebindGlobal(current, 'capture', 'CommandOrControl+KeyS', true)).toEqual({ shortcut: 'CommandOrControl+Shift+A', captureShortcut: 'CommandOrControl+KeyS', keybindings: { redo: '', capture: '' }, moved: ['Take screenshot'] });
     expect(current.keybindings).toEqual({ redo: '' });
+  });
+  it('refuses a shortcut the other global command owns', () => {
+    expect(rebindGlobal(current, 'toggle', 'CommandOrControl+Control+Shift+KeyS', true)).toBe('capture');
+    expect(rebindGlobal(current, 'capture', 'CommandOrControl+Shift+KeyA', true)).toBe('toggle');
+  });
+  it('unbinds the capture shortcut but never the toggle shortcut', () => {
+    expect(rebindGlobal(current, 'capture', '', true)).toEqual({ shortcut: 'CommandOrControl+Shift+A', captureShortcut: '', keybindings: { redo: '' }, moved: [] });
+    expect(rebindGlobal(current, 'toggle', '', true)).toBeUndefined();
+    const unbound = { ...current, captureShortcut: '' };
+    expect(rebindGlobal(unbound, 'capture', '', true)).toBeUndefined();
+    expect(rebindGlobal(unbound, 'toggle', 'Super+Control+Shift+KeyS', true)).toEqual({ shortcut: 'Super+Control+Shift+KeyS', captureShortcut: '', keybindings: { redo: '' }, moved: [] });
   });
   it('moves a command shortcut from the command that used it', () => {
     expect(rebindCommand(current, 'undo', 'CmdOrCtrl+KeyZ', true)).toBeUndefined();
     expect(rebindCommand(current, 'undo', DEFAULT_SHORTCUT, true)).toBe('toggle');
-    expect(rebindCommand(current, 'redo', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, keybindings: { undo: '', redo: 'CommandOrControl+KeyZ' }, moved: ['Undo'] });
+    expect(rebindCommand(current, 'undo', 'CommandOrControl+Control+Shift+KeyS', true)).toBe('capture');
+    expect(rebindCommand(current, 'undo', 'Super+Control+Shift+KeyS', false)).toBe('capture');
+    expect(rebindCommand(current, 'undo', 'CommandOrControl+Shift+KeyS', false)).toEqual({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: { redo: '', undo: 'CommandOrControl+Shift+KeyS' }, moved: [] });
+    expect(rebindCommand(current, 'redo', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: { undo: '', redo: 'CommandOrControl+KeyZ' }, moved: ['Undo'] });
     expect(current.keybindings).toEqual({ redo: '' });
   });
   it('drops a binding equal to the default and unbinds on an empty shortcut', () => {
-    expect(rebindCommand({ ...current, keybindings: { undo: 'Alt+KeyU' } }, 'undo', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, keybindings: {}, moved: [] });
-    expect(rebindCommand(current, 'undo', '', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, keybindings: { redo: '', undo: '' }, moved: [] });
+    expect(rebindCommand({ ...current, keybindings: { undo: 'Alt+KeyU' } }, 'undo', 'CommandOrControl+KeyZ', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: {}, moved: [] });
+    expect(rebindCommand(current, 'undo', '', true)).toEqual({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: { redo: '', undo: '' }, moved: [] });
   });
 });

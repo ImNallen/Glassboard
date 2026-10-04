@@ -3,6 +3,7 @@ import type { ColorMode, Tool } from './drawing';
 import { swatchColor } from './swatches';
 
 export const DEFAULT_SHORTCUT = preferenceDefaults.shortcut;
+export const DEFAULT_CAPTURE_SHORTCUT = preferenceDefaults.captureShortcut;
 type KeyEvent = Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'> & Partial<Pick<KeyboardEvent, 'code'>>;
 export const platformMac = typeof navigator !== 'undefined' && navigator.platform.toLowerCase().includes('mac');
 
@@ -33,7 +34,7 @@ export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMod
   { command: 'color-blue', name: 'Blue', colorMode: 'solid', slot: 5, shortcut: 'Digit8' },
 ];
 
-/** Every in-app binding with its default. The show/hide shortcut is global and lives in `Preferences.shortcut`. */
+/** Every in-app binding with its default. Global shortcuts live in `Preferences.shortcut` and `Preferences.captureShortcut`. */
 export const KEYBINDINGS: readonly { id: string; group: KeybindingGroup; name: string; shortcut: string; description?: string }[] = [
   { id: 'undo', group: 'Drawing', name: 'Undo', shortcut: 'CommandOrControl+KeyZ' },
   { id: 'redo', group: 'Drawing', name: 'Redo', shortcut: 'CommandOrControl+Shift+KeyZ' },
@@ -52,33 +53,49 @@ export function keybinding(keybindings: Keybindings | undefined, id: string): st
 /** The label of the shortcut bound to a command, empty when unbound. */
 export function keyLabel(keybindings: Keybindings | undefined, id: string): string { return shortcutLabel(keybinding(keybindings, id)); }
 
-/** The global show/hide shortcut and the in-app bindings, which must not share a shortcut. */
-export type Bindings = { shortcut: string; keybindings: Keybindings };
+/** Commands on system-wide shortcuts, which work even while Glassboard is hidden. */
+export type GlobalCommand = 'toggle' | 'capture';
+const GLOBAL_FIELDS = { toggle: 'shortcut', capture: 'captureShortcut' } as const;
+/** The global shortcuts and the in-app bindings, which must not share a shortcut. An empty `captureShortcut` is unbound. */
+export type Bindings = { shortcut: string; captureShortcut: string; keybindings: Keybindings };
 /** New bindings, with the names of the commands unbound to make room. */
 export type Rebound = Bindings & { moved: string[] };
 
-function unbind(keybindings: Keybindings, shortcut: string, mac: boolean, except?: string): Omit<Rebound, 'shortcut'> {
+function unbind(keybindings: Keybindings, shortcut: string, mac: boolean, except?: string): Pick<Rebound, 'keybindings' | 'moved'> {
   const taken = KEYBINDINGS.filter(binding => binding.id !== except && sameShortcut(keybinding(keybindings, binding.id), shortcut, mac));
   return { keybindings: { ...keybindings, ...Object.fromEntries(taken.map(binding => [binding.id, ''])) }, moved: taken.map(binding => binding.name) };
 }
 
-/** Bind `next` to show/hide, unbinding any command that uses it. Undefined when nothing changes. */
-export function rebindToggle(current: Bindings, next: string, mac = platformMac): Rebound | undefined {
-  if (sameShortcut(next, current.shortcut, mac)) return;
-  return { shortcut: next, ...unbind(current.keybindings, next, mac) };
+function globalOwner(current: Bindings, shortcut: string, mac: boolean, except?: GlobalCommand): GlobalCommand | undefined {
+  return (['toggle', 'capture'] as const).find(command => command !== except && current[GLOBAL_FIELDS[command]] !== '' && sameShortcut(current[GLOBAL_FIELDS[command]], shortcut, mac));
+}
+
+/**
+ * Bind `next` to a global command, unbinding any in-app command that uses it; an empty `next` unbinds capture.
+ * Undefined when nothing changes, the other global command when it owns `next`.
+ */
+export function rebindGlobal(current: Bindings, command: GlobalCommand, next: string, mac = platformMac): Rebound | GlobalCommand | undefined {
+  const field = GLOBAL_FIELDS[command];
+  if (sameShortcut(next, current[field], mac) || (!next && command === 'toggle')) return;
+  const owner = next ? globalOwner(current, next, mac, command) : undefined;
+  if (owner) return owner;
+  const rebound: Rebound = { shortcut: current.shortcut, captureShortcut: current.captureShortcut, ...(next ? unbind(current.keybindings, next, mac) : { keybindings: { ...current.keybindings }, moved: [] }) };
+  rebound[field] = next;
+  return rebound;
 }
 
 /**
  * Bind `next` to a command, unbinding any other command that uses it; an empty `next` unbinds the command.
- * A binding equal to the default is removed from the map. Undefined when nothing changes, `'toggle'` when show/hide owns `next`.
+ * A binding equal to the default is removed from the map. Undefined when nothing changes, the global command that owns `next` when one does.
  */
-export function rebindCommand(current: Bindings, id: string, next: string, mac = platformMac): Rebound | 'toggle' | undefined {
+export function rebindCommand(current: Bindings, id: string, next: string, mac = platformMac): Rebound | GlobalCommand | undefined {
   if (sameShortcut(next, keybinding(current.keybindings, id), mac)) return;
-  if (next && sameShortcut(next, current.shortcut, mac)) return 'toggle';
+  const owner = next ? globalOwner(current, next, mac) : undefined;
+  if (owner) return owner;
   const { keybindings, moved } = next ? unbind(current.keybindings, next, mac, id) : { keybindings: { ...current.keybindings }, moved: [] };
   if (sameShortcut(next, keybinding(undefined, id), mac)) delete keybindings[id];
   else keybindings[id] = next;
-  return { shortcut: current.shortcut, keybindings, moved };
+  return { shortcut: current.shortcut, captureShortcut: current.captureShortcut, keybindings, moved };
 }
 
 /**

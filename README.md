@@ -56,6 +56,7 @@ On Windows, use **Ctrl** wherever **Cmd** appears.
 | Action | Shortcut |
 | --- | --- |
 | Turn annotation mode on or off (global, configurable) | Cmd+Shift+A |
+| Open the screenshot tool from anywhere (global, configurable) | Cmd+Ctrl+Shift+S (Win+Ctrl+Shift+S on Windows) |
 | Capture a screenshot region | Cmd+S |
 | Copy the capture and close | Cmd+C |
 | Arrow / Pen / Square / Circle | Cmd+1 / 2 / 3 / 4 |

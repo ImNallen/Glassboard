@@ -1,6 +1,6 @@
 use crate::{
     preference_saves::PreferenceSaves,
-    preferences::{Preferences, ToggleShortcut},
+    preferences::{GlobalShortcut, Preferences},
     session::{HistoryAvailability, Mode, Session, Transition, TutorialStep},
     state::{publish, report, snapshot, AppState},
     windows::{
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
 #[cfg(target_os = "windows")]
 use tauri_plugin_autostart::ManagerExt;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_opener::OpenerExt;
 
 pub(crate) const REPOSITORY_URL: &str = "https://github.com/ImNallen/Glassboard";
@@ -37,6 +37,29 @@ pub(crate) enum Action {
     Quit,
     #[serde(untagged)]
     Session(Transition),
+}
+
+/// Commands on system-wide shortcuts, which work even while Glassboard is hidden.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum GlobalCommand {
+    Toggle,
+    Capture,
+}
+impl GlobalCommand {
+    pub(crate) const ALL: [Self; 2] = [Self::Toggle, Self::Capture];
+    pub(crate) fn shortcut(self, preferences: &Preferences) -> Option<&GlobalShortcut> {
+        match self {
+            Self::Toggle => Some(&preferences.shortcut),
+            Self::Capture => preferences.capture_shortcut.get(),
+        }
+    }
+    fn perform(self, app: &tauri::AppHandle) -> Result<()> {
+        match self {
+            Self::Toggle => transition(app, Transition::Toggle),
+            Self::Capture => perform(app, Action::Capture),
+        }
+    }
 }
 
 pub(crate) fn perform(app: &tauri::AppHandle, action: Action) -> Result<()> {
@@ -245,16 +268,34 @@ pub(crate) fn migrate_login_item(app: &tauri::AppHandle) -> Result<()> {
         .migrate()
         .map_err(|e| format!("Could not migrate the login item: {e}").into())
 }
-pub(crate) fn register_toggle(app: &tauri::AppHandle, shortcut: &ToggleShortcut) -> Result<()> {
+fn register(
+    app: &tauri::AppHandle,
+    command: GlobalCommand,
+    shortcut: &GlobalShortcut,
+) -> Result<()> {
     app.global_shortcut()
-        .on_shortcut(shortcut.parsed(), |app, _, event| {
+        .on_shortcut(shortcut.parsed(), move |app, _, event| {
             if event.state() == ShortcutState::Pressed {
-                if let Err(e) = transition(app, Transition::Toggle) {
+                if let Err(e) = command.perform(app) {
                     report(app, e);
                 }
             }
         })
         .map_err(|e| format!("Could not register {}: {e}", shortcut.as_str()).into())
+}
+/// Registers every bound global shortcut and returns the commands whose shortcut failed.
+pub(crate) fn register_global_shortcuts(app: &tauri::AppHandle) -> Vec<GlobalCommand> {
+    let preferences = snapshot(app).preferences;
+    GlobalCommand::ALL
+        .into_iter()
+        .filter(|&command| {
+            command.shortcut(&preferences).is_some_and(|shortcut| {
+                register(app, command, shortcut)
+                    .inspect_err(|error| log::error!("{error}"))
+                    .is_err()
+            })
+        })
+        .collect()
 }
 /// Parsed here rather than by Tauri, which would prefix the messages Settings shows.
 #[tauri::command]
@@ -266,51 +307,104 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
     if preferences == old {
         return Ok(());
     }
-    let parsed = preferences.shortcut.parsed();
-    let old_parsed = old.shortcut.parsed();
-    let changed = parsed != old_parsed;
-    if changed {
-        register_toggle(app, &preferences.shortcut)?;
-    }
+    let parsed = |command: GlobalCommand, preferences| {
+        command.shortcut(preferences).map(GlobalShortcut::parsed)
+    };
+    let changed: Vec<_> = GlobalCommand::ALL
+        .into_iter()
+        .filter(|&command| parsed(command, &preferences) != parsed(command, &old))
+        .collect();
     let saves = app.state::<PreferenceSaves>();
-    if changed {
-        if let Err(e) = saves.save_now(preferences.clone()) {
-            let _ = app.global_shortcut().unregister(parsed);
-            return Err(format!("Could not save preferences: {e}").into());
-        }
-        // A saved shortcut that another app already held at launch was never
-        // registered, and Windows refuses to unregister it. Skip it so the user
-        // can always move to a shortcut that works.
-        let unregistered = if app.global_shortcut().is_registered(old_parsed) {
-            app.global_shortcut().unregister(old_parsed)
-        } else {
-            Ok(())
-        };
-        if let Err(error) = unregistered {
-            let _ = app.global_shortcut().unregister(parsed);
-            if let Err(error) = saves.save_now(old.clone()) {
-                report(app, format!("Could not restore preferences: {error}"));
-            }
-            return Err(error.into());
-        }
+    if !changed.is_empty() {
+        rebind(app, &saves, &changed, &old, &preferences)?;
     }
     let reposition = old.toolbar_position != preferences.toolbar_position;
     {
         let state = app.state::<AppState>();
         let mut state = state.0.lock().unwrap();
         state.preferences = preferences.clone();
-        if changed {
-            // The new shortcut registered above, so the toggle works again.
-            state.shortcut_unavailable = false;
-        }
+        // Each changed command now holds its new shortcut, or none.
+        state
+            .unavailable_shortcuts
+            .retain(|command| !changed.contains(command));
     }
-    if !changed {
+    if changed.is_empty() {
         saves.queue(preferences)?;
     }
     if reposition {
         position_toolbar(app)?;
     }
     publish(app)
+}
+/// Moves each changed command to its new shortcut: registers the new ones, saves, then
+/// unregisters the old ones. Any failure undoes every step taken so far.
+fn rebind(
+    app: &tauri::AppHandle,
+    saves: &PreferenceSaves,
+    changed: &[GlobalCommand],
+    old: &Preferences,
+    new: &Preferences,
+) -> Result<()> {
+    let shortcuts = app.global_shortcut();
+    let taken: Vec<Shortcut> = changed
+        .iter()
+        .filter_map(|command| command.shortcut(new).map(GlobalShortcut::parsed))
+        .collect();
+    let mut registered = Vec::new();
+    let mut unregistered = Vec::new();
+    let mut saved = false;
+    let result = (|| -> Result<()> {
+        // A shortcut moving to another command is already registered here, so free it first.
+        for &command in changed {
+            if let Some(shortcut) = command.shortcut(old) {
+                if taken.contains(&shortcut.parsed()) && shortcuts.is_registered(shortcut.parsed())
+                {
+                    shortcuts.unregister(shortcut.parsed())?;
+                    unregistered.push((command, shortcut));
+                }
+            }
+        }
+        for &command in changed {
+            if let Some(shortcut) = command.shortcut(new) {
+                register(app, command, shortcut)?;
+                registered.push(shortcut.parsed());
+            }
+        }
+        saves
+            .save_now(new.clone())
+            .map_err(|e| format!("Could not save preferences: {e}"))?;
+        saved = true;
+        for &command in changed {
+            let Some(shortcut) = command.shortcut(old) else {
+                continue;
+            };
+            // A saved shortcut that another app already held at launch was never
+            // registered, and Windows refuses to unregister it. Skip it so the user
+            // can always move to a shortcut that works.
+            if taken.contains(&shortcut.parsed()) || !shortcuts.is_registered(shortcut.parsed()) {
+                continue;
+            }
+            shortcuts.unregister(shortcut.parsed())?;
+            unregistered.push((command, shortcut));
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        for shortcut in registered {
+            let _ = shortcuts.unregister(shortcut);
+        }
+        for (command, shortcut) in unregistered {
+            if let Err(error) = register(app, command, shortcut) {
+                report(app, error);
+            }
+        }
+        if saved {
+            if let Err(error) = saves.save_now(old.clone()) {
+                report(app, format!("Could not restore preferences: {error}"));
+            }
+        }
+    }
+    result
 }
 
 #[cfg(test)]
@@ -328,5 +422,12 @@ mod tests {
         );
         assert!(parse("interact").is_err());
         assert_eq!(serde_json::to_value(Action::Clear).unwrap(), "clear");
+    }
+    #[test]
+    fn global_commands_keep_their_wire_names() {
+        assert_eq!(
+            serde_json::to_value(GlobalCommand::ALL).unwrap(),
+            serde_json::json!(["toggle", "capture"])
+        );
     }
 }
