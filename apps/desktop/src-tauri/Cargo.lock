@@ -1698,6 +1698,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-foundation",
+ "plist",
  "serde",
  "serde_json",
  "tauri",
@@ -1708,6 +1709,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
+ "tempfile",
  "windows-sys 0.61.2",
  "xcap",
 ]
