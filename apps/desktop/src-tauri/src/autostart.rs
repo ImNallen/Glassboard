@@ -1,198 +1,185 @@
-use plist::Value;
+use plist::{Dictionary, Value};
 use std::{
     error::Error,
-    fs::File,
+    fs,
     io::{ErrorKind, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
-/// Associates an existing legacy LaunchAgent with its app without enabling it.
-pub(crate) fn associate_plist(path: &Path, bundle_identifier: &str) -> Result<(), Box<dyn Error>> {
-    let mut file = match File::open(path) {
-        Ok(file) => file,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error.into()),
-    };
-    let mut agent = Value::from_reader(&mut file)?;
-    let dictionary = agent
-        .as_dictionary_mut()
-        .ok_or("The login item must contain a plist dictionary")?;
-    let mut identifiers = match dictionary.get("AssociatedBundleIdentifiers") {
-        None => Vec::new(),
-        Some(Value::String(identifier)) => vec![Value::String(identifier.clone())],
-        Some(Value::Array(identifiers))
-            if identifiers.iter().all(|value| value.as_string().is_some()) =>
-        {
-            identifiers.clone()
-        }
-        Some(_) => return Err("The login item's bundle associations must be strings".into()),
-    };
-    if identifiers
-        .iter()
-        .any(|identifier| identifier.as_string() == Some(bundle_identifier))
-    {
-        return Ok(());
-    }
-    identifiers.push(Value::String(bundle_identifier.into()));
-    dictionary.insert(
-        "AssociatedBundleIdentifiers".into(),
-        Value::Array(identifiers),
-    );
+/// The LaunchAgent that opens Glassboard at login. Enabled means its file exists.
+pub(crate) struct LoginItem {
+    pub agent: PathBuf,
+    /// The agent auto-launch wrote under the package name, parented to the developer.
+    pub legacy: PathBuf,
+    pub identifier: String,
+    pub executable: PathBuf,
+}
 
-    let mut bytes = Vec::new();
-    agent.to_writer_xml(&mut bytes)?;
-    let mut replacement = tempfile::NamedTempFile::new_in(
-        path.parent()
-            .ok_or("The login item has no parent directory")?,
-    )?;
-    replacement
-        .as_file()
-        .set_permissions(file.metadata()?.permissions())?;
-    replacement.write_all(&bytes)?;
-    replacement.as_file().sync_all()?;
-    replacement.persist(path)?;
-    Ok(())
+impl LoginItem {
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.agent.exists()
+    }
+
+    pub(crate) fn set_enabled(&self, enabled: bool) -> Result<(), Box<dyn Error>> {
+        if !enabled {
+            return remove(&self.agent);
+        }
+        let directory = self
+            .agent
+            .parent()
+            .ok_or("The login item has no parent directory")?;
+        fs::create_dir_all(directory)?;
+        let mut bytes = Vec::new();
+        Value::Dictionary(self.plist()).to_writer_xml(&mut bytes)?;
+        // Background Task Management reads the developer attribution only when
+        // an agent first appears, so the finished file must arrive in one rename.
+        let mut file = tempfile::NamedTempFile::new_in(directory)?;
+        file.write_all(&bytes)?;
+        file.as_file().sync_all()?;
+        file.persist(&self.agent)?;
+        Ok(())
+    }
+
+    /// Replaces the legacy agent with the identified one. Writes first so a crash
+    /// between the two steps converges on the next launch.
+    pub(crate) fn migrate(&self) -> Result<(), Box<dyn Error>> {
+        if !self.legacy.exists() {
+            return Ok(());
+        }
+        self.set_enabled(true)?;
+        remove(&self.legacy)
+    }
+
+    fn plist(&self) -> Dictionary {
+        let string = |value: &str| Value::String(value.into());
+        let mut plist = Dictionary::new();
+        plist.insert("Label".into(), string(&self.identifier));
+        plist.insert(
+            "ProgramArguments".into(),
+            Value::Array(vec![string(&self.executable.to_string_lossy())]),
+        );
+        plist.insert("RunAtLoad".into(), Value::Boolean(true));
+        plist.insert(
+            "AssociatedBundleIdentifiers".into(),
+            Value::Array(vec![string(&self.identifier)]),
+        );
+        plist
+    }
+}
+
+fn remove(path: &Path) -> Result<(), Box<dyn Error>> {
+    match fs::remove_file(path) {
+        Err(error) if error.kind() != ErrorKind::NotFound => Err(error.into()),
+        _ => Ok(()),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, os::unix::fs::PermissionsExt};
 
-    const BUNDLE_ID: &str = "dev.glassboard.desktop";
-    const LEGACY_AGENT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+    fn item(directory: &Path) -> LoginItem {
+        let agents = directory.join("Library/LaunchAgents");
+        LoginItem {
+            agent: agents.join("dev.glassboard.desktop.plist"),
+            legacy: agents.join("Glassboard.plist"),
+            identifier: "dev.glassboard.desktop".into(),
+            executable: "/Applications/Glassboard.app/Contents/MacOS/glassboard".into(),
+        }
+    }
+
+    fn expected() -> Value {
+        Value::from_reader(std::io::Cursor::new(
+            br#"<?xml version="1.0" encoding="UTF-8"?>
 <plist version="1.0"><dict>
-    <key>Label</key><string>Glassboard</string>
+    <key>Label</key><string>dev.glassboard.desktop</string>
     <key>ProgramArguments</key><array>
-        <string>/Applications/Glassboard &amp; Notes.app/Contents/MacOS/glassboard</string>
-        <string>--value=&lt;hello&gt;</string>
+        <string>/Applications/Glassboard.app/Contents/MacOS/glassboard</string>
     </array>
     <key>RunAtLoad</key><true/>
-    <key>Disabled</key><true/>
-    <key>EnvironmentVariables</key><dict><key>CUSTOM</key><string>keep me</string></dict>
-</dict></plist>"#;
-
-    fn legacy_agent() -> Value {
-        Value::from_reader(std::io::Cursor::new(LEGACY_AGENT)).unwrap()
+    <key>AssociatedBundleIdentifiers</key><array>
+        <string>dev.glassboard.desktop</string>
+    </array>
+</dict></plist>"#,
+        ))
+        .unwrap()
     }
 
     #[test]
-    fn migration_preserves_existing_job_settings_and_permissions() {
-        for binary in [false, true] {
-            let directory = tempfile::tempdir().unwrap();
-            let path = directory.path().join("Glassboard.plist");
-            let mut expected = legacy_agent();
-            if binary {
-                expected.to_file_binary(&path).unwrap();
-            } else {
-                fs::write(&path, LEGACY_AGENT).unwrap();
-            }
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
-
-            associate_plist(&path, BUNDLE_ID).unwrap();
-
-            expected.as_dictionary_mut().unwrap().insert(
-                "AssociatedBundleIdentifiers".into(),
-                Value::Array(vec![Value::String(BUNDLE_ID.into())]),
-            );
-            assert_eq!(Value::from_file(&path).unwrap(), expected);
-            assert_eq!(
-                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
-                0o640
-            );
-        }
-    }
-
-    #[test]
-    fn absent_login_item_stays_disabled_without_creating_directories() {
+    fn enabling_writes_the_identified_agent() {
         let directory = tempfile::tempdir().unwrap();
-        let path = directory.path().join("LaunchAgents/Glassboard.plist");
-        associate_plist(&path, BUNDLE_ID).unwrap();
-        assert!(!path.parent().unwrap().exists());
+        let item = item(directory.path());
+        assert!(!item.is_enabled());
+
+        item.set_enabled(true).unwrap();
+
+        assert!(item.is_enabled());
+        assert_eq!(Value::from_file(&item.agent).unwrap(), expected());
+        let agents = item.agent.parent().unwrap();
+        assert_eq!(fs::read_dir(agents).unwrap().count(), 1);
     }
 
     #[test]
-    fn already_associated_jobs_are_not_rewritten() {
-        use std::os::unix::fs::MetadataExt;
+    fn disabling_removes_the_agent_and_tolerates_absence() {
+        let directory = tempfile::tempdir().unwrap();
+        let item = item(directory.path());
+        item.set_enabled(true).unwrap();
 
-        for association in [
-            Value::String(BUNDLE_ID.into()),
-            Value::Array(vec![
-                Value::String("dev.other.app".into()),
-                Value::String(BUNDLE_ID.into()),
-            ]),
-        ] {
-            let directory = tempfile::tempdir().unwrap();
-            let path = directory.path().join("Glassboard.plist");
-            let mut agent = legacy_agent();
-            agent
-                .as_dictionary_mut()
-                .unwrap()
-                .insert("AssociatedBundleIdentifiers".into(), association);
-            agent.to_file_binary(&path).unwrap();
-            let original = fs::read(&path).unwrap();
-            let inode = fs::metadata(&path).unwrap().ino();
+        item.set_enabled(false).unwrap();
+        assert!(!item.is_enabled());
+        assert!(!item.agent.exists());
 
-            associate_plist(&path, BUNDLE_ID).unwrap();
-            associate_plist(&path, BUNDLE_ID).unwrap();
-
-            assert_eq!(fs::read(&path).unwrap(), original);
-            assert_eq!(fs::metadata(&path).unwrap().ino(), inode);
-        }
+        item.set_enabled(false).unwrap();
+        assert!(!item.is_enabled());
     }
 
     #[test]
-    fn migration_keeps_other_valid_bundle_associations() {
-        for association in [
-            Value::String("dev.other.app".into()),
-            Value::Array(vec![Value::String("dev.other.app".into())]),
-        ] {
-            let directory = tempfile::tempdir().unwrap();
-            let path = directory.path().join("Glassboard.plist");
-            let mut expected = legacy_agent();
-            expected
-                .as_dictionary_mut()
-                .unwrap()
-                .insert("AssociatedBundleIdentifiers".into(), association);
-            expected.to_file_xml(&path).unwrap();
+    fn migrating_replaces_the_legacy_agent() {
+        let directory = tempfile::tempdir().unwrap();
+        let item = item(directory.path());
+        fs::create_dir_all(item.legacy.parent().unwrap()).unwrap();
+        fs::write(
+            &item.legacy,
+            br#"<plist version="1.0"><dict>
+    <key>Label</key><string>Glassboard</string>
+    <key>ProgramArguments</key><array><string>/old/glassboard</string></array>
+    <key>RunAtLoad</key><true/>
+</dict></plist>"#,
+        )
+        .unwrap();
 
-            associate_plist(&path, BUNDLE_ID).unwrap();
+        item.migrate().unwrap();
 
-            expected.as_dictionary_mut().unwrap().insert(
-                "AssociatedBundleIdentifiers".into(),
-                Value::Array(vec![
-                    Value::String("dev.other.app".into()),
-                    Value::String(BUNDLE_ID.into()),
-                ]),
-            );
-            assert_eq!(Value::from_file(&path).unwrap(), expected);
-        }
+        assert!(!item.legacy.exists());
+        assert!(item.is_enabled());
+        assert_eq!(Value::from_file(&item.agent).unwrap(), expected());
     }
 
     #[test]
-    fn malformed_jobs_are_reported_without_modifying_them() {
-        let mut invalid_association = legacy_agent();
-        invalid_association.as_dictionary_mut().unwrap().insert(
-            "AssociatedBundleIdentifiers".into(),
-            Value::Array(vec![Value::Integer(7.into())]),
-        );
-        let mut invalid_bytes = Vec::new();
-        invalid_association
-            .to_writer_xml(&mut invalid_bytes)
-            .unwrap();
-        for bytes in [
-            b"<plist><dict>broken".to_vec(),
-            b"<plist version=\"1.0\"><array/></plist>".to_vec(),
-            invalid_bytes,
-        ] {
-            let directory = tempfile::tempdir().unwrap();
-            let path = directory.path().join("Glassboard.plist");
-            fs::write(&path, &bytes).unwrap();
+    fn migrating_without_a_legacy_agent_creates_nothing() {
+        let directory = tempfile::tempdir().unwrap();
+        let item = item(directory.path());
 
-            assert!(associate_plist(&path, BUNDLE_ID).is_err());
+        item.migrate().unwrap();
 
-            assert_eq!(fs::read(&path).unwrap(), bytes);
-            assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
-        }
+        assert!(!item.is_enabled());
+        assert!(!directory.path().join("Library").exists());
+    }
+
+    #[test]
+    fn migrating_twice_converges() {
+        let directory = tempfile::tempdir().unwrap();
+        let item = item(directory.path());
+        fs::create_dir_all(item.legacy.parent().unwrap()).unwrap();
+        fs::write(&item.legacy, b"<plist version=\"1.0\"><dict/></plist>").unwrap();
+
+        item.migrate().unwrap();
+        let first = fs::read(&item.agent).unwrap();
+        item.migrate().unwrap();
+
+        assert!(!item.legacy.exists());
+        assert_eq!(fs::read(&item.agent).unwrap(), first);
+        let agents = item.agent.parent().unwrap();
+        assert_eq!(fs::read_dir(agents).unwrap().count(), 1);
     }
 }
