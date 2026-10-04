@@ -16,8 +16,8 @@ mod windows;
 
 use capture::{copy_capture, copy_capture_region, get_capture_image};
 use commands::{
-    action, activate_overlay, expand_toolbar, get_autostart, get_session, register_toggle,
-    report_history, set_autostart, set_preferences, transition,
+    action, activate_overlay, expand_toolbar, get_autostart, get_session,
+    register_global_shortcuts, report_history, set_autostart, set_preferences, transition,
 };
 use preference_saves::PreferenceSaves;
 use preferences::Preferences;
@@ -186,14 +186,12 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     windows::create_windows(app)?;
     tray::create_tray(app)?;
     let handle = app.handle();
-    if let Err(error) = register_toggle(handle, &snapshot(handle).preferences.shortcut) {
-        log::error!("{error}");
-        app.state::<AppState>()
-            .0
-            .lock()
-            .unwrap()
-            .shortcut_unavailable = true;
-    }
+    let unavailable = register_global_shortcuts(handle);
+    app.state::<AppState>()
+        .0
+        .lock()
+        .unwrap()
+        .unavailable_shortcuts = unavailable;
     select_cursor_monitor(handle);
     // The app still works with a misplaced window, so these are not fatal.
     problems.extend(position_toolbar(handle).err().map(|e| e.to_string()));
@@ -206,7 +204,9 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     let session = snapshot(handle);
     // The tutorial explains problems itself. Otherwise nothing is on screen
     // at launch, so open Settings to explain them.
-    if (!problems.is_empty() || session.shortcut_unavailable) && session.tutorial.is_none() {
+    if (!problems.is_empty() || !session.unavailable_shortcuts.is_empty())
+        && session.tutorial.is_none()
+    {
         if let Err(error) = transition(handle, Transition::Settings) {
             log::error!("Could not open settings: {error}");
         }

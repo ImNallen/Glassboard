@@ -56,7 +56,7 @@
         <span class="mode">Annotation mode</span>
       {/if}
     </footer>
-    {#if session.shortcutUnavailable}
+    {#if session.unavailableShortcuts.includes('toggle')}
       <p class="error" role="alert">Another app is using <kbd>{shortcut}</kbd>. <button class="link" disabled={busy} onclick={() => run('settings')}>Choose a different shortcut</button></p>
     {/if}
     {#if errors.message}

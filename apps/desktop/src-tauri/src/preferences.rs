@@ -93,14 +93,14 @@ impl TryFrom<BTreeMap<String, String>> for Keybindings {
     }
 }
 
-/// The global show/hide shortcut, saved as the user recorded it.
+/// A system-wide shortcut, saved as the user recorded it.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(try_from = "String", into = "String")]
-pub(crate) struct ToggleShortcut {
+pub(crate) struct GlobalShortcut {
     text: String,
     parsed: Shortcut,
 }
-impl ToggleShortcut {
+impl GlobalShortcut {
     pub(crate) fn as_str(&self) -> &str {
         &self.text
     }
@@ -108,7 +108,7 @@ impl ToggleShortcut {
         self.parsed
     }
 }
-impl TryFrom<String> for ToggleShortcut {
+impl TryFrom<String> for GlobalShortcut {
     type Error = String;
     fn try_from(text: String) -> std::result::Result<Self, Self::Error> {
         let parsed: Shortcut = text.parse().map_err(|e| format!("Invalid shortcut: {e}"))?;
@@ -121,9 +121,33 @@ impl TryFrom<String> for ToggleShortcut {
         Ok(Self { text, parsed })
     }
 }
-impl From<ToggleShortcut> for String {
-    fn from(shortcut: ToggleShortcut) -> Self {
+impl From<GlobalShortcut> for String {
+    fn from(shortcut: GlobalShortcut) -> Self {
         shortcut.text
+    }
+}
+
+/// The global screenshot shortcut; an empty string leaves it unbound.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "String", into = "String")]
+pub(crate) struct CaptureShortcut(Option<GlobalShortcut>);
+impl CaptureShortcut {
+    pub(crate) fn get(&self) -> Option<&GlobalShortcut> {
+        self.0.as_ref()
+    }
+}
+impl TryFrom<String> for CaptureShortcut {
+    type Error = String;
+    fn try_from(text: String) -> std::result::Result<Self, Self::Error> {
+        if text.is_empty() {
+            return Ok(Self(None));
+        }
+        text.try_into().map(|shortcut| Self(Some(shortcut)))
+    }
+}
+impl From<CaptureShortcut> for String {
+    fn from(shortcut: CaptureShortcut) -> Self {
+        shortcut.0.map(String::from).unwrap_or_default()
     }
 }
 
@@ -133,7 +157,9 @@ pub(crate) struct Preferences {
     pub(crate) tool: Tool,
     pub(crate) color: HexColor,
     pub(crate) color_mode: ColorMode,
-    pub(crate) shortcut: ToggleShortcut,
+    /// Toggles drawing. Saved files keep the name from when it was the only global shortcut.
+    pub(crate) shortcut: GlobalShortcut,
+    pub(crate) capture_shortcut: CaptureShortcut,
     pub(crate) keybindings: Keybindings,
     /// The toolbar's solid color swatches, in toolbar order.
     pub(crate) swatches: [HexColor; 6],
@@ -179,7 +205,18 @@ impl Preferences {
         for (field, value) in fields {
             merged[field] = value;
         }
-        serde_json::from_value(merged)
+        let preferences: Self = serde_json::from_value(merged)?;
+        if preferences
+            .capture_shortcut
+            .get()
+            .map(GlobalShortcut::parsed)
+            == Some(preferences.shortcut.parsed())
+        {
+            return Err(serde::de::Error::custom(
+                "Toggling Glassboard and taking a screenshot need different shortcuts.",
+            ));
+        }
+        Ok(preferences)
     }
     /// Loads saved preferences, with a message for the user when any had to be reset.
     pub(crate) fn load(app: &tauri::AppHandle) -> (Self, Option<String>) {
@@ -269,6 +306,16 @@ fn upgrade(saved: &mut Map<String, Value>) {
             *color = upgraded_color(color).into();
         }
     }
+    // Files from before the screenshot shortcut keep a toggle shortcut that took its default.
+    if !saved.contains_key("captureShortcut") {
+        let toggle = saved.get("shortcut").and_then(Value::as_str);
+        let default = Preferences::default().capture_shortcut;
+        if toggle.and_then(|text| text.parse::<Shortcut>().ok())
+            == default.get().map(GlobalShortcut::parsed)
+        {
+            saved.insert("captureShortcut".into(), "".into());
+        }
+    }
 }
 
 /// Rebuilds preferences one saved field at a time, so a single unreadable
@@ -323,8 +370,8 @@ mod tests {
     fn hex(color: &str) -> HexColor {
         HexColor(color.into())
     }
-    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","shortcut":"Alt+Shift+KeyG","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
-    fn shortcut(text: &str) -> ToggleShortcut {
+    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
+    fn shortcut(text: &str) -> GlobalShortcut {
         String::from(text).try_into().unwrap()
     }
     fn with(field: &str, value: Value) -> serde_json::Result<Preferences> {
@@ -455,6 +502,45 @@ mod tests {
                 ..Preferences::default()
             }
         );
+    }
+    #[test]
+    fn the_capture_shortcut_must_differ_from_the_toggle_shortcut() {
+        let parse = |fields: Value| Preferences::parse(fields).map_err(|e| e.to_string());
+        assert_eq!(
+            parse(json!({"shortcut": "Alt+KeyG", "captureShortcut": "Alt+G"})).unwrap_err(),
+            "Toggling Glassboard and taking a screenshot need different shortcuts."
+        );
+        assert_eq!(
+            parse(json!({"shortcut": "Alt+KeyG", "captureShortcut": ""}))
+                .unwrap()
+                .capture_shortcut
+                .get(),
+            None
+        );
+        assert_eq!(
+            parse(json!({"captureShortcut": "Shift+KeyS"})).unwrap_err(),
+            "Include CommandOrControl, Control, Super, or Alt in the shortcut."
+        );
+    }
+    #[test]
+    fn files_from_before_the_capture_shortcut_take_its_default_unless_toggle_holds_it() {
+        let dir = scratch_dir("capture-default");
+        std::fs::create_dir_all(&dir).unwrap();
+        for (toggle, capture) in [
+            ("Alt+KeyG", "Super+Control+Shift+KeyS"),
+            ("Control+Super+Shift+KeyS", ""),
+        ] {
+            std::fs::write(
+                dir.join(FILE_NAME),
+                json!({"version": 1, "tool": "pen", "shortcut": toggle}).to_string(),
+            )
+            .unwrap();
+            let (preferences, warning) = load_from(&dir);
+            assert!(warning.is_none(), "{toggle}");
+            assert_eq!(preferences.shortcut.as_str(), toggle);
+            assert_eq!(String::from(preferences.capture_shortcut), capture);
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
     fn scratch_dir(name: &str) -> std::path::PathBuf {
         let dir = std::env::temp_dir().join(format!(

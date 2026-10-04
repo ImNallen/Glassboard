@@ -265,15 +265,56 @@ it('shows why an install started from the tray failed, but not a background chec
   expect(status()).toBe('');
 });
 
-it('opens on keybindings and explains a toggle shortcut another app holds', async () => {
-  const session = $state<Session>({ ...structuredClone(defaults), shortcutUnavailable: true });
+it('opens on keybindings and explains each global shortcut another app holds', async () => {
+  const session = $state<Session>({ ...structuredClone(defaults), unavailableShortcuts: ['capture'] });
   settings = mount(Settings, { target: document.body, props: { get session() { return session; }, errors: createErrors(() => session) } });
   await tick();
+  const notes = () => [...document.querySelectorAll('.note.unavailable')].map(note => note.textContent);
   expect(document.querySelector('#tab-keybindings')?.getAttribute('aria-selected')).toBe('true');
-  expect(document.querySelector('.note.unavailable')?.textContent).toContain('Another app is using');
-  session.shortcutUnavailable = false;
+  expect(notes()).toEqual(['Another app is using Win+Ctrl+Shift+S, so it can’t take screenshots. Record a different shortcut.']);
+  session.unavailableShortcuts = ['toggle', 'capture'];
   flushSync();
-  expect(document.querySelector('.note.unavailable')).toBeNull();
+  expect(notes()).toEqual([
+    'Another app is using Ctrl+Shift+A, so it can’t turn on drawing. Record a different shortcut.',
+    'Another app is using Win+Ctrl+Shift+S, so it can’t take screenshots. Record a different shortcut.',
+  ]);
+  session.unavailableShortcuts = [];
+  flushSync();
+  expect(notes()).toEqual([]);
+});
+
+it('records, refuses, clears, and resets the global screenshot shortcut', async () => {
+  const session = await setup();
+  const status = () => document.querySelector('.status')?.textContent;
+  expect(row('Take screenshot').getAttribute('aria-label')).toBe('Take screenshot: Win+Ctrl+Shift+S');
+  row('Take screenshot').click();
+  press('A', 'KeyA', { ctrlKey: true, shiftKey: true });
+  await tick();
+  expect(status()).toBe('Ctrl+Shift+A is already used to toggle Glassboard.');
+  expect(session().preferences.captureShortcut).toBe('Super+Control+Shift+KeyS');
+
+  row('Take screenshot').click();
+  press('x', 'KeyX', { ctrlKey: true, altKey: true });
+  await tick();
+  expect(session().preferences.captureShortcut).toBe('CommandOrControl+Alt+KeyX');
+  row('Toggle Glassboard').click();
+  press('x', 'KeyX', { ctrlKey: true, altKey: true });
+  await tick();
+  expect(status()).toBe('Ctrl+Alt+X is already used to take a screenshot.');
+  row('Undo').click();
+  press('x', 'KeyX', { ctrlKey: true, altKey: true });
+  await tick();
+  expect(status()).toBe('Ctrl+Alt+X is already used to take a screenshot.');
+
+  row('Take screenshot').click();
+  press('Backspace', 'Backspace');
+  await tick();
+  expect(session().preferences.captureShortcut).toBe('');
+  expect(row('Take screenshot').getAttribute('aria-label')).toBe('Take screenshot: not set');
+  document.querySelector<HTMLButtonElement>('.reset-all')!.click();
+  await tick();
+  expect(session().preferences.captureShortcut).toBe('Super+Control+Shift+KeyS');
+  expect(document.querySelector<HTMLButtonElement>('.reset-all')!.disabled).toBe(true);
 });
 
 it('dismisses a backend error from the status line', async () => {

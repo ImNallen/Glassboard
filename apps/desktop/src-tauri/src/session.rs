@@ -1,4 +1,5 @@
 use crate::{
+    commands::GlobalCommand,
     preferences::Preferences,
     windows::{geometry::Rect, Surface},
 };
@@ -60,8 +61,8 @@ pub(crate) struct Session {
     pub(crate) history_by_overlay: HashMap<Surface, HistoryAvailability>,
     pub(crate) preferences: Preferences,
     pub(crate) error: Option<String>,
-    /// The toggle shortcut could not be registered, usually because another app holds it.
-    pub(crate) shortcut_unavailable: bool,
+    /// Commands whose shortcut could not be registered, usually because another app holds it.
+    pub(crate) unavailable_shortcuts: Vec<GlobalCommand>,
     pub(crate) capture: Option<CaptureSession>,
 }
 #[derive(Clone)]
@@ -111,7 +112,7 @@ impl Session {
             history_by_overlay: HashMap::new(),
             preferences,
             error: None,
-            shortcut_unavailable: false,
+            unavailable_shortcuts: Vec::new(),
             capture: None,
         }
     }
