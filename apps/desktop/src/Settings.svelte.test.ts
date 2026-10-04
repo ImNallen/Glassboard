@@ -245,7 +245,8 @@ it('checks for updates from the header without a message when nothing is new', a
   const button = () => document.querySelector<HTMLButtonElement>('header button[aria-label="Check for updates"]')!;
   expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
   button().click();
-  await vi.waitFor(() => expect(button().title).toBe('You have the latest version.'));
+  await tick();
+  expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
   expect(document.querySelector('.status')!.textContent).toBe('');
 });
 

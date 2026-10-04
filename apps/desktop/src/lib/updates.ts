@@ -3,16 +3,15 @@ import { listen } from '@tauri-apps/api/event';
 import { action, native } from '@glassboard/ui/session';
 
 export type UpdateStatus =
-  | { state: 'disabled' } | { state: 'idle' } | { state: 'checking' } | { state: 'up-to-date' }
+  | { state: 'disabled' } | { state: 'idle' } | { state: 'checking' }
   | { state: 'downloading'; version: string; percent: number | null } | { state: 'ready'; version: string }
   | { state: 'installing'; version: string } | { state: 'failed'; message: string };
 
-let preview: UpdateStatus = { state: 'idle' };
 const previewWatchers = new Set<(status: UpdateStatus) => void>();
 
 export async function watchUpdates(fn: (status: UpdateStatus) => void): Promise<() => void> {
   if (!native) {
-    previewWatchers.add(fn); fn(preview);
+    previewWatchers.add(fn); fn({ state: 'idle' });
     return () => { previewWatchers.delete(fn); };
   }
   let received = false;
@@ -23,8 +22,7 @@ export async function watchUpdates(fn: (status: UpdateStatus) => void): Promise<
 }
 export async function checkForUpdates() {
   if (native) return action('check-for-updates');
-  preview = { state: 'up-to-date' };
-  previewWatchers.forEach(fn => fn(preview));
+  for (const state of ['checking', 'idle'] as const) previewWatchers.forEach(fn => fn({ state }));
 }
 export const installUpdate = () => action('install-update');
 
@@ -33,7 +31,6 @@ export function updateDetail(status: UpdateStatus) {
     case 'disabled': return 'Updates come with release builds.';
     case 'idle': return 'Glassboard checks GitHub for new versions once a day.';
     case 'checking': return 'Checking…';
-    case 'up-to-date': return 'You have the latest version.';
     case 'downloading': return `Downloading version ${status.version}…${status.percent === null ? '' : ` ${status.percent}%`}`;
     case 'ready': return `Version ${status.version} is ready.`;
     case 'installing': return `Installing version ${status.version}…`;
