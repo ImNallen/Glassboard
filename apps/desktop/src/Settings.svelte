@@ -48,7 +48,7 @@
     const stop = watchUpdates(next => {
       const requested = awaitingOutcome || untrack(() => updateStatus.state) === 'installing';
       updateStatus = next;
-      if (['up-to-date', 'ready', 'failed'].includes(next.state)) awaitingOutcome = false;
+      if (['idle', 'ready', 'failed'].includes(next.state)) awaitingOutcome = false;
       updateFailure = next.state === 'failed' && requested ? next.message : '';
     }).catch(errors.report);
     return () => { stop.then(unlisten => unlisten?.()); };

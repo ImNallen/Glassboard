@@ -27,7 +27,6 @@ pub(crate) enum UpdateStatus {
     Disabled,
     Idle,
     Checking,
-    UpToDate,
     Downloading {
         version: String,
         percent: Option<u8>,
@@ -47,7 +46,6 @@ enum Phase<Verified> {
     Disabled,
     Idle,
     Checking,
-    UpToDate,
     Downloading(String, Option<u8>),
     Ready(String, Verified),
     Installing(String),
@@ -56,7 +54,7 @@ enum Phase<Verified> {
 
 impl<Verified> Phase<Verified> {
     fn begin_check(&mut self) -> bool {
-        let idle = matches!(self, Phase::Idle | Phase::UpToDate | Phase::Failed(_));
+        let idle = matches!(self, Phase::Idle | Phase::Failed(_));
         if idle {
             *self = Phase::Checking;
         }
@@ -64,7 +62,7 @@ impl<Verified> Phase<Verified> {
     }
     fn found(&mut self, version: Option<String>) {
         if matches!(self, Phase::Checking) {
-            *self = version.map_or(Phase::UpToDate, |version| Phase::Downloading(version, None));
+            *self = version.map_or(Phase::Idle, |version| Phase::Downloading(version, None));
         }
     }
     fn progress(&mut self, percent: Option<u8>) {
@@ -102,7 +100,6 @@ impl<Verified> Phase<Verified> {
             Phase::Disabled => UpdateStatus::Disabled,
             Phase::Idle => UpdateStatus::Idle,
             Phase::Checking => UpdateStatus::Checking,
-            Phase::UpToDate => UpdateStatus::UpToDate,
             Phase::Downloading(version, percent) => UpdateStatus::Downloading {
                 version: version.clone(),
                 percent: *percent,
@@ -210,7 +207,14 @@ async fn fetch(app: &AppHandle) -> Result<(), Error> {
         .on_before_exit(move || cleanup.cleanup_before_exit())
         .build()?
         .check()
-        .await?;
+        .await
+        .or_else(|error| match error {
+            // GitHub has no manifest yet, or none for this system: nothing new.
+            Error::ReleaseNotFound | Error::TargetNotFound(_) | Error::TargetsNotFound(_) => {
+                Ok(None)
+            }
+            error => Err(error),
+        })?;
     advance(app, |phase| {
         phase.found(found.as_ref().map(|update| update.version.clone()))
     });
@@ -294,9 +298,6 @@ fn explain(error: &Error) -> String {
         Error::Minisign(_) | Error::Base64(_) | Error::SignatureUtf8(_) => {
             "The update's signature didn't match, so it was discarded."
         }
-        Error::ReleaseNotFound | Error::TargetNotFound(_) | Error::TargetsNotFound(_) => {
-            "No update is available for this system yet."
-        }
         Error::Io(error)
             if matches!(
                 error.kind(),
@@ -322,7 +323,6 @@ mod tests {
             Phase::Disabled,
             Phase::Idle,
             Phase::Checking,
-            Phase::UpToDate,
             Phase::Downloading("0.2.0".into(), Some(40)),
             Phase::Ready("0.2.0".into(), ()),
             Phase::Installing("0.2.0".into()),
@@ -368,14 +368,11 @@ mod tests {
     }
 
     #[test]
-    fn only_idle_up_to_date_and_failed_start_a_check() {
+    fn only_idle_and_failed_start_a_check() {
         for mut phase in every() {
             let before = phase.status();
             let started = phase.begin_check();
-            let idle = matches!(
-                before,
-                UpdateStatus::Idle | UpdateStatus::UpToDate | UpdateStatus::Failed { .. }
-            );
+            let idle = matches!(before, UpdateStatus::Idle | UpdateStatus::Failed { .. });
             assert_eq!(started, idle, "{before:?}");
             assert_eq!(
                 phase.status(),
@@ -388,7 +385,7 @@ mod tests {
     fn a_check_finds_nothing_or_a_version_to_download() {
         assert_eq!(
             changed(table(|phase| phase.found(None))),
-            [(UpdateStatus::Checking, UpdateStatus::UpToDate)]
+            [(UpdateStatus::Checking, UpdateStatus::Idle)]
         );
         assert_eq!(
             changed(table(|phase| phase.found(Some("0.2.0".into())))),
@@ -470,7 +467,7 @@ mod tests {
     fn status_serializes_as_the_settings_contract() {
         let json = |status: UpdateStatus| serde_json::to_string(&status).unwrap();
         assert_eq!(json(ready()), r#"{"state":"ready","version":"0.2.0"}"#);
-        assert_eq!(json(UpdateStatus::UpToDate), r#"{"state":"up-to-date"}"#);
+        assert_eq!(json(UpdateStatus::Idle), r#"{"state":"idle"}"#);
         assert_eq!(
             json(downloading(Some(40))),
             r#"{"state":"downloading","version":"0.2.0","percent":40}"#
