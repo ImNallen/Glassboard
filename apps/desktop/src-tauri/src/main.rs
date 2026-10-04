@@ -42,7 +42,7 @@ fn main() {
         log::error!("{info}\n{}", std::backtrace::Backtrace::force_capture());
         default_hook(info);
     }));
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         // Registered first so a second launch exits before creating windows,
         // a tray icon, or a competing global shortcut.
         .plugin(tauri_plugin_single_instance::init(|app, _, _| {
@@ -59,9 +59,12 @@ fn main() {
                 .build(),
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_opener::init())
-        // Login items use a macOS Launch Agent and the Windows Run registry key.
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_opener::init());
+    // Login items use the Windows Run registry key. On macOS the autostart
+    // module writes a Launch Agent itself, so Login Items credit Glassboard.
+    #[cfg(target_os = "windows")]
+    let builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
+    let app = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         .on_window_event(|window, event| {
             // Native activation (including clicking another display) can raise a
@@ -149,7 +152,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     let mut problems = Vec::new();
     #[cfg(target_os = "macos")]
     problems.extend(
-        commands::associate_login_item(app.handle())
+        commands::migrate_login_item(app.handle())
             .err()
             .map(|e| e.to_string()),
     );
