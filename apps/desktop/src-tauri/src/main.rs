@@ -1,5 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(target_os = "macos")]
+mod autostart;
 mod capture;
 mod commands;
 mod error;
@@ -145,6 +147,12 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     );
     // Problems found while starting are shown together once the windows exist.
     let mut problems = Vec::new();
+    #[cfg(target_os = "macos")]
+    problems.extend(
+        commands::associate_login_item(app.handle())
+            .err()
+            .map(|e| e.to_string()),
+    );
     let (preferences, warning) = Preferences::load(app.handle());
     problems.extend(warning);
     app.manage(AppState(Mutex::new(Session::new(preferences))));

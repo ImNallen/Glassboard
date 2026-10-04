@@ -206,9 +206,24 @@ pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool
         launcher.disable()
     }
     .map_err(|e| format!("Could not change the login item: {e}"))?;
+    #[cfg(target_os = "macos")]
+    if enabled {
+        associate_login_item(&app)?;
+    }
     launcher
         .is_enabled()
         .map_err(|e| format!("Could not read the login item: {e}").into())
+}
+#[cfg(target_os = "macos")]
+pub(crate) fn associate_login_item(app: &tauri::AppHandle) -> Result<()> {
+    // auto-launch's LaunchAgent backend names the plist after the package name.
+    let path = app
+        .path()
+        .home_dir()?
+        .join("Library/LaunchAgents")
+        .join(format!("{}.plist", app.package_info().name));
+    crate::autostart::associate_plist(&path, &app.config().identifier)
+        .map_err(|e| format!("Could not associate the login item with Glassboard: {e}").into())
 }
 pub(crate) fn register_toggle(app: &tauri::AppHandle, shortcut: &ToggleShortcut) -> Result<()> {
     app.global_shortcut()
