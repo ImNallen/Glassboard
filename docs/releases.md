@@ -3,6 +3,20 @@
 The maintainer reviews, commits, and pushes repository changes. Agents leave edits
 in the working tree, as required by [AGENTS.md](../AGENTS.md).
 
+## CI/CD flow
+
+Pull requests and pushes to `main` run **Check**. The active Main ruleset requires
+`web`, `desktop (macos-latest)`, and `desktop (windows-latest)` before merging.
+Those jobs check and test the shared UI, website, and desktop app; run the native
+Rust checks and desktop builds on macOS and Windows; and lint the workflows.
+
+**Release** reruns the same checks at the selected dispatch commit. Only after
+they pass does it align the draft to that commit, build installers, sign updater
+packages, and verify the updater manifest. The maintainer tests the draft
+installers and publishes manually. A published release or a relevant `main`
+push can start **Pages**. Its public-download check stops deployment until the
+published installers are accessible.
+
 ## Keep the updater key
 
 Installed copies of Glassboard check GitHub once a day for a newer release. They
@@ -29,13 +43,29 @@ which turns them on. A local `tauri build` without that file needs no key.
 
 ## Prepare the installers
 
+For a new app version, run `npm run version:bump -- patch`, `minor`, `major`, or
+an exact stable or prerelease version such as `0.2.0-rc.1`. The command updates
+the desktop npm package, its lock entry, and the Rust package and lock versions. Run
+`npm run version:check` to confirm that all four copies agree. Review the changed
+files before committing. Rebuilding the current draft at the same version does
+not need a bump. Keep the website's advertised version on the last public
+release until the final installers are ready.
+
 1. Review and commit the intended desktop release changes, then push them to GitHub.
 2. Run the **Release** workflow from the intended revision.
-3. Wait for both the macOS and Windows jobs to finish successfully. The macOS job
+   Its **Check** job must pass for that exact commit before the workflow changes
+   the draft. The workflow then uses the same SHA for both builds and aligns the
+   draft's source target automatically. Start a new run when changing revisions;
+   rerun the same workflow only to retry that revision. Do not rerun an older
+   revision after starting a newer one for the same version. An existing version tag
+   pointing at another commit or an already published release stops the run.
+3. Wait for the entire workflow to succeed. Check the summary for the expected
+   version tag and full build commit SHA. The macOS job
    must finish notarizing and stapling the DMG, then replace the uploaded draft asset.
    The `updater-manifest` job must also pass. It confirms that the draft's
    `latest.json` names this version and signs an update for Apple silicon, Intel,
-   and Windows. Do not publish a draft that fails it.
+   and Windows, and that the draft still targets the build commit. Do not publish
+   while the workflow is running or publish a draft from a failed run.
 4. Open the draft release and confirm it contains both installers. For v0.1.0, these are:
    - `Glassboard_0.1.0_universal.dmg`
    - `Glassboard_0.1.0_x64-setup.exe`
@@ -107,7 +137,7 @@ stays in CI.
    npm run desktop tauri build -- --config /tmp/gb-test.conf.json
    ```
 
-4. Raise the version in `apps/desktop/package.json` by one patch and build again.
+4. Record the current version, run `npm run version:bump -- patch`, and build again.
    Do not commit the change. Copy the update package and its `.sig` file into
    `/tmp/gb-serve`. On macOS the package is `Glassboard.app.tar.gz`. On Windows it
    is the `-setup.exe`.
@@ -134,7 +164,7 @@ stays in CI.
     Confirm that the new version starts once, keeps the toolbar position, and
     responds to the drawing shortcut. On Windows, confirm that no stale tray icon
     remains.
-11. Revert the version change.
+11. Restore the recorded version with `npm run version:bump -- <previous-version>`.
 
 ## Deploy the website
 
