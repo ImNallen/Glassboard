@@ -7,8 +7,10 @@ in the working tree, as required by [AGENTS.md](../AGENTS.md).
 
 Pull requests and pushes to `main` run **Check**. The active Main ruleset requires
 `web`, `desktop (macos-latest)`, and `desktop (windows-latest)` before merging.
-Those jobs check and test the shared UI, website, and desktop app; run the native
-Rust checks and desktop builds on macOS and Windows; and lint the workflows.
+The workflow also runs `desktop (ubuntu-22.04)` for experimental Linux X11 support.
+Add that job to the repository ruleset before requiring Linux checks for merges.
+Those jobs check and test the shared UI, website, and desktop app, run the native
+Rust checks and desktop builds on all three platforms, and lint the workflows.
 
 **Release** reruns the same checks at the selected dispatch commit. Only after
 they pass does it align the draft to that commit, build installers, sign updater
@@ -19,10 +21,12 @@ published installers are accessible.
 
 ## Keep the updater key
 
-Installed copies of Glassboard check GitHub once a day for a newer release. They
-install an update only if its signature matches the public key in
+Release builds on macOS, Windows, and Linux AppImages check GitHub once a day for a
+newer release. They install an update only if its signature matches the public key in
 [`tauri.conf.json`](../apps/desktop/src-tauri/tauri.conf.json). The first public
 release must include the updater. Copies installed without it never update themselves.
+Linux Debian packages and unpackaged binaries disable automatic updates. Install a
+newer Debian package manually.
 
 The private key is `~/.tauri/glassboard-updater.key`. Its password is in
 `~/.tauri/glassboard-updater.key.password`. Back up both offline. If either is
@@ -54,7 +58,7 @@ release until the final installers are ready.
 1. Review and commit the intended desktop release changes, then push them to GitHub.
 2. Run the **Release** workflow from the intended revision.
    Its **Check** job must pass for that exact commit before the workflow changes
-   the draft. The workflow then uses the same SHA for both builds and aligns the
+   the draft. The workflow then uses the same SHA for all builds and aligns the
    draft's source target automatically. Start a new run when changing revisions;
    rerun the same workflow only to retry that revision. Do not rerun an older
    revision after starting a newer one for the same version. An existing version tag
@@ -64,11 +68,15 @@ release until the final installers are ready.
    must finish notarizing and stapling the DMG, then replace the uploaded draft asset.
    The `updater-manifest` job must also pass. It confirms that the draft's
    `latest.json` names this version and signs an update for Apple silicon, Intel,
-   and Windows, and that the draft still targets the build commit. Do not publish
+   Windows, and Linux x86_64, and that the draft still targets the build commit. Do not publish
    while the workflow is running or publish a draft from a failed run.
-4. Open the draft release and confirm it contains both installers. For v0.1.0, these are:
-   - `Glassboard_0.1.0_universal.dmg`
-   - `Glassboard_0.1.0_x64-setup.exe`
+4. Open the draft release and confirm it contains every installer. For v0.1.1, these are:
+   - `Glassboard_0.1.1_universal.dmg`
+   - `Glassboard_0.1.1_x64-setup.exe`
+   - `Glassboard_0.1.1_amd64.AppImage`
+   - `Glassboard_0.1.1_amd64.deb`
+   The signed updater manifest must contain `linux-x86_64` alongside both macOS
+   architectures and Windows. The AppImage and its `.sig` supply the Linux update.
 5. Download the final draft installers and complete the packaged checks below.
 6. Add release notes, then publish the complete draft.
 
@@ -94,14 +102,40 @@ have performed it and record the OS version and architecture alongside the resul
 - [ ] macOS minimum target: verify launch, drawing, capture, and clipboard on macOS 12 before advertising that minimum as supported.
 - [ ] macOS: verify the final DMG with `xcrun stapler validate` and Gatekeeper.
 - [ ] Windows x64: run setup, record any unsigned-publisher or SmartScreen prompt, and launch the installed app.
-- [ ] Both platforms: finish the tutorial and toggle drawing with Cmd+Shift+A or Ctrl+Shift+A.
-- [ ] Both platforms: draw, undo, clear, and return to the underlying app.
-- [ ] Both platforms: capture a region, annotate it, copy it, and paste it into another app.
+- [ ] All supported platforms: finish the tutorial and toggle drawing with Cmd+Shift+A or Ctrl+Shift+A.
+- [ ] All supported platforms: draw, undo, clear, and return to the underlying app.
+- [ ] All supported platforms: capture a region, annotate it, copy it, and paste it into another app.
 - [ ] macOS: test the Screen Recording permission prompt, denial, and recovery.
-- [ ] Both platforms: open settings and quit from the menu bar or system tray.
-- [ ] Both platforms: test multiple displays and different display scales. Record remaining limitations in the release notes.
-- [ ] Both platforms: before the first public release, complete the updater rehearsal below.
-- [ ] Both platforms: after each later release, update the previous public release from Settings and confirm the new version starts.
+- [ ] All supported platforms: open settings and quit from the menu bar or system tray.
+- [ ] All supported platforms: test multiple displays and different display scales. Record remaining limitations in the release notes.
+- [ ] macOS, Windows, and Linux AppImage: complete the updater rehearsal below before advertising automatic updates.
+- [ ] macOS, Windows, and Linux AppImage: after each later release, update the previous public release from Settings and confirm the new version starts.
+
+## Check the Linux preview
+
+Linux support in 0.1.1 is experimental and requires an X11 desktop session, a
+compositor, and a system tray host. Wayland sessions, including XWayland, must show
+an explanation before Glassboard creates windows. CI builds on Ubuntu 22.04
+x86_64. Run `bash scripts/linux/verify.sh` for Debian Docker checks on the host's
+native CPU architecture. A virtual X11 desktop checks application behavior but does not
+cover real GPUs, physical monitors, or every Linux desktop.
+
+- [ ] Linux x86_64: make the final AppImage executable, launch it on X11, and finish the tutorial.
+- [ ] Linux x86_64: install the Debian package with `sudo apt install ./Glassboard_0.1.1_amd64.deb` and launch it.
+- [ ] Linux: toggle autostart, confirm the desktop autostart entry, and test a new login.
+- [ ] Linux: open Settings from the tray menu before and after an update becomes ready.
+- [ ] Linux: repeatedly activate the drawing overlay and confirm that visible controls remain above it without moving or taking keyboard focus.
+- [ ] Linux: capture the screen and confirm that Glassboard windows and drawings do not appear in the screenshot.
+- [ ] Linux: copy a region and a full annotated capture. Paste each in another application after the capture editor closes. Repeat the capture and copy.
+- [ ] Linux: test X11 at normal, double, and fractional display scales. Record physical multi-display coverage separately.
+- [ ] Linux: launch in a Wayland login with and without an XWayland display. Confirm the explanation and nonzero exit.
+- [ ] Linux: launch without a display and confirm the explanation on stderr.
+
+Keep Glassboard running until the copied image is pasted. X11 clipboard ownership
+ends when the application exits. AppImage automatic updates require the AppImage
+to remain writable. Debian package users install new packages manually.
+The current autostart dependency uses `~/.config/autostart` regardless of
+`XDG_CONFIG_HOME`. Test login execution separately for custom configuration paths.
 
 ## Rehearse an update
 
@@ -130,7 +164,7 @@ stays in CI.
    }
    ```
 
-3. Build the current version and install it into Applications, or run its setup on Windows:
+3. Build the current version. Install it into Applications on macOS, run its setup on Windows, or launch its AppImage on Linux X11:
 
    ```sh
    export TAURI_SIGNING_PRIVATE_KEY=/tmp/gb-test.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD=test
@@ -140,9 +174,9 @@ stays in CI.
 4. Record the current version, run `npm run version:bump -- patch`, and build again.
    Do not commit the change. Copy the update package and its `.sig` file into
    `/tmp/gb-serve`. On macOS the package is `Glassboard.app.tar.gz`. On Windows it
-   is the `-setup.exe`.
+   is the `-setup.exe`. On Linux it is the `.AppImage`.
 5. Write `/tmp/gb-serve/latest.json` with the new version and one platform entry,
-   such as `darwin-aarch64` or `windows-x86_64`. Its `url` points at the served
+   such as `darwin-aarch64`, `windows-x86_64`, or `linux-x86_64`. Its `url` points at the served
    package, and its `signature` is the contents of the `.sig` file. Then serve it:
 
    ```sh
@@ -173,8 +207,10 @@ The website advertises the version in
 record on the last public release while the next desktop version is in development.
 Changing the desktop package version does not change website downloads.
 
-1. Update the advertised version and exact asset filenames only when both final
-   installers are ready. Have the maintainer review, commit, and push the website changes.
+1. Update the advertised version and exact asset filenames only when all final
+   installers are ready. Linux uses an optional `linux` asset ending in `.AppImage`.
+   Add it only after publishing that installer. Older releases keep only their
+   macOS and Windows assets. Have the maintainer review, commit, and push the website changes.
 2. Publish the complete draft before deployment. A push before publication can run
    the Pages workflow, but its public-download check must fail and stop deployment.
 3. From the repository root, run the public check:
@@ -183,7 +219,7 @@ Changing the desktop package version does not change website downloads.
    npm run web verify:downloads
    ```
 
-   The command requests release metadata and both installer URLs without credentials.
+   The command requests release metadata and every advertised installer URL without credentials.
    It rejects a draft, a wrong tag, a missing or incomplete asset, or an inaccessible
    download. A GitHub API outage or rate limit also stops deployment. Retry after the
    cause is resolved rather than bypassing the check.
@@ -194,8 +230,8 @@ Changing the desktop package version does not change website downloads.
    stale website code. The workflow installs dependencies from the workspace root,
    checks and tests the UI and website, builds the website, verifies public downloads,
    and uploads `apps/web/dist` for deployment.
-6. Open the deployed URL. Check both download links, `/install/`, icons, and release
-   notes. Test a narrow screen and disable JavaScript to confirm both downloads remain
+6. Open the deployed URL. Check every download link, `/install/`, icons, and release
+   notes. Test a narrow screen and disable JavaScript to confirm all downloads remain
    available. With JavaScript enabled, test the browser drawing demo.
 
 Local website builds do not fetch GitHub release metadata. Use `npm run web build`
