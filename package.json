@@ -11,7 +11,10 @@
     "desktop": "npm --workspace apps/desktop run --",
     "web": "npm --workspace apps/web run --",
     "check": "npm run check --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test:release && npm run test --workspaces --if-present",
+    "test:release": "node --test scripts/bump-version.test.mjs",
+    "version:bump": "node scripts/bump-version.mjs",
+    "version:check": "node scripts/bump-version.mjs --check",
     "build": "npm run build --workspaces --if-present",
     "ui": "npm --workspace packages/ui run --"
   },

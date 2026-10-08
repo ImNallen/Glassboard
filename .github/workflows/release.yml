@@ -1,7 +1,83 @@
 name: Release
 on: workflow_dispatch
+concurrency:
+  group: release
+  cancel-in-progress: false
+permissions:
+  contents: read
 jobs:
+  check:
+    uses: ./.github/workflows/check.yml
+    permissions:
+      contents: read
+  prepare:
+    needs: check
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version=$(jq -er '.version | strings' apps/desktop/package.json)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]] || { echo "Invalid desktop version: $version" >&2; exit 1; }
+          tag="v$version"
+          sha="$GITHUB_SHA"
+          repo="$GITHUB_REPOSITORY"
+
+          releases=$(gh api --paginate "repos/$repo/releases?per_page=100" | jq -s -c --arg tag "$tag" '
+            if length > 0 and all(.[]; type == "array") and
+              all(.[][]; type == "object" and (.tag_name | type == "string") and (.draft | type == "boolean"))
+            then [.[][] | select(.tag_name == $tag)] |
+              if length <= 1 then . else error("duplicate releases") end
+            else error("invalid release inventory") end')
+          if [[ $(jq 'length' <<< "$releases") == 1 ]]; then
+            jq -e '.[0].draft == true' <<< "$releases" >/dev/null || { echo "Release $tag is already published" >&2; exit 1; }
+          fi
+
+          refs=$(gh api --paginate "repos/$repo/git/matching-refs/tags/$tag?per_page=100" | jq -s -c --arg ref "refs/tags/$tag" '
+            if length > 0 and all(.[]; type == "array") and
+              all(.[][]; type == "object" and (.ref | type == "string") and (.object | type == "object"))
+            then [.[][] | select(.ref == $ref)] |
+              if length <= 1 then . else error("duplicate tag refs") end
+            else error("invalid tag ref inventory") end')
+          if [[ $(jq 'length' <<< "$refs") == 1 ]]; then
+            object=$(jq -c '.[0].object | select(.type == "commit" or .type == "tag") | select(.sha | type == "string" and test("^[0-9a-f]{40}$"))' <<< "$refs")
+            [[ -n "$object" ]] || { echo "Invalid tag ref for $tag" >&2; exit 1; }
+            while :; do
+              type=$(jq -r .type <<< "$object")
+              object_sha=$(jq -r .sha <<< "$object")
+              [[ "$type" == tag ]] || break
+              object=$(gh api "repos/$repo/git/tags/$object_sha" | jq -c '.object | select(.type == "commit" or .type == "tag") | select(.sha | type == "string" and test("^[0-9a-f]{40}$"))')
+              [[ -n "$object" ]] || { echo "Invalid annotated tag $tag" >&2; exit 1; }
+            done
+            [[ $(jq -r .type <<< "$object") == commit ]] || { echo "Tag $tag did not resolve to a commit" >&2; exit 1; }
+            [[ $(jq -r .sha <<< "$object") == "$sha" ]] || { echo "Tag $tag points to another commit" >&2; exit 1; }
+          fi
+
+          if [[ $(jq 'length' <<< "$releases") == 0 ]]; then
+            gh release create "$tag" --title "Glassboard $tag" --notes '' --draft --target "$sha"
+          else
+            gh release edit "$tag" --target "$sha" --draft
+          fi
+          gh release view "$tag" --json tagName,isDraft,targetCommitish --jq '.' |
+            jq -e --arg tag "$tag" --arg sha "$sha" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' >/dev/null
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "sha=$sha"
+          } >> "$GITHUB_OUTPUT"
   desktop:
+    needs: prepare
     permissions:
       contents: write
     strategy:
@@ -15,6 +91,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -26,6 +104,16 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
       - run: npm ci
+      - name: Check draft source before uploading assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          BUILD_SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" --json tagName,isDraft,targetCommitish --jq '.' |
+            jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' >/dev/null
       - uses: tauri-apps/tauri-action@v1
         id: tauri
         env:
@@ -51,23 +139,39 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           ARTIFACT_PATHS: ${{ steps.tauri.outputs.artifactPaths }}
-          TAG: v${{ steps.tauri.outputs.appVersion }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          BUILD_SHA: ${{ needs.prepare.outputs.sha }}
         run: |
+          set -euo pipefail
           dmg=$(jq -er '.[] | select(endswith(".dmg"))' <<< "$ARTIFACT_PATHS")
           xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" --wait
           xcrun stapler staple "$dmg"
+          gh release view "$TAG" --json tagName,isDraft,targetCommitish --jq '.' |
+            jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' >/dev/null
           gh release upload "$TAG" "$dmg" --clobber
   # Both platforms write latest.json on the draft, and a lost write would strand one of them.
   updater-manifest:
-    needs: desktop
+    needs: [prepare, desktop]
     permissions:
-      contents: write
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_SHA: ${{ needs.prepare.outputs.sha }}
         run: |
-          version=$(jq -er .version apps/desktop/package.json)
-          gh release download "v$version" --pattern latest.json
-          jq -e --arg v "$version" '.version == $v and ([.platforms["darwin-aarch64"], .platforms["darwin-x86_64"], .platforms["windows-x86_64"]] | all(.url != null and (.signature // "") != ""))' latest.json
+          set -euo pipefail
+          gh release download "$TAG" --pattern latest.json
+          jq -e --arg v "$VERSION" '.version == $v and ([.platforms["darwin-aarch64"], .platforms["darwin-x86_64"], .platforms["windows-x86_64"]] | all(.url != null and (.signature // "") != ""))' latest.json
+          release=$(gh release view "$TAG" --json tagName,isDraft,targetCommitish,url)
+          jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' <<< "$release" >/dev/null
+          url=$(jq -er .url <<< "$release")
+          {
+            echo "Draft release: [$TAG]($url)"
+            echo "Build commit: \`$BUILD_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
