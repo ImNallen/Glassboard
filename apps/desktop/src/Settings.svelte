@@ -179,7 +179,7 @@
           <h2 id="startup-title">Startup</h2>
           <div class="list">
             <div class="row">
-              <span class="row-label" id="autostart-label">{platformMac ? 'Open at login' : 'Start with Windows'}<small>Glassboard waits in the {platformMac ? 'menu bar' : 'tray'} until you need it</small></span>
+              <span class="row-label" id="autostart-label">Open at login<small>Glassboard waits in the {platformMac ? 'menu bar' : 'tray'} until you need it</small></span>
               <button class="switch" role="switch" aria-checked={autostart === true} aria-labelledby="autostart-label"
                 disabled={autostart === null || switchingAutostart} onclick={toggleAutostart}><span></span></button>
             </div>

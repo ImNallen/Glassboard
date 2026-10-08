@@ -1,6 +1,8 @@
 use super::Surface;
 use crate::state::report;
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
+#[cfg(target_os = "windows")]
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
 };
@@ -18,9 +20,7 @@ pub(super) fn raise_controls(app: &tauri::AppHandle) {
                 if !window.is_visible()? {
                     return Ok(());
                 }
-                let hwnd = window.hwnd()?;
-                // SAFETY: Tauri owns this live HWND and we are on its window thread.
-                Ok(unsafe { raise_without_activation(hwnd.0) }?)
+                raise_window(&window)
             })();
             if let Err(error) = result {
                 report(
@@ -37,7 +37,55 @@ pub(super) fn raise_controls(app: &tauri::AppHandle) {
     }
 }
 
+#[cfg(target_os = "linux")]
+fn raise_window(window: &tauri::WebviewWindow) -> crate::Result<()> {
+    use gtk::prelude::*;
+    use tauri::Manager;
+    let app = window.app_handle();
+    let native_window = window.gtk_window()?;
+    let native = native_window
+        .window()
+        .ok_or("The control window is unavailable")?;
+    let below = [
+        Surface::Settings,
+        Surface::Tutorial,
+        Surface::Toolbar,
+        crate::state::snapshot(app).active_overlay,
+    ];
+    for surface in below
+        .into_iter()
+        .skip_while(|surface| surface.label() != window.label())
+        .skip(1)
+    {
+        let Some(sibling) = surface.window(app) else {
+            continue;
+        };
+        if sibling.is_visible()? {
+            let sibling_window = sibling.gtk_window()?;
+            let sibling = sibling_window
+                .window()
+                .ok_or("The sibling window is unavailable")?;
+            // Transients inherit the focused full-screen overlay's WM stacking layer.
+            native_window.set_transient_for(Some(&sibling_window));
+            // An explicit sibling asks the WM to restack reparented client windows.
+            native.restack(Some(&sibling), true);
+            return Ok(());
+        }
+    }
+    native_window.set_transient_for(gtk::Window::NONE);
+    native.raise();
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn raise_window(window: &tauri::WebviewWindow) -> crate::Result<()> {
+    let hwnd = window.hwnd()?;
+    // SAFETY: Tauri owns this live HWND and this runs on its window thread.
+    Ok(unsafe { raise_without_activation(hwnd.0) }?)
+}
+
 /// `hwnd` must be live and belong to the calling thread.
+#[cfg(target_os = "windows")]
 unsafe fn raise_without_activation(hwnd: HWND) -> std::io::Result<()> {
     // Repeating set_always_on_top(true) is a no-op in Tao when the flag is
     // already set. SetWindowPos must run each time an overlay is raised.
@@ -59,7 +107,7 @@ unsafe fn raise_without_activation(hwnd: HWND) -> std::io::Result<()> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "windows"))]
 mod tests {
     use super::*;
     use std::ptr::null_mut;

@@ -126,6 +126,8 @@ pub(crate) struct Updates(Mutex<Phase<VerifiedDownload>>);
 
 pub(crate) fn start(app: &tauri::App) {
     let signed_release = !cfg!(debug_assertions);
+    #[cfg(target_os = "linux")]
+    let signed_release = signed_release && app.env().appimage.is_some();
     app.manage(Updates(Mutex::new(if signed_release {
         Phase::Idle
     } else {

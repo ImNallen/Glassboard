@@ -28,7 +28,7 @@ export const installUpdate = () => action('install-update');
 
 export function updateDetail(status: UpdateStatus) {
   switch (status.state) {
-    case 'disabled': return 'Updates come with release builds.';
+    case 'disabled': return 'Automatic updates are unavailable in this build.';
     case 'idle': return 'Glassboard checks GitHub for new versions once a day.';
     case 'checking': return 'Checking…';
     case 'downloading': return `Downloading version ${status.version}…${status.percent === null ? '' : ` ${status.percent}%`}`;

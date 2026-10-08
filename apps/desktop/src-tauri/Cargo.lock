@@ -1688,9 +1688,10 @@ dependencies = [
 
 [[package]]
 name = "glassboard"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arboard",
+ "gtk",
  "image",
  "log",
  "objc2",

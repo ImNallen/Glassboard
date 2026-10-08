@@ -9,7 +9,10 @@ const base = import.meta.env.BASE_URL;
 const repo = 'https://github.com/ImNallen/Glassboard';
 const macos = release.downloads[0];
 const windows = release.downloads[1];
-const description = 'Install Glassboard on macOS or Windows, then start drawing over your screen.';
+const linux = release.downloads.find(download => download.platform === 'linux');
+const description = linux
+  ? 'Install Glassboard on macOS, Windows, or an experimental Linux X11 desktop, then start drawing over your screen.'
+  : 'Install Glassboard on macOS or Windows, then start drawing over your screen.';
 ---
 
 <html lang="en">
@@ -66,13 +69,25 @@ const description = 'Install Glassboard on macOS or Windows, then start drawing 
           <p class="note">The Windows installer is currently unsigned. Windows may show an “Unknown publisher” or SmartScreen warning. Check that you downloaded it from the Glassboard GitHub release linked here. If your device blocks installation, follow your organization's policy or contact your administrator.</p>
           <p class="note">Windows support and mixed-DPI displays still need more testing. <a href={`${repo}/issues`}>Report an issue</a> if something does not work.</p>
         </section>
+        {linux && <section aria-labelledby="linux">
+          <h2 id="linux">Install on Linux</h2>
+          <a class="button primary" href={linux.url}>Download for Linux <span aria-hidden="true">↓</span></a>
+          <p class="release-detail">Experimental X11 support · 64-bit Intel and AMD · .AppImage</p>
+          <ol>
+            <li>Sign in to an X11 or Xorg desktop session.</li>
+            <li>Make the downloaded AppImage executable in your file manager's permissions, then open it.</li>
+            <li>Follow the tutorial. Open Settings from the system tray menu.</li>
+          </ol>
+          <p class="note">Linux support is experimental and requires a compositor and a system tray host. Wayland and XWayland sessions are not supported. Keep Glassboard running until you paste a copied capture.</p>
+          <p class="note">The AppImage supports automatic updates. Debian package users install a newer package from the <a href={release.notesUrl}>GitHub release</a>.</p>
+        </section>}
       </div>
       <section class="first-drawing" aria-labelledby="first-drawing">
         <h2 id="first-drawing">Your first drawing</h2>
-        <p>Press <kbd>Cmd+Shift+A</kbd> on macOS or <kbd>Ctrl+Shift+A</kbd> on Windows to draw over your screen. Press the shortcut again to clear your drawings and get back to work.</p>
-        <p>Press <kbd>Cmd+Ctrl+Shift+S</kbd> on macOS or <kbd>Win+Ctrl+Shift+S</kbd> on Windows to open the screenshot tool directly, even when Glassboard is hidden.</p>
+        <p>Press <kbd>Cmd+Shift+A</kbd> on macOS or <kbd>Ctrl+Shift+A</kbd> on {linux ? 'Windows or Linux' : 'Windows'} to draw over your screen. Press the shortcut again to clear your drawings and get back to work.</p>
+        <p>Press <kbd>Cmd+Ctrl+Shift+S</kbd> on macOS or <kbd>Win+Ctrl+Shift+S</kbd> on Windows{linux && <> or <kbd>Super+Ctrl+Shift+S</kbd> on Linux</>} to open the screenshot tool directly, even when Glassboard is hidden.</p>
         <p>While drawing, press <kbd>Cmd+S</kbd> or <kbd>Ctrl+S</kbd> to capture a region. Annotate it, then press <kbd>Cmd+C</kbd> or <kbd>Ctrl+C</kbd> to copy it. Press <kbd>Esc</kbd> to cancel.</p>
-        <p>Open settings from the menu bar or system tray icon to change the global shortcuts.</p>
+        <p>Open settings from the menu bar or system tray {linux ? 'menu' : 'icon'} to change the global shortcuts.</p>
         <p class="note"><a href={release.notesUrl}>Release notes</a> · <a href={`${repo}#shortcuts`}>All shortcuts</a> · <a href={`${repo}#build-from-source`}>Build from source</a></p>
       </section>
     </main>
