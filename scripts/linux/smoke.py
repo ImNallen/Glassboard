@@ -223,6 +223,8 @@ def drawing():
         require(changed_pixels(reference.convert("RGB").crop(mark_box), baseline) < 20, "Empty overlays hid or changed the independent application")
     before = fixture_clicks()
     drag(mark_box[0] + 20 * scale, mark_box[1] + 30 * scale, mark_box[2] - 20 * scale, mark_box[3] - 30 * scale)
+    wait_for(lambda: changed_pixels(baseline, screenshot("drawing-mark").crop(mark_box)) > 40,
+             "Native pointer drawing did not render")
     painted = screenshot("drawing-mark").crop(mark_box)
     delta = changed_pixels(baseline, painted)
     require(delta > 40, f"Native pointer drawing changed only {delta} pixels")
@@ -232,6 +234,8 @@ def drawing():
 
 def undo(baseline):
     key("ctrl+z")
+    wait_for(lambda: changed_pixels(baseline, screenshot("drawing-undo").crop(mark_box)) < 20,
+             "Undo did not restore the fixture region")
     delta = changed_pixels(baseline, screenshot("drawing-undo").crop(mark_box))
     require(delta < 20, f"Undo left {delta} drawing pixels")
     return f"Undo restored the fixture region with {delta} changed pixels."
@@ -239,6 +243,8 @@ def undo(baseline):
 
 def clear(baseline):
     drag(mark_box[0] + 20 * scale, mark_box[1] + 30 * scale, mark_box[2] - 20 * scale, mark_box[3] - 30 * scale)
+    wait_for(lambda: changed_pixels(baseline, screenshot("drawing-before-clear").crop(mark_box)) > 40,
+             "Second mark did not render")
     require(changed_pixels(baseline, screenshot("drawing-before-clear").crop(mark_box)) > 40, "Second mark did not render")
     toolbar = wait_for(lambda: window("Glassboard"), "Toolbar did not appear")
     x, y, width, height = geometry(toolbar)
@@ -249,6 +255,8 @@ def clear(baseline):
     click_control("Clear this display")
     command("xdotool", "mousemove", 20, 100)
     time.sleep(0.5)
+    wait_for(lambda: changed_pixels(baseline, screenshot("drawing-clear").crop(mark_box)) < 20,
+             "Clear did not restore the fixture region")
     delta = changed_pixels(baseline, screenshot("drawing-clear").crop(mark_box))
     require(delta < 20, f"Clear left {delta} drawing pixels")
     return "Clear removed the second native pointer mark."

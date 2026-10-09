@@ -7,7 +7,7 @@ in the working tree, as required by [AGENTS.md](../AGENTS.md).
 
 Pull requests and pushes to `main` run **Check**. The active Main ruleset requires
 `web`, `desktop (macos-latest)`, and `desktop (windows-latest)` before merging.
-The workflow also runs `desktop (ubuntu-22.04)` for experimental Linux X11 support.
+The workflow also runs `desktop (ubuntu-24.04)` for experimental Linux X11 support.
 Add that job to the repository ruleset before requiring Linux checks for merges.
 Those jobs check and test the shared UI, website, and desktop app, run the native
 Rust checks and desktop builds on all three platforms, and lint the workflows.
@@ -115,10 +115,14 @@ have performed it and record the OS version and architecture alongside the resul
 
 Linux support in 0.1.1 is experimental and requires an X11 desktop session, a
 compositor, and a system tray host. Wayland sessions, including XWayland, must show
-an explanation before Glassboard creates windows. CI builds on Ubuntu 22.04
-x86_64. Run `bash scripts/linux/verify.sh` for Debian Docker checks on the host's
-native CPU architecture. A virtual X11 desktop checks application behavior but does not
-cover real GPUs, physical monitors, or every Linux desktop.
+an explanation before Glassboard creates windows. CI checks and release packages
+build on Ubuntu 24.04 x86_64 because the locked Rust dependencies require
+PipeWire 0.3.65 or newer. Ubuntu 22.04's stock PipeWire is too old. This changes
+the build baseline for the unpublished Linux preview. Compatibility of the release
+binaries with older distributions is unverified, even where source builds work.
+Run `bash scripts/linux/verify.sh` for Ubuntu 24.04 Docker checks on the host's
+native CPU architecture. A virtual X11 desktop checks application behavior but
+does not cover real GPUs, physical monitors, or every Linux desktop.
 
 - [ ] Linux x86_64: make the final AppImage executable, launch it on X11, and finish the tutorial.
 - [ ] Linux x86_64: install the Debian package with `sudo apt install ./Glassboard_0.1.1_amd64.deb` and launch it.

@@ -23,7 +23,7 @@ docker run --rm --name "$name" "${options[@]+"${options[@]}"}" --shm-size=1g \
     --mount "type=bind,source=$evidence,target=/evidence" \
     --mount "type=volume,source=glassboard-linux-cargo-registry,target=/usr/local/cargo/registry" \
     --mount "type=volume,source=glassboard-linux-cargo-git,target=/usr/local/cargo/git" \
-    --mount "type=volume,source=glassboard-linux-target-$architecture,target=/target" \
+    --mount "type=volume,source=glassboard-linux-target-ubuntu24-$architecture,target=/target" \
     --mount "type=volume,source=glassboard-linux-npm,target=/root/.npm" \
     -e "GLASSBOARD_LINUX_DPI=${GLASSBOARD_LINUX_DPI:-96 192}" \
     "$image" bash -c '

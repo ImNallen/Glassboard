@@ -1,0 +1,18 @@
+xfce4-panel: Failed to connect to session manager: Failed to connect to the session manager: SESSION_MANAGER environment variable not defined
+xfce4-panel-Message: 21:33:57.568: Plugin "(null)-7" was not found and has been removed from the configuration
+xfce4-panel-Message: 21:33:57.569: Plugin "pulseaudio-8" was not found and has been removed from the configuration
+xfce4-panel-Message: 21:33:57.569: Plugin "power-manager-plugin-9" was not found and has been removed from the configuration
+xfce4-panel-Message: 21:33:57.569: Plugin "notification-plugin-10" was not found and has been removed from the configuration
+libclock-Message: 21:33:57.580: could not get proxy for org.freedesktop.login1
+
+(xfce4-panel:2059): libclock-WARNING **: 21:33:57.580: could not instantiate a sleep monitor
+
+(wrapper-2.0:2105): libactions-WARNING **: 21:33:57.736: Calling CanShutdown failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:2105): libactions-WARNING **: 21:33:57.737: Calling CanRestart failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:2105): libactions-WARNING **: 21:33:57.737: Calling CanSuspend failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:2105): libactions-WARNING **: 21:33:57.737: Calling CanHibernate failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:2105): libactions-WARNING **: 21:33:57.737: Calling CanHybridSleep failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files

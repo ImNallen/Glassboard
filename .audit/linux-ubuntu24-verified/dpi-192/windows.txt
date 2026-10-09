@@ -1,0 +1,6 @@
+0x00600003 -1 0    0    2560 54   aeaa53d4bc08 xfce4-panel
+0x00600010 -1 974  1594 612  6    aeaa53d4bc08 xfce4-panel
+0x00600014 -1 974  1738 612  98   aeaa53d4bc08 xfce4-panel
+0x00800003  0 202  384  1700 900  aeaa53d4bc08 Glassboard Linux fixture
+0x01000003  0 0    54   2560 1600 aeaa53d4bc08 Glassboard annotations
+0x0100003b  0 536  1432 1488 152  aeaa53d4bc08 Glassboard

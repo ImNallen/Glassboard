@@ -86,7 +86,9 @@ For development or a local build, you'll need:
 - Rust (stable)
 - The [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
 
-On Ubuntu 22.04 or Debian 12, install the native build dependencies:
+The locked Rust dependencies require PipeWire 0.3.65 or newer. Ubuntu 22.04's
+stock PipeWire is too old. On Ubuntu 24.04 or Debian 12, install the native build
+dependencies:
 
 ```sh
 sudo apt-get update
@@ -109,6 +111,9 @@ npm run desktop tauri build
 On macOS this creates `Glassboard.app` and a `.dmg`. Windows creates a setup `.exe`.
 Linux creates a `.deb` and an `.AppImage` through `tauri.linux.conf.json`. Find the
 installers in `apps/desktop/src-tauri/target/release/bundle/`.
+
+Linux release packages build on Ubuntu 24.04. Compatibility of those binaries
+with older distributions, including Debian 12, is unverified.
 
 On Linux, make the AppImage executable and open it, or install the Debian package
 with `sudo apt install ./Glassboard_0.1.1_amd64.deb`. Use the filename from your
@@ -176,7 +181,7 @@ Run the native Linux checks from any Docker host, including macOS:
 bash scripts/linux/verify.sh
 ```
 
-The runner builds the app in Debian and drives it on a virtual X11 desktop at
+The runner builds the app in Ubuntu 24.04 and drives it on a virtual X11 desktop at
 normal and double display scales. It checks drawing, undo, clear, window ordering,
 capture, clipboard ownership, tray Settings, and autostart registration. Evidence
 is saved in `.audit/linux-x11`. It uses the Docker host's native CPU architecture.

@@ -1,0 +1,121 @@
+
+(glassboard:18297): dbind-WARNING **: 21:15:17.963: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+[2026-10-08][21:15:17][glassboard][INFO] Starting Glassboard 0.1.1 on linux aarch64
+[2026-10-08][21:15:18][glassboard][ERROR] panicked at /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.37.1/src/platform_impl/linux/event_loop.rs:457:18:
+called `Option::unwrap()` on a `None` value
+   0: std::backtrace::Backtrace::create
+   1: glassboard::main::{{closure}}
+   2: std::panicking::panic_with_hook
+   3: std::panicking::panic_handler::{{closure}}
+   4: std::sys::backtrace::__rust_end_short_backtrace
+   5: __rustc::rust_begin_unwind
+   6: core::panicking::panic_fmt
+   7: core::panicking::panic
+   8: core::option::unwrap_failed
+   9: tao::platform_impl::platform::event_loop::EventLoop<T>::new_gtk::{{closure}}
+  10: glib::main_context_channel::dispatch
+  11: g_main_context_dispatch
+  12: <unknown>
+  13: g_main_context_iteration
+  14: gtk_main_iteration_do
+  15: gtk::auto::functions::main_iteration_do
+  16: tao::platform_impl::platform::event_loop::EventLoop<T>::run_return::{{closure}}
+  17: glib::main_context::<impl glib::auto::main_context::MainContext>::with_thread_default
+  18: tao::platform_impl::platform::event_loop::EventLoop<T>::run_return
+  19: tao::platform_impl::platform::event_loop::EventLoop<T>::run
+  20: tao::event_loop::EventLoop<T>::run
+  21: <tauri_runtime_wry::Wry<T> as tauri_runtime::Runtime<T>>::run
+  22: tauri::app::App<R>::run
+  23: glassboard::main
+  24: core::ops::function::FnOnce::call_once
+  25: std::sys::backtrace::__rust_begin_short_backtrace
+  26: std::rt::lang_start::{{closure}}
+  27: std::rt::lang_start_internal
+  28: std::rt::lang_start
+  29: main
+  30: <unknown>
+  31: __libc_start_main
+  32: _start
+
+
+thread 'main' (18297) panicked at /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tao-0.37.1/src/platform_impl/linux/event_loop.rs:457:18:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+[2026-10-08][21:15:18][glassboard][ERROR] panicked at library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+   0: std::backtrace::Backtrace::create
+   1: glassboard::main::{{closure}}
+   2: std::panicking::panic_with_hook
+   3: std::panicking::panic_handler::{{closure}}
+   4: std::sys::backtrace::__rust_end_short_backtrace
+   5: __rustc::rust_begin_unwind
+   6: core::panicking::panic_nounwind_fmt
+   7: core::panicking::panic_nounwind
+   8: core::panicking::panic_cannot_unwind
+   9: glib::main_context_channel::dispatch
+  10: g_main_context_dispatch
+  11: <unknown>
+  12: g_main_context_iteration
+  13: gtk_main_iteration_do
+  14: gtk::auto::functions::main_iteration_do
+  15: tao::platform_impl::platform::event_loop::EventLoop<T>::run_return::{{closure}}
+  16: glib::main_context::<impl glib::auto::main_context::MainContext>::with_thread_default
+  17: tao::platform_impl::platform::event_loop::EventLoop<T>::run_return
+  18: tao::platform_impl::platform::event_loop::EventLoop<T>::run
+  19: tao::event_loop::EventLoop<T>::run
+  20: <tauri_runtime_wry::Wry<T> as tauri_runtime::Runtime<T>>::run
+  21: tauri::app::App<R>::run
+  22: glassboard::main
+  23: core::ops::function::FnOnce::call_once
+  24: std::sys::backtrace::__rust_begin_short_backtrace
+  25: std::rt::lang_start::{{closure}}
+  26: std::rt::lang_start_internal
+  27: std::rt::lang_start
+  28: main
+  29: <unknown>
+  30: __libc_start_main
+  31: _start
+
+
+thread 'main' (18297) panicked at library/core/src/panicking.rs:225:5:
+panic in a function that cannot unwind
+stack backtrace:
+   0:     0xaaaab0f99b54 - <std::sys::backtrace::BacktraceLock::print::DisplayBacktrace as core::fmt::Display>::fmt::h30fc0247e9ce7054
+   1:     0xaaaab0face54 - core::fmt::write::hb92b802a3c5af65c
+   2:     0xaaaab0f6d87c - std::io::Write::write_fmt::hc4bc5385f5069cc3
+   3:     0xaaaab0f80094 - std::panicking::default_hook::{{closure}}::h40ceeb85429d41a5
+   4:     0xaaaab0f7ff7c - std::panicking::default_hook::hac628b3547dd031d
+   5:     0xaaaab0052dd0 - <alloc::boxed::Box<F,A> as core::ops::function::Fn<Args>>::call::h3261e4640962d46e
+   6:     0xaaaaafedebb8 - glassboard::main::{{closure}}::hbb73e28a46736fc0
+   7:     0xaaaab0f80368 - std::panicking::panic_with_hook::h259bfc28258f3dde
+   8:     0xaaaab0f80170 - std::panicking::panic_handler::{{closure}}::hb472bee8efdebbc8
+   9:     0xaaaab0f7a808 - std::sys::backtrace::__rust_end_short_backtrace::ha74c7040a01a9fcb
+  10:     0xaaaab0f63be8 - __rustc[d131491b17107b07]::rust_begin_unwind
+  11:     0xaaaaafe667d8 - core::panicking::panic_nounwind_fmt::hcc708fb8d5e165eb
+  12:     0xaaaaafe66760 - core::panicking::panic_nounwind::h3ef42d69bdd1d4a6
+  13:     0xaaaaafe668b8 - core::panicking::panic_cannot_unwind::h3e4cf370999eaabd
+  14:     0xaaaab00e858c - glib::main_context_channel::dispatch::h41382d515cc38a42
+  15:     0xffff9f946c34 - g_main_context_dispatch
+  16:     0xffff9f946ed8 - <unknown>
+  17:     0xffff9f946f84 - g_main_context_iteration
+  18:     0xffff999e2170 - gtk_main_iteration_do
+  19:     0xaaaab0cef580 - gtk::auto::functions::main_iteration_do::hcc30ad2a92e77809
+  20:     0xaaaab01a0be4 - tao::platform_impl::platform::event_loop::EventLoop<T>::run_return::{{closure}}::h812c0bdee2c69045
+  21:     0xaaaab0065108 - glib::main_context::<impl glib::auto::main_context::MainContext>::with_thread_default::h04185554276c3f93
+  22:     0xaaaab01a07c0 - tao::platform_impl::platform::event_loop::EventLoop<T>::run_return::h21b15444c68b5951
+  23:     0xaaaab01a1378 - tao::platform_impl::platform::event_loop::EventLoop<T>::run::h1f59a015636f18da
+  24:     0xaaaab007276c - tao::event_loop::EventLoop<T>::run::hfc4655274247fb1b
+  25:     0xaaaab00af30c - <tauri_runtime_wry::Wry<T> as tauri_runtime::Runtime<T>>::run::hf8d9794851e97a8f
+  26:     0xaaaaafea09b0 - tauri::app::App<R>::run::h058225f7c11eac50
+  27:     0xaaaaafe81744 - glassboard::main::h40787a5846739eb5
+  28:     0xaaaab0223484 - core::ops::function::FnOnce::call_once::h3efdfa0f92c6a567
+  29:     0xaaaab0164a9c - std::sys::backtrace::__rust_begin_short_backtrace::hf7610371f9a74a4f
+  30:     0xaaaaaff9cef4 - std::rt::lang_start::{{closure}}::he0b2fe797743377e
+  31:     0xaaaab0f6f4f0 - std::rt::lang_start_internal::h22caed170e00c560
+  32:     0xaaaaaff9ced8 - std::rt::lang_start::h03fb2897ba0b7399
+  33:     0xaaaaafe8269c - main
+  34:     0xffff97507744 - <unknown>
+  35:     0xffff97507818 - __libc_start_main
+  36:     0xaaaaafe66a30 - _start
+  37:                0x0 - <unknown>
+thread caused non-unwinding panic. aborting.

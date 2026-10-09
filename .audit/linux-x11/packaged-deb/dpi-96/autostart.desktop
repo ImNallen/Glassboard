@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Glassboard
+Comment=Glassboardstartup script
+Exec=/usr/bin/glassboard 
+StartupNotify=false
+Terminal=false

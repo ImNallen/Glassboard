@@ -1,0 +1,396 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.58kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/rust:1.93.0-bookworm
+#2 ...
+
+#3 [internal] load metadata for docker.io/library/node:24-bookworm
+#3 DONE 0.5s
+
+#4 [internal] load metadata for docker.io/library/ubuntu:24.04
+#4 DONE 0.5s
+
+#2 [internal] load metadata for docker.io/library/rust:1.93.0-bookworm
+#2 DONE 0.6s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [stage-2 1/8] FROM docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55
+#6 resolve docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 0.0s done
+#6 DONE 0.0s
+
+#7 [rust 1/1] FROM docker.io/library/rust:1.93.0-bookworm@sha256:d0a4aa3ca2e1088ac0c81690914a0d810f2eee188197034edf366ed010a2b382
+#7 resolve docker.io/library/rust:1.93.0-bookworm@sha256:d0a4aa3ca2e1088ac0c81690914a0d810f2eee188197034edf366ed010a2b382 0.0s done
+#7 DONE 0.0s
+
+#8 [node 1/1] FROM docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+#8 resolve docker.io/library/node:24-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0 0.0s done
+#8 DONE 0.0s
+
+#9 [stage-2 4/8] COPY --from=node /usr/local/bin/node /usr/local/bin/node
+#9 CACHED
+
+#10 [stage-2 3/8] COPY --from=rust /usr/local/rustup /usr/local/rustup
+#10 CACHED
+
+#11 [stage-2 5/8] COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+#11 CACHED
+
+#12 [stage-2 2/8] COPY --from=rust /usr/local/cargo/bin /usr/local/cargo/bin
+#12 CACHED
+
+#13 [stage-2 6/8] RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx     && apt-get update     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends        build-essential curl git        libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev        libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev        libwayland-dev libegl-dev libgbm-dev libssl-dev pkg-config patchelf ca-certificates        xvfb xauth openbox xcompmgr xfce4-panel xfconf dbus-x11        xdotool wmctrl xclip x11-utils x11-xserver-utils scrot        python3 python3-pil python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-atspi-2.0        at-spi2-core gsettings-desktop-schemas     && rm -rf /var/lib/apt/lists/*
+#13 CACHED
+
+#14 [stage-2 7/8] WORKDIR /workspace
+#14 CACHED
+
+#15 [stage-2 8/8] RUN rustup component add clippy rustfmt
+#15 CACHED
+
+#16 exporting to image
+#16 exporting layers done
+#16 exporting manifest sha256:d4b8d1879d51dbe9426ec25beb64ca399088fa7636ef0943fb04fe3632e3abc9 done
+#16 exporting config sha256:e7dbfce85b2c2c5ac0bcfcf236415ccdcf3c533282436cb18f7a1efb70ce86f8 done
+#16 exporting attestation manifest sha256:f401795df6f93874931748b2de8a33f199d8e29eac2cd8f87934a49c78465d9b done
+#16 exporting manifest list sha256:620f7e2ff09fa25ccc5a4cf0ce073281544f148a5471893b44fdaf153fb5da04 done
+#16 naming to docker.io/library/glassboard-linux-test:ubuntu24-review done
+#16 unpacking to docker.io/library/glassboard-linux-test:ubuntu24-review done
+#16 DONE 0.0s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/qharvx45zw8cz9wf8ruquklng
+npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+
+added 369 packages, and audited 373 packages in 4s
+
+105 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+
+> check
+> npm run check --workspaces --if-present
+
+
+> @glassboard/desktop@0.1.1 check
+> svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /workspace/apps/desktop
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings
+
+> @glassboard/web@0.0.1 check
+> astro check
+
+▶ Astro collects anonymous usage data.
+  This information helps us improve Astro.
+  Run "astro telemetry disable" to opt-out.
+  https://astro.build/telemetry
+
+22:24:18 [types] Generated 84ms
+22:24:18 [check] Getting diagnostics for Astro files in /workspace/apps/web...
+Result (10 files): 
+- 0 errors
+- 0 warnings
+- 0 hints
+
+
+> @glassboard/ui@0.1.0 check
+> svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /workspace/packages/ui
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings
+
+> test
+> npm run test:release && npm run test --workspaces --if-present
+
+
+> test:release
+> node --test scripts/bump-version.test.mjs
+
+▶ native npm bumps patch, minor, major, and an explicit version
+  ✔ patch (148.342916ms)
+  ✔ minor (145.417167ms)
+  ✔ major (145.956458ms)
+  ✔ 0.2.0-rc.1 (147.508042ms)
+✔ native npm bumps patch, minor, major, and an explicit version (587.997542ms)
+✔ prerelease becomes stable and repeating an exact version is idempotent (411.590125ms)
+✔ command flags keep the lock current when inherited npm config disables it (143.589375ms)
+✔ validation rejects drift, malformed input, and a wrong Tauri pointer without writes (191.508625ms)
+✔ failed npm child restores all four original files (32.732ms)
+✔ npm returning a different exact version restores all four original files (36.906542ms)
+✔ CRLF Rust files retain line endings; npm never changes Git refs (152.498084ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1580.779375
+
+> @glassboard/desktop@0.1.1 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/workspace/apps/desktop[39m
+
+ [32m✓[39m src/lib/updates.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m src/lib/capture.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m src/App.test.ts [2m([22m[2m23 tests[22m[2m)[22m[32m 221[2mms[22m[39m
+[90mstderr[2m | src/Settings.svelte.test.ts[2m > [22m[2mrecords, refuses, clears, and resets the global screenshot shortcut
+[22m[39mCtrl+Shift+A is already used to toggle Glassboard.
+
+[90mstderr[2m | src/Settings.svelte.test.ts[2m > [22m[2mrecords, refuses, clears, and resets the global screenshot shortcut
+[22m[39mCtrl+Alt+X is already used to take a screenshot.
+
+[90mstderr[2m | src/Settings.svelte.test.ts[2m > [22m[2mrecords, refuses, clears, and resets the global screenshot shortcut
+[22m[39mCtrl+Alt+X is already used to take a screenshot.
+
+ [32m✓[39m src/Settings.svelte.test.ts [2m([22m[2m14 tests[22m[2m)[22m[33m 566[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[32m59 passed[39m[22m[90m (59)[39m
+[2m   Start at [22m 22:24:24
+[2m   Duration [22m 7.32s[2m (transform 11.35s, setup 28ms, import 13.25s, tests 810ms, environment 393ms)[22m
+
+
+> @glassboard/web@0.0.1 test
+> node --test scripts/*.test.mjs
+
+✔ keeps the published 0.1.0 downloads without a Linux asset (0.693833ms)
+✔ adds an experimental X11 download only when an AppImage is named (0.103ms)
+✔ rejects invalid Linux installers and continues requiring macOS and Windows (0.30725ms)
+✔ verifies both exact public download URLs without authorization and follows redirects (11.924041ms)
+✔ rejects an unpublished draft before checking installer URLs (0.714625ms)
+✔ rejects a release that lacks the Windows installer (0.282125ms)
+✔ rejects an unreachable Windows download even when its metadata exists (0.261417ms)
+✔ rejects an anonymously inaccessible release (0.185209ms)
+✔ rejects a mismatched tag or an empty installer (0.672375ms)
+✔ rejects an installer that has not finished uploading (0.212792ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 43.957375
+
+> @glassboard/ui@0.1.0 test
+> vitest run
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/workspace/packages/ui[39m
+
+ [32m✓[39m src/lib/drawing/renderer.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+ [32m✓[39m src/lib/swatches.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/contract/transitions.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 9[2mms[22m[39m
+ [32m✓[39m src/lib/themes.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 10[2mms[22m[39m
+ [32m✓[39m src/lib/drawing.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/lib/shortcuts.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m src/lib/session.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m src/contract/toggle-shortcuts.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m src/lib/selection.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m src/lib/capture-export.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/lib/capture.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/lib/keys.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/lib/errors.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m src/Overlay.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 45[2mms[22m[39m
+ [32m✓[39m src/Toolbar.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 141[2mms[22m[39m
+ [32m✓[39m src/Capture.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 278[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m16 passed[39m[22m[90m (16)[39m
+[2m      Tests [22m [1m[32m189 passed[39m[22m[90m (189)[39m
+[2m   Start at [22m 22:24:32
+[2m   Duration [22m 6.99s[2m (transform 12.56s, setup 247ms, import 14.77s, tests 673ms, environment 1.22s)[22m
+
+
+> build
+> npm run build --workspaces --if-present
+
+
+> @glassboard/desktop@0.1.1 build
+> vite build
+
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 4153 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-DG_V2jol.css   36.30 kB │ gzip:  7.04 kB
+dist/assets/index-B7hj4gG3.js   153.42 kB │ gzip: 53.08 kB
+
+✓ built in 815ms
+
+> @glassboard/web@0.0.1 build
+> astro build
+
+22:24:40 [types] Generated 22ms
+22:24:40 [build] output: "static"
+22:24:40 [build] mode: "static"
+22:24:40 [build] directory: /workspace/apps/web/dist/
+22:24:40 [build] Collecting build info...
+22:24:40 [build] ✓ Completed in 47ms.
+22:24:40 [build] Building static entrypoints...
+22:24:40 [vite] ✓ built in 100ms
+22:24:41 [vite] ✓ built in 1.04s
+22:24:41 [build] Rearranging server assets...
+
+ generating static routes 
+22:24:41   ├─ /install/index.html (+6ms) 
+22:24:41   ├─ /index.html (+10ms) 
+22:24:41 ✓ Completed in 32ms.
+
+22:24:41 [build] ✓ Completed in 1.20s.
+22:24:41 [build] 2 page(s) built in 1.25s
+22:24:41 [build] Complete!
+    Finished `test` profile [unoptimized] target(s) in 0.20s
+     Running unittests src/main.rs (/target/debug/deps/glassboard-08ed492c1330f767)
+
+running 55 tests
+test capture::image::tests::binary_frame_preserves_dimensions_and_rgba_byte_order ... ok
+test capture::image::tests::crop_preserves_pixels_and_includes_the_last_row_and_column ... ok
+test capture::image::tests::crop_rejects_empty_overflowing_or_outside_regions ... ok
+test capture::image::tests::crop_rejects_regions_larger_than_the_image_limit ... ok
+test capture::screen::x11::tests::permits_fractional_scale_truncation_at_negative_origins ... ok
+test capture::screen::x11::tests::refuses_missing_ambiguous_and_invalid_monitor_geometry ... ok
+test capture::screen::x11::tests::resolves_scaled_bounds_without_reinterpreting_a_physical_cursor_as_logical ... ok
+test capture::image::tests::png_decoding_preserves_pixels_and_rejects_garbage ... ok
+test capture::tests::copy_requests_need_a_binary_body_and_a_numeric_capture_id ... ok
+test commands::tests::actions_keep_their_wire_names ... ok
+test linux_startup::tests::accepts_x11_and_virtual_displays_without_a_session_type ... ok
+test commands::tests::global_commands_keep_their_wire_names ... ok
+test linux_startup::tests::refuses_a_missing_or_empty_display ... ok
+test linux_startup::tests::refuses_wayland_even_with_an_xwayland_display ... ok
+test preferences::tests::older_preferences_default_to_rainbow_and_keep_color_and_shortcut ... ok
+test preferences::tests::missing_preferences_load_defaults_without_a_warning ... ok
+test preference_saves::tests::failed_transaction_keeps_the_previous_pending_preferences ... ok
+test preferences::tests::out_of_range_drawing_preferences_are_rejected ... ok
+test preferences::tests::the_capture_shortcut_must_differ_from_the_toggle_shortcut ... ok
+test session::tests::a_frame_only_attaches_to_the_capture_it_was_taken_for ... ok
+test updates::tests::a_check_finds_nothing_or_a_version_to_download ... ok
+test preference_saves::tests::shortcut_save_cannot_be_overwritten_by_an_older_background_snapshot ... ok
+test preference_saves::tests::rapid_changes_coalesce_and_flush_preserves_the_latest_selection ... ok
+test updates::tests::install_takes_the_download_exactly_once ... ok
+test updates::tests::only_a_download_in_progress_reports_progress ... ok
+test updates::tests::only_a_download_in_progress_becomes_ready ... ok
+test updates::tests::only_idle_and_failed_start_a_check ... ok
+test updates::tests::only_work_in_progress_can_fail ... ok
+test updates::tests::progress_is_a_whole_percent_of_a_known_size ... ok
+test windows::geometry::tests::capture_dock_preserves_native_coordinates_with_scaling_and_negative_origins ... ok
+test updates::tests::checks_are_due_daily_or_hourly_after_a_failure ... ok
+test windows::geometry::tests::centers_the_toolbar_on_each_selected_edge ... ok
+test windows::geometry::tests::clamps_at_edges_and_handles_negative_monitor_origins_and_scaling ... ok
+test windows::geometry::tests::cursor_samples_use_window_css_coordinates_in_every_dock_position ... ok
+test preferences::tests::files_from_before_the_capture_shortcut_take_its_default_unless_toggle_holds_it ... ok
+test windows::geometry::tests::error_panels_expand_inward_without_moving_the_toolbar ... ok
+test updates::tests::status_serializes_as_the_settings_contract ... ok
+test windows::geometry::tests::handles_scaled_negative_coordinates_and_short_displays ... ok
+test windows::geometry::tests::keeps_side_taskbar_and_small_screen_positions_in_the_work_area ... ok
+test windows::geometry::tests::opens_below_top_bar_and_above_bottom_taskbar ... ok
+test windows::geometry::tests::tutorial_shrinks_to_a_short_display_and_drops_its_top_gap ... ok
+test windows::geometry::tests::proximity_includes_a_margin_around_the_window ... ok
+test windows::geometry::tests::tutorial_sits_centered_below_the_top_of_the_work_area ... ok
+test windows::geometry::tests::tutorial_rounds_fractional_scales_down_on_negative_origins ... ok
+test windows::tests::surfaces_keep_the_labels_and_urls_the_frontend_reads ... ok
+test session::tests::transitions_match_the_shared_fixture ... ok
+test preferences::tests::toggle_shortcuts_follow_the_shared_grammar ... ok
+test preferences::tests::unreadable_preferences_are_moved_aside_before_defaults_are_saved ... ok
+test preferences::tests::palette_upgrades_apply_only_to_files_saved_before_versions ... ok
+test preferences::tests::one_invalid_field_resets_only_that_field ... ok
+test preferences::tests::saved_preferences_replace_the_file_and_load_back ... ok
+test preferences::tests::saved_and_sent_preferences_keep_their_exact_json ... ok
+test preferences::tests::damaged_preferences_are_backed_up_and_repaired_once ... ok
+test preference_saves::tests::background_failure_is_reported_and_flush_retries_it ... ok
+test preference_saves::tests::updates_do_not_wait_for_a_slow_disk_write ... ok
+
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+    Finished `dev` profile [unoptimized] target(s) in 0.18s
+
+> @glassboard/desktop@0.1.1 tauri
+> tauri build --debug --no-bundle
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> @glassboard/desktop@0.1.1 build
+> vite build
+
+vite v8.3.1 building client environment for production...
+transforming...
+✓ 4153 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.46 kB │ gzip:  0.30 kB
+dist/assets/index-DG_V2jol.css   36.30 kB │ gzip:  7.04 kB
+dist/assets/index-B7hj4gG3.js   153.42 kB │ gzip: 53.08 kB
+
+✓ built in 815ms
+   Compiling glassboard v0.1.1 (/workspace/apps/desktop/src-tauri)
+    Finished `dev` profile [unoptimized] target(s) in 5.05s
+       Built application at: /target/debug/glassboard
+dbus-daemon[1764]: [session uid=0 pid=1764] Activating service name='ca.desrt.dconf' requested by ':1.0' (uid=0 pid=1786 comm="gsettings set org.gnome.desktop.interface toolkit-")
+dbus-daemon[1764]: [session uid=0 pid=1764] Successfully activated service 'ca.desrt.dconf'
+dbus-daemon[1764]: [session uid=0 pid=1764] Activating service name='org.a11y.Bus' requested by ':1.2' (uid=0 pid=1806 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[1764]: [session uid=0 pid=1764] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[1815]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=0 pid=1806 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[1764]: [session uid=0 pid=1764] Activating service name='org.xfce.Xfconf' requested by ':1.4' (uid=0 pid=1806 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[1815]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[1764]: [session uid=0 pid=1764] Successfully activated service 'org.xfce.Xfconf'
+PASS startup refusals
+CLICK 'Dismiss tutorial' at 791,73 26x26
+PASS native welcome and tutorial dismissal
+PASS native drawing and pointer interception
+PASS undo
+PASS toolbar stacking and click-through
+TOOLBAR at 268,716 744x76
+CLICK 'Clear this display' at 934,737 32x34
+PASS clear
+PASS capture excludes overlay and retains clipboard ownership
+PASS annotated second copy replaces clipboard
+TRAY at 1142,0 26x26
+CLICK 'Open at login' at 1208,531 34x20
+CLICK 'Close settings' at 1229,199 26x26
+TRAY at 1142,0 26x26
+CLICK 'Open at login' at 1208,531 34x20
+CLICK 'Close settings' at 1229,199 26x26
+TRAY at 1142,0 26x26
+CLICK 'Close settings' at 1229,199 26x26
+PASS tray Settings and autostart registration
+
+(xfconfd:1823): xfconfd-WARNING **: 22:25:07.491: Name org.xfce.Xfconf lost on the message dbus, exiting.
+dbus-daemon[2253]: [session uid=0 pid=2253] Activating service name='ca.desrt.dconf' requested by ':1.0' (uid=0 pid=2275 comm="gsettings set org.gnome.desktop.interface toolkit-")
+dbus-daemon[2253]: [session uid=0 pid=2253] Successfully activated service 'ca.desrt.dconf'
+dbus-daemon[2253]: [session uid=0 pid=2253] Activating service name='org.a11y.Bus' requested by ':1.2' (uid=0 pid=2295 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[2253]: [session uid=0 pid=2253] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[2304]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=0 pid=2295 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[2253]: [session uid=0 pid=2253] Activating service name='org.xfce.Xfconf' requested by ':1.4' (uid=0 pid=2295 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[2304]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+dbus-daemon[2253]: [session uid=0 pid=2253] Successfully activated service 'org.xfce.Xfconf'
+PASS startup refusals
+CLICK 'Dismiss tutorial' at 791,73 26x26
+PASS native welcome and tutorial dismissal
+PASS native drawing and pointer interception
+PASS undo
+PASS toolbar stacking and click-through
+FAIL Second mark did not render
+
+(xfconfd:2312): xfconfd-WARNING **: 22:25:15.929: Name org.xfce.Xfconf lost on the message dbus, exiting.

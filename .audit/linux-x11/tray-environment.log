@@ -1,0 +1,24 @@
+stalonetray:
+  Installed: (none)
+  Candidate: (none)
+  Version table:
+xfce4-panel:
+  Installed: (none)
+  Candidate: 4.18.2-1
+  Version table:
+     4.18.2-1 500
+        500 http://deb.debian.org/debian bookworm/main arm64 Packages
+tint2:
+  Installed: (none)
+  Candidate: 17.0.1-1
+  Version table:
+     17.0.1-1 500
+        500 http://deb.debian.org/debian bookworm/main arm64 Packages
+Reading package lists...
+Building dependency tree...
+Reading state information...
+Package stalonetray is not available, but is referred to by another package.
+This may mean that the package is missing, has been obsoleted, or
+is only available from another source
+
+E: Package 'stalonetray' has no installation candidate

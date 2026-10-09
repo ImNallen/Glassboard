@@ -1,0 +1,60 @@
+{
+  "dpi": 96,
+  "status": "fail",
+  "checks": [
+    {
+      "name": "startup refusals",
+      "status": "pass",
+      "details": "No display, Wayland without DISPLAY, and XWayland each exited 1 with an explanation."
+    },
+    {
+      "name": "native welcome and tutorial dismissal",
+      "status": "fail",
+      "details": "Accessible control 'Dismiss tutorial' did not appear"
+    },
+    {
+      "name": "native drawing and pointer interception",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "undo",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "clear",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "toolbar stacking and click-through",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "capture excludes overlay and retains clipboard ownership",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "annotated second copy replaces clipboard",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "tray Settings and autostart registration",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    }
+  ],
+  "unverified": [
+    "Physical GPUs and monitors",
+    "Multiple monitors and negative origins",
+    "Other X11 window managers and tray hosts",
+    "Native Wayland GUI refusal",
+    "Login session autostart execution",
+    "Full-monitor copy",
+    "Packaged AppImage launch and updater"
+  ]
+}

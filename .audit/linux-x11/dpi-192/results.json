@@ -1,0 +1,61 @@
+{
+  "dpi": 192,
+  "gdkScale": 2,
+  "status": "pass",
+  "checks": [
+    {
+      "name": "startup refusals",
+      "status": "pass",
+      "details": "No display, Wayland without DISPLAY, and XWayland each exited 1 with an explanation."
+    },
+    {
+      "name": "native welcome and tutorial dismissal",
+      "status": "pass",
+      "details": 12582915
+    },
+    {
+      "name": "native drawing and pointer interception",
+      "status": "pass",
+      "details": "Real pointer input changed 11867 pixels without reaching the independent application."
+    },
+    {
+      "name": "undo",
+      "status": "pass",
+      "details": "Undo restored the fixture region with 0 changed pixels."
+    },
+    {
+      "name": "toolbar stacking and click-through",
+      "status": "pass",
+      "details": "Three focus and hide/show cycles preserved toolbar stacking, focus, and click-through."
+    },
+    {
+      "name": "clear",
+      "status": "pass",
+      "details": "Clear removed the second native pointer mark."
+    },
+    {
+      "name": "capture excludes overlay and retains clipboard ownership",
+      "status": "pass",
+      "details": "Independent xclip read a 780 by 240 PNG after editor closure. 0 pixels differ from the fixture."
+    },
+    {
+      "name": "annotated second copy replaces clipboard",
+      "status": "pass",
+      "details": "Independent xclip read a 1100 by 300 PNG after editor closure. 16810 pixels differ from the fixture."
+    },
+    {
+      "name": "tray Settings and autostart registration",
+      "status": "pass",
+      "details": "Tray menu opened Settings. Autostart enabled, reread its desktop registration, disabled, and reread the absence."
+    }
+  ],
+  "unverified": [
+    "Physical GPUs and monitors",
+    "Multiple monitors and negative origins",
+    "Other X11 window managers and tray hosts",
+    "Native Wayland GUI refusal",
+    "Login session autostart execution",
+    "Full-monitor copy",
+    "Packaged AppImage launch and updater"
+  ]
+}

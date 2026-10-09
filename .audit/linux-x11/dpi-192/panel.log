@@ -1,0 +1,14 @@
+xfce4-panel: Failed to connect to session manager: Failed to connect to the session manager: SESSION_MANAGER environment variable not defined
+libclock-Message: 21:45:50.213: could not get proxy for org.freedesktop.login1
+
+(xfce4-panel:38881): libclock-WARNING **: 21:45:50.213: could not instantiate a sleep monitor
+
+(wrapper-2.0:38909): libactions-WARNING **: 21:45:50.352: Calling CanShutdown failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:38909): libactions-WARNING **: 21:45:50.352: Calling CanRestart failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:38909): libactions-WARNING **: 21:45:50.352: Calling CanSuspend failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:38909): libactions-WARNING **: 21:45:50.352: Calling CanHibernate failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:38909): libactions-WARNING **: 21:45:50.353: Calling CanHybridSleep failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files

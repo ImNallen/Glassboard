@@ -1,0 +1,63 @@
+{
+  "binary": "/target/debug/glassboard",
+  "dpi": 192,
+  "gdkScale": 2,
+  "status": "fail",
+  "checks": [
+    {
+      "name": "startup refusals",
+      "status": "pass",
+      "details": "No display, Wayland without DISPLAY, and XWayland each exited 1 with an explanation."
+    },
+    {
+      "name": "native welcome and tutorial dismissal",
+      "status": "pass",
+      "details": 8388611
+    },
+    {
+      "name": "native drawing and pointer interception",
+      "status": "pass",
+      "details": "Real pointer input changed 1189 pixels without reaching the independent application."
+    },
+    {
+      "name": "undo",
+      "status": "pass",
+      "details": "Undo restored the fixture region with 0 changed pixels."
+    },
+    {
+      "name": "toolbar stacking and click-through",
+      "status": "pass",
+      "details": "Three focus and hide/show cycles preserved toolbar stacking, focus, and click-through."
+    },
+    {
+      "name": "clear",
+      "status": "fail",
+      "details": "Second mark did not render"
+    },
+    {
+      "name": "capture excludes overlay and retains clipboard ownership",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "annotated second copy replaces clipboard",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    },
+    {
+      "name": "tray Settings and autostart registration",
+      "status": "unverified",
+      "details": "An earlier check failed."
+    }
+  ],
+  "unverified": [
+    "Physical GPUs and monitors",
+    "Multiple monitors and negative origins",
+    "Other X11 window managers and tray hosts",
+    "Native Wayland GUI refusal",
+    "Login session autostart execution",
+    "Full-monitor copy",
+    "Signed AppImage update installation",
+    "Packaged AppImage launch"
+  ]
+}
