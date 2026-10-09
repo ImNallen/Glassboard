@@ -1,6 +1,5 @@
 use crate::Result;
 
-/// Capture after native exclusion/synchronization, without a fixed startup delay.
 pub(crate) fn capture(
     app: &tauri::AppHandle,
     point: (i32, i32),
@@ -12,34 +11,164 @@ pub(crate) fn capture(
         let _ = (app, point);
         macos::capture(position, size)
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        let _ = (app, point);
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        x11::capture(position, size)
+    }
+    #[cfg(target_os = "windows")]
     {
         let _ = (position, size);
-        #[cfg(target_os = "windows")]
-        {
-            // Window hide requests are queued. A main-thread barrier ensures they
-            // run before the compositor flush; the capture worker waits for both.
-            let (send, receive) = std::sync::mpsc::channel();
-            app.run_on_main_thread(move || {
-                let status = unsafe { windows_sys::Win32::Graphics::Dwm::DwmFlush() };
-                let _ = send.send(status);
-            })?;
-            let status = receive.recv()?;
-            if status < 0 {
-                // Preserve capture on systems where compositor synchronization fails.
-                log::warn!("Compositor flush failed ({status:#x}); using capture delay");
-                std::thread::sleep(std::time::Duration::from_millis(150));
-            }
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = app;
+        // The main-thread barrier applies hide requests before the compositor flush.
+        let (send, receive) = std::sync::mpsc::channel();
+        app.run_on_main_thread(move || {
+            let status = unsafe { windows_sys::Win32::Graphics::Dwm::DwmFlush() };
+            let _ = send.send(status);
+        })?;
+        let status = receive.recv()?;
+        if status < 0 {
+            log::warn!("Compositor flush failed ({status:#x}); using capture delay");
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
-        // Windows monitor handles stay on this worker, rather than crossing threads.
         xcap::Monitor::from_point(point.0, point.1)
             .and_then(|monitor| monitor.capture_image())
             .map_err(|e| format!("Could not capture the screen: {e}").into())
+    }
+}
+
+#[cfg(any(target_os = "linux", test))]
+mod x11 {
+    use super::*;
+    use crate::windows::geometry::Rect;
+
+    #[cfg(target_os = "linux")]
+    pub(super) fn capture(position: (i32, i32), size: (u32, u32)) -> Result<image::RgbaImage> {
+        let monitors = xcap::Monitor::all()?;
+        let geometry = monitors
+            .iter()
+            .map(|monitor| {
+                Ok((
+                    Rect {
+                        x: monitor.x()?.into(),
+                        y: monitor.y()?.into(),
+                        width: monitor.width()?.into(),
+                        height: monitor.height()?.into(),
+                    },
+                    f64::from(monitor.scale_factor()?),
+                ))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let physical = Rect {
+            x: position.0.into(),
+            y: position.1.into(),
+            width: size.0.into(),
+            height: size.1.into(),
+        };
+        let index = resolve_monitor(physical, geometry.into_iter())?;
+        monitors[index]
+            .capture_image()
+            .map_err(|error| format!("Could not capture the screen: {error}").into())
+    }
+
+    fn resolve_monitor(
+        physical: Rect,
+        monitors: impl Iterator<Item = (Rect, f64)>,
+    ) -> Result<usize> {
+        let mut matching = monitors
+            .enumerate()
+            .filter_map(|(index, (logical, scale))| {
+                if !scale.is_finite() || scale <= 0.0 {
+                    return None;
+                }
+                // XCap truncates each logical origin and extent independently.
+                let matches = [
+                    (physical.x, logical.x),
+                    (physical.y, logical.y),
+                    (physical.width, logical.width),
+                    (physical.height, logical.height),
+                ]
+                .into_iter()
+                .all(|(physical, logical)| (physical - logical * scale).abs() < scale);
+                matches.then_some(index)
+            });
+        let index = matching
+            .next()
+            .ok_or("The capture display is unavailable")?;
+        if matching.next().is_some() {
+            return Err(
+                "The capture display is ambiguous. Try capturing on another display.".into(),
+            );
+        }
+        Ok(index)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        fn rect(x: f64, y: f64, width: f64, height: f64) -> Rect {
+            Rect {
+                x,
+                y,
+                width,
+                height,
+            }
+        }
+
+        #[test]
+        fn resolves_scaled_bounds_without_reinterpreting_a_physical_cursor_as_logical() {
+            let displays = vec![
+                (rect(0.0, 0.0, 960.0, 540.0), 2.0),
+                (rect(960.0, 0.0, 1280.0, 720.0), 2.0),
+            ];
+            assert_eq!(
+                resolve_monitor(rect(1920.0, 0.0, 2560.0, 1440.0), displays.into_iter()).unwrap(),
+                1
+            );
+        }
+
+        #[test]
+        fn permits_fractional_scale_truncation_at_negative_origins() {
+            for (physical, logical) in [
+                (
+                    rect(-2048.0, -77.0, 2048.0, 1152.0),
+                    rect(-1365.0, -51.0, 1365.0, 768.0),
+                ),
+                (
+                    rect(2050.0, 77.0, 2050.0, 1152.0),
+                    rect(1366.0, 51.0, 1366.0, 768.0),
+                ),
+            ] {
+                assert_eq!(
+                    resolve_monitor(physical, [(logical, 1.5)].into_iter()).unwrap(),
+                    0
+                );
+            }
+        }
+
+        #[test]
+        fn refuses_missing_ambiguous_and_invalid_monitor_geometry() {
+            let physical = rect(0.0, 0.0, 1920.0, 1080.0);
+            assert!(resolve_monitor(physical, std::iter::empty())
+                .unwrap_err()
+                .to_string()
+                .contains("unavailable"));
+            let duplicate = (rect(0.0, 0.0, 960.0, 540.0), 2.0);
+            assert!(
+                resolve_monitor(physical, [duplicate, duplicate].into_iter())
+                    .unwrap_err()
+                    .to_string()
+                    .contains("ambiguous")
+            );
+            for scale in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+                assert!(resolve_monitor(physical, [(physical, scale)].into_iter()).is_err());
+            }
+            assert!(
+                resolve_monitor(physical, [(rect(0.0, 0.0, 900.0, 540.0), 2.0)].into_iter())
+                    .is_err()
+            );
+        }
     }
 }
 

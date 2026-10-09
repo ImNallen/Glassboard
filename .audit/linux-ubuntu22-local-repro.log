@@ -1,0 +1,129 @@
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+NAME="Ubuntu"
+VERSION_ID="22.04"
+VERSION="22.04.5 LTS (Jammy Jellyfish)"
+VERSION_CODENAME=jammy
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=jammy
+rustc 1.93.0 (254b59607 2026-01-19)
+0.3.48
+0.2
+   Compiling serde_core v1.0.229
+   Compiling memchr v2.8.3
+   Compiling glob v0.3.4
+   Compiling proc-macro2 v1.0.107
+   Compiling libc v0.2.189
+   Compiling target-lexicon v0.13.5
+   Compiling clang-sys v1.9.1
+   Compiling winnow v1.0.4
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling aho-corasick v1.1.5
+   Compiling smallvec v1.16.2
+   Compiling cfg-if v1.0.5
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling regex-syntax v0.8.11
+   Compiling minimal-lexical v0.2.1
+   Compiling nom v7.1.3
+   Compiling regex-automata v0.4.18
+   Compiling toml v1.1.6+spec-1.1.0
+   Compiling libloading v0.8.9
+   Compiling cfg-expr v0.20.9
+   Compiling either v1.18.0
+   Compiling heck v0.5.0
+   Compiling bindgen v0.72.1
+   Compiling find-msvc-tools v0.1.14
+   Compiling unicode-width v0.2.2
+   Compiling version-compare v0.2.1
+   Compiling anstyle v1.0.14
+   Compiling pkg-config v0.3.34
+   Compiling shlex v2.0.1
+   Compiling system-deps v7.0.8
+   Compiling cc v1.5.1
+   Compiling annotate-snippets v0.11.5
+   Compiling itertools v0.13.0
+   Compiling regex v1.13.1
+   Compiling syn v2.0.119
+   Compiling cexpr v0.6.0
+   Compiling rustc-hash v2.1.3
+   Compiling bitflags v2.13.2
+   Compiling shlex v1.3.0
+   Compiling rustix v1.1.5
+   Compiling libspa v0.10.1
+    Checking linux-raw-sys v0.12.1
+   Compiling libspa-sys v0.10.1
+    Checking nom v8.0.0
+    Checking cookie-factory v0.3.3
+error[E0425]: cannot find function `spa_meta_region_is_valid` in crate `spa_sys`
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/buffer/meta.rs:107:27
+    |
+107 |         unsafe { spa_sys::spa_meta_region_is_valid(self.as_raw()) }
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: a function with a similar name exists: `spa_meta_cursor_is_valid`
+    |
+   ::: /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-sys-0.10.1/src/meta.rs:11:5
+    |
+ 11 |     pub fn spa_meta_cursor_is_valid(m: *const spa_meta_cursor) -> bool;
+    |     ------------------------------------------------------------------- similarly named function `spa_meta_cursor_is_valid` defined here
+
+error[E0425]: cannot find function `spa_meta_first` in crate `spa_sys`
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/buffer/meta.rs:157:36
+    |
+157 |             pos: unsafe { spa_sys::spa_meta_first(video_damage.as_raw()) }.cast(),
+    |                                    ^^^^^^^^^^^^^^ not found in `spa_sys`
+
+error[E0560]: struct `spa_video_info_raw` has no field named `flags`
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/param/video/raw.rs:228:13
+    |
+228 |             flags: 0,
+    |             ^^^^^ `spa_video_info_raw` does not have this field
+    |
+    = note: all struct fields are already assigned
+
+error[E0609]: no field `flags` on type `spa_video_info_raw`
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/param/video/raw.rs:258:16
+    |
+258 |         self.0.flags = flags.bits();
+    |                ^^^^^ unknown field
+    |
+    = note: available fields are: `format`, `modifier`, `size`, `framerate`, `max_framerate` ... and 10 others
+
+error[E0609]: no field `flags` on type `spa_video_info_raw`
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/param/video/raw.rs:262:45
+    |
+262 |         VideoFlags::from_bits_retain(self.0.flags)
+    |                                             ^^^^^ unknown field
+    |
+    = note: available fields are: `format`, `modifier`, `size`, `framerate`, `max_framerate` ... and 10 others
+
+error[E0308]: mismatched types
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/param/video/raw.rs:266:27
+    |
+266 |         self.0.modifier = modifier;
+    |         ---------------   ^^^^^^^^ expected `i64`, found `u64`
+    |         |
+    |         expected due to the type of this binding
+
+error[E0308]: mismatched types
+   --> /usr/local/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/libspa-0.10.1/src/param/video/raw.rs:270:9
+    |
+269 |     pub fn modifier(self) -> u64 {
+    |                              --- expected `u64` because of return type
+270 |         self.0.modifier
+    |         ^^^^^^^^^^^^^^^ expected `u64`, found `i64`
+    |
+help: you can convert an `i64` to a `u64` and panic if the converted value doesn't fit
+    |
+270 |         self.0.modifier.try_into().unwrap()
+    |                        ++++++++++++++++++++
+
+Some errors have detailed explanations: E0308, E0425, E0560, E0609.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `libspa` (lib) due to 7 previous errors

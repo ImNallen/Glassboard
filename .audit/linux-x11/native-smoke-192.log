@@ -1,0 +1,33 @@
+dbus-daemon[38827]: [session uid=0 pid=38827] Activating service name='ca.desrt.dconf' requested by ':1.0' (uid=0 pid=38849 comm="gsettings set org.gnome.desktop.interface toolkit-")
+dbus-daemon[38827]: [session uid=0 pid=38827] Successfully activated service 'ca.desrt.dconf'
+dbus-daemon[38827]: [session uid=0 pid=38827] Activating service name='org.a11y.Bus' requested by ':1.2' (uid=0 pid=38881 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[38827]: [session uid=0 pid=38827] Successfully activated service 'org.a11y.Bus'
+dbus-daemon[38890]: Activating service name='org.a11y.atspi.Registry' requested by ':1.0' (uid=0 pid=38881 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[38827]: [session uid=0 pid=38827] Activating service name='org.xfce.Xfconf' requested by ':1.4' (uid=0 pid=38881 comm="xfce4-panel --disable-wm-check")
+dbus-daemon[38827]: [session uid=0 pid=38827] Successfully activated service 'org.xfce.Xfconf'
+dbus-daemon[38890]: Successfully activated service 'org.a11y.atspi.Registry'
+SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+PASS startup refusals
+/workspace/scripts/linux/smoke.py:135: DeprecationWarning: Atspi.Accessible.get_component_iface is deprecated
+  bounds = node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
+CLICK 'Dismiss tutorial' at 791,73 26x26
+PASS native welcome and tutorial dismissal
+PASS native drawing and pointer interception
+PASS undo
+PASS toolbar stacking and click-through
+TOOLBAR at 536,1432 1488x152
+CLICK 'Clear this display' at 934,737 32x34
+PASS clear
+PASS capture excludes overlay and retains clipboard ownership
+PASS annotated second copy replaces clipboard
+TRAY at 1142,0 26x26
+CLICK 'Open at login' at 1208,531 34x20
+CLICK 'Close settings' at 1229,199 26x26
+TRAY at 1142,0 26x26
+CLICK 'Open at login' at 1208,531 34x20
+CLICK 'Close settings' at 1229,199 26x26
+TRAY at 1142,0 26x26
+CLICK 'Close settings' at 1229,199 26x26
+PASS tray Settings and autostart registration
+
+(xfconfd:38897): xfconfd-CRITICAL **: 21:46:09.345: Name org.xfce.Xfconf lost on the message dbus, exiting.

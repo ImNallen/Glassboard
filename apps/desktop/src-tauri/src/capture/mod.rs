@@ -13,8 +13,14 @@ use crate::{
     Result,
 };
 pub(crate) use image::CaptureRegion;
-use std::{borrow::Cow, sync::Arc};
+use std::{
+    borrow::Cow,
+    sync::{Arc, Mutex},
+};
 use tauri::{LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize};
+
+#[derive(Default)]
+pub(crate) struct CaptureClipboard(Mutex<Option<arboard::Clipboard>>);
 
 /// The IPC request cap for an annotated PNG, checked once where the bytes arrive.
 const MAX_REQUEST_BYTES: usize = 96 * 1024 * 1024;
@@ -114,10 +120,31 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
         (cursor.x / coordinate_scale).round() as i32,
         (cursor.y / coordinate_scale).round() as i32,
     );
-    let monitor = xcap::Monitor::from_point(capture_point.0, capture_point.1)
-        .map_err(|e| format!("Could not find the display under the cursor: {e}"))?;
-    let position = (monitor.x()?, monitor.y()?);
-    let size = (monitor.width()?, monitor.height()?);
+    #[cfg(target_os = "linux")]
+    let (position, size) = {
+        let monitor = app
+            .available_monitors()?
+            .into_iter()
+            .find(|monitor| {
+                Rect::from(tauri::PhysicalRect {
+                    position: *monitor.position(),
+                    size: *monitor.size(),
+                })
+                .contains(cursor.x, cursor.y, 0.0)
+            })
+            .ok_or("Could not find the display under the cursor")?;
+        let position = monitor.position();
+        let size = monitor.size();
+        ((position.x, position.y), (size.width, size.height))
+    };
+    #[cfg(not(target_os = "linux"))]
+    let (position, size) = {
+        let monitor = xcap::Monitor::from_point(capture_point.0, capture_point.1)
+            .map_err(|e| format!("Could not find the display under the cursor: {e}"))?;
+        let position = (monitor.x()?, monitor.y()?);
+        let size = (monitor.width()?, monitor.height()?);
+        (position, size)
+    };
     let id = app.state::<AppState>().0.lock().unwrap().begin_capture();
     apply_windows(app)?;
     let handle = app.clone();
@@ -175,7 +202,7 @@ fn present(
         )
     };
     window.set_position(origin)?;
-    window.set_size(extent)?;
+    crate::windows::set_size(&window, extent)?;
     // Reuse the native toolbar's work-area layout rather than docking
     // the embedded capture toolbar against the full display edges.
     let monitor = capture_monitor(app, position)?;
@@ -248,11 +275,18 @@ pub(crate) async fn copy_capture_region(
 }
 
 fn write_clipboard(app: &tauri::AppHandle, id: u32, image: ::image::RgbaImage) -> Result<()> {
+    let state = app.state::<CaptureClipboard>();
+    let mut clipboard = state.0.lock().unwrap();
     if !current(app, id) {
         return Err("Capture cancelled".into());
     }
-    arboard::Clipboard::new()
-        .map_err(|e| format!("Could not open the clipboard: {e}"))?
+    let clipboard = match clipboard.as_mut() {
+        Some(clipboard) => clipboard,
+        None => clipboard.insert(
+            arboard::Clipboard::new().map_err(|e| format!("Could not open the clipboard: {e}"))?,
+        ),
+    };
+    clipboard
         .set_image(arboard::ImageData {
             width: image.width() as usize,
             height: image.height() as usize,

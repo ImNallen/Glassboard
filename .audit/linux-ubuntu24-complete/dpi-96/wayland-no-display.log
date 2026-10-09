@@ -1,0 +1,1 @@
+Glassboard could not start: Glassboard's experimental Linux support requires an X11 desktop session. Sign out and select an X11 or Xorg session at the login screen, then open Glassboard again. Wayland and XWayland sessions are not supported.

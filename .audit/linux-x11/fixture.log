@@ -1,0 +1,2 @@
+
+(glassboard-fixture.py:18296): dbind-WARNING **: 21:15:17.945: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files

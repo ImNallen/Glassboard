@@ -17,6 +17,14 @@ fn menu(app: &AppHandle, ready: bool) -> tauri::Result<Menu<tauri::Wry>> {
     let clear = MenuItem::with_id(app, "clear", "Clear screen", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Glassboard", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&clear, &quit])?;
+    #[cfg(target_os = "linux")]
+    menu.prepend(&MenuItem::with_id(
+        app,
+        "settings",
+        "Settings",
+        true,
+        None::<&str>,
+    )?)?;
     if ready {
         let restart = MenuItem::with_id(
             app,
@@ -54,7 +62,7 @@ pub(crate) fn create_tray(app: &tauri::App) -> tauri::Result<()> {
         .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("Glassboard")
         .menu(&menu(app.handle(), false)?)
-        .show_menu_on_left_click(false)
+        .show_menu_on_left_click(cfg!(target_os = "linux"))
         .on_tray_icon_event(|tray, event| {
             use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
             let open_settings = matches!(

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Glassboard
+Comment=Glassboardstartup script
+Exec=/target/debug/bundle/appimage/Glassboard_0.1.1_aarch64.AppImage 
+StartupNotify=false
+Terminal=false

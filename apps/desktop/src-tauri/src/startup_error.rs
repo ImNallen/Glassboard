@@ -6,6 +6,7 @@ const TITLE: &str = "Glassboard could not start";
 /// release build has no console and no Glassboard window may exist to show it.
 pub(crate) fn exit(error: &str) -> ! {
     log::error!("Could not start Glassboard: {error}");
+    eprintln!("{TITLE}: {error}");
     show_native(&format!(
         "{error}\n\nTry opening Glassboard again. If this keeps happening, \
          report it at {REPOSITORY_URL}/issues and include Glassboard's log file."
@@ -49,5 +50,24 @@ fn show_native(details: &str) {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "windows")))]
+#[cfg(target_os = "linux")]
+fn show_native(details: &str) {
+    use gtk::prelude::*;
+    if gtk::init().is_err() {
+        return;
+    }
+    let dialog = gtk::MessageDialog::new(
+        None::<&gtk::Window>,
+        gtk::DialogFlags::MODAL,
+        gtk::MessageType::Error,
+        gtk::ButtonsType::Ok,
+        TITLE,
+    );
+    dialog.set_title(TITLE);
+    dialog.set_secondary_text(Some(details));
+    dialog.run();
+    dialog.close();
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
 fn show_native(_details: &str) {}

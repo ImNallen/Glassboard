@@ -2,7 +2,7 @@ pub(crate) mod geometry;
 pub(crate) mod settings;
 mod setup;
 pub(crate) mod toolbar;
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 mod z_order;
 pub(crate) use setup::create_windows;
 
@@ -62,6 +62,32 @@ impl Serialize for Surface {
     }
 }
 
+pub(crate) fn set_size(
+    window: &tauri::WebviewWindow,
+    size: impl Into<tauri::Size>,
+) -> tauri::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::{GtkWindowExt, WidgetExt};
+        let size = size.into().to_logical::<i32>(window.scale_factor()?);
+        let native_window = window.clone();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        window.run_on_main_thread(move || {
+            let result = native_window.gtk_window().map(|native| {
+                // Nonresizable GTK windows fix both geometry limits to their requested size.
+                native.set_size_request(size.width, size.height);
+                native.resize(size.width, size.height);
+            });
+            let _ = sender.send(result);
+        })?;
+        receiver
+            .recv()
+            .map_err(|_| tauri::Error::FailedToReceiveMessage)?
+    }
+    #[cfg(not(target_os = "linux"))]
+    window.set_size(size)
+}
+
 pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
     if let Some(capture) = Surface::Capture.window(app) {
@@ -101,6 +127,7 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
     sync_tutorial(app)?;
     app.state::<toolbar::Toolbar>()
         .set_active(state.mode == Mode::Draw);
+    raise_toolbar(app);
     publish(app)
 }
 /// Keep the small guide on the active display without covering the drawing toolbar.
@@ -117,7 +144,7 @@ pub(crate) fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
                 let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
                 let frame = top_center(work, size, scale);
                 // Resize first: macOS keeps the bottom edge when resizing, so a later resize would shift the top.
-                window.set_size(PhysicalSize::new(frame.width, frame.height))?;
+                set_size(&window, PhysicalSize::new(frame.width, frame.height))?;
                 window.set_position(PhysicalPosition::new(frame.x, frame.y))?;
             }
         }
@@ -135,9 +162,9 @@ pub(crate) fn focus_drawing(app: &tauri::AppHandle) {
     raise_toolbar(app);
 }
 pub(crate) fn raise_toolbar(app: &tauri::AppHandle) {
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     z_order::raise_controls(app);
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     let _ = app;
 }
 pub(crate) fn select_cursor_monitor(app: &tauri::AppHandle) {

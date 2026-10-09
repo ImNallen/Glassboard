@@ -5,6 +5,8 @@ mod autostart;
 mod capture;
 mod commands;
 mod error;
+#[cfg(target_os = "linux")]
+mod linux_startup;
 mod preference_saves;
 mod preferences;
 mod session;
@@ -35,6 +37,11 @@ use windows::{
 use error::Result;
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    if let Err(error) = linux_startup::prepare() {
+        startup_error::exit(&error.to_string());
+    }
+
     // Release builds have no console, so record panics in the log before the
     // default hook prints them and the process unwinds or aborts.
     let default_hook = std::panic::take_hook();
@@ -60,9 +67,9 @@ fn main() {
         )
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_opener::init());
-    // Login items use the Windows Run registry key. On macOS the autostart
-    // module writes a Launch Agent itself, so Login Items credit Glassboard.
-    #[cfg(target_os = "windows")]
+    // Linux uses a desktop autostart entry and Windows uses the Run registry key.
+    // macOS writes a Launch Agent so Login Items credit Glassboard.
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
     let app = builder
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -70,7 +77,7 @@ fn main() {
             // Native activation (including clicking another display) can raise a
             // transparent drawing window above the toolbar before a drawing command.
             let surface = Surface::parse(window.label());
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             if matches!(surface, Some(Surface::Overlay(_)))
                 && matches!(event, tauri::WindowEvent::Focused(true))
             {
@@ -181,6 +188,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         }
         app.set_menu(menu)?;
     }
+    app.manage(capture::CaptureClipboard::default());
     app.manage(TrayAnchor(Mutex::new(None)));
     app.manage(Toolbar::default());
     windows::create_windows(app)?;

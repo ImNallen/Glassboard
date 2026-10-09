@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { checkForUpdates, installUpdate, updateDetail, updateLabel, watchUpdates, type UpdateStatus } from './updates';
 
 it.each<[UpdateStatus, string]>([
-  [{ state: 'disabled' }, 'Updates come with release builds.'],
+  [{ state: 'disabled' }, 'Automatic updates are unavailable in this build.'],
   [{ state: 'idle' }, 'Glassboard checks GitHub for new versions once a day.'],
   [{ state: 'checking' }, 'Checking…'],
   [{ state: 'downloading', version: '0.2.0', percent: null }, 'Downloading version 0.2.0…'],

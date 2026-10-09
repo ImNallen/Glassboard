@@ -5,6 +5,15 @@ use super::{
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::WidgetExt;
+        let native = window.gtk_window()?;
+        if matches!(surface, Surface::Overlay(_)) {
+            // Tao's input shape requires a native window even while the overlay is hidden.
+            native.realize();
+        }
+    }
     #[cfg(target_os = "macos")]
     {
         use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
@@ -21,7 +30,7 @@ fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::
             _ => 26,
         });
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     let _ = (window, surface);
     Ok(())
 }
@@ -29,7 +38,7 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
     for (index, monitor) in app.available_monitors()?.iter().enumerate() {
         let surface = Surface::Overlay(index);
         let window = window_builder(app, surface, "Glassboard annotations").build()?;
-        window.set_size(*monitor.size())?;
+        super::set_size(&window, *monitor.size())?;
         window.set_position(*monitor.position())?;
         configure_overlay(&window, surface)?;
     }
@@ -42,6 +51,8 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
         let window = window_builder(app, surface, title)
             .inner_size(width, height)
             .build()?;
+        #[cfg(target_os = "linux")]
+        super::set_size(&window, tauri::LogicalSize::new(width, height))?;
         configure_overlay(&window, surface)?;
     }
     Ok(())

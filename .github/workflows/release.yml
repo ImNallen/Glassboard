@@ -88,6 +88,8 @@ jobs:
             args: --target universal-apple-darwin
           - os: windows-latest
             args: ''
+          - os: ubuntu-24.04
+            args: ''
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -100,6 +102,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - name: Install Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libssl-dev
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
@@ -125,6 +132,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPIMAGE_EXTRACT_AND_RUN: ${{ runner.os == 'Linux' && '1' || '' }}
         with:
           projectPath: apps/desktop
           tauriScript: npm run tauri
@@ -149,7 +157,7 @@ jobs:
           gh release view "$TAG" --json tagName,isDraft,targetCommitish --jq '.' |
             jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' >/dev/null
           gh release upload "$TAG" "$dmg" --clobber
-  # Both platforms write latest.json on the draft, and a lost write would strand one of them.
+  # Each platform writes latest.json on the draft, and a lost write would strand its users.
   updater-manifest:
     needs: [prepare, desktop]
     permissions:
@@ -167,7 +175,7 @@ jobs:
         run: |
           set -euo pipefail
           gh release download "$TAG" --pattern latest.json
-          jq -e --arg v "$VERSION" '.version == $v and ([.platforms["darwin-aarch64"], .platforms["darwin-x86_64"], .platforms["windows-x86_64"]] | all(.url != null and (.signature // "") != ""))' latest.json
+          jq -e --arg v "$VERSION" '.version == $v and ([.platforms["darwin-aarch64"], .platforms["darwin-x86_64"], .platforms["windows-x86_64"], .platforms["linux-x86_64"]] | all(.url != null and (.signature // "") != ""))' latest.json
           release=$(gh release view "$TAG" --json tagName,isDraft,targetCommitish,url)
           jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' <<< "$release" >/dev/null
           url=$(jq -er .url <<< "$release")

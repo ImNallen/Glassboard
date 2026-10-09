@@ -65,7 +65,10 @@ impl Rect {
     }
     pub(crate) fn place(self, window: &tauri::WebviewWindow) -> Result<()> {
         window.set_position(PhysicalPosition::new(self.x, self.y))?;
-        Ok(window.set_size(PhysicalSize::new(self.width, self.height))?)
+        Ok(super::set_size(
+            window,
+            PhysicalSize::new(self.width, self.height),
+        )?)
     }
 }
 

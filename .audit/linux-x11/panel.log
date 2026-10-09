@@ -1,0 +1,26 @@
+
+(xfce4-panel:9787): dbind-WARNING **: 21:07:23.397: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+xfce4-panel: Failed to connect to session manager: Failed to connect to the session manager: SESSION_MANAGER environment variable not defined
+
+(migrate:9801): dbind-WARNING **: 21:07:23.413: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+xfce4-panel-Message: 21:07:23.524: Plugin "(null)-7" was not found and has been removed from the configuration
+xfce4-panel-Message: 21:07:23.524: Plugin "pulseaudio-8" was not found and has been removed from the configuration
+xfce4-panel-Message: 21:07:23.525: Plugin "power-manager-plugin-9" was not found and has been removed from the configuration
+xfce4-panel-Message: 21:07:23.525: Plugin "notification-plugin-10" was not found and has been removed from the configuration
+
+(wrapper-2.0:9817): dbind-WARNING **: 21:07:23.535: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+libclock-Message: 21:07:23.536: could not get proxy for org.freedesktop.login1
+
+(xfce4-panel:9787): libclock-WARNING **: 21:07:23.536: could not instantiate a sleep monitor
+
+(wrapper-2.0:9820): dbind-WARNING **: 21:07:23.578: AT-SPI: Error retrieving accessibility bus address: org.freedesktop.DBus.Error.ServiceUnknown: The name org.a11y.Bus was not provided by any .service files
+
+(wrapper-2.0:9820): libactions-WARNING **: 21:07:23.687: Calling CanShutdown failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:9820): libactions-WARNING **: 21:07:23.687: Calling CanRestart failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:9820): libactions-WARNING **: 21:07:23.687: Calling CanSuspend failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:9820): libactions-WARNING **: 21:07:23.688: Calling CanHibernate failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files
+
+(wrapper-2.0:9820): libactions-WARNING **: 21:07:23.688: Calling CanHybridSleep failed GDBus.Error:org.freedesktop.DBus.Error.ServiceUnknown: The name org.xfce.SessionManager was not provided by any .service files

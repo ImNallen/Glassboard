@@ -9,7 +9,8 @@ import { release } from '../lib/release.mjs';
 
 const title = 'Glassboard';
 const tagline = 'Draw on your screen. Then get back to work.';
-const description = 'Draw over any app, or capture and annotate a screenshot to share. Glassboard is a small, local annotation tool for macOS and Windows.';
+const linuxAvailable = release.downloads.some(download => download.platform === 'linux');
+const description = `Draw over any app, or capture and annotate a screenshot to share. Glassboard is a small, local annotation tool for ${linuxAvailable ? 'macOS, Windows, and experimental Linux X11 desktops' : 'macOS and Windows'}.`;
 const repo = 'https://github.com/ImNallen/Glassboard';
 const base = import.meta.env.BASE_URL;
 ---
@@ -42,7 +43,7 @@ const base = import.meta.env.BASE_URL;
     <main class="wrap hero">
       <div class="row">
         <div class="intro">
-          <p class="eyebrow">For macOS &amp; Windows</p>
+          <p class="eyebrow">{linuxAvailable ? 'For macOS, Windows & Linux X11' : 'For macOS & Windows'}</p>
           <h1><span>Draw on your screen.</span> <span>Then get back to work.</span></h1>
           <p class="lede">Point things out over any app, or annotate a screenshot and copy it into a chat.</p>
           <div class="actions">

@@ -14,7 +14,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use tauri::{Emitter, Manager};
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_opener::OpenerExt;
@@ -221,7 +221,7 @@ pub(crate) fn get_autostart(app: tauri::AppHandle) -> Result<bool> {
     {
         Ok(login_item(&app)?.is_enabled())
     }
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     {
         app.autolaunch()
             .is_enabled()
@@ -237,7 +237,7 @@ pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool
             .map_err(|e| format!("Could not change the login item: {e}"))?;
         Ok(item.is_enabled())
     }
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     {
         let launcher = app.autolaunch();
         if enabled {

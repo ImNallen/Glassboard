@@ -1,6 +1,6 @@
 [package]
 name = "glassboard"
-version = "0.1.0"
+version = "0.1.1"
 description = "A quiet tool for directing attention"
 authors = ["Glassboard"]
 edition = "2021"
@@ -42,6 +42,11 @@ objc2-core-foundation = "0.3"
 objc2-core-graphics = "0.3"
 objc2-foundation = { version = "0.3", features = ["NSString"] }
 
-[target.'cfg(target_os = "windows")'.dependencies]
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-autostart = "2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[target.'cfg(target_os = "windows")'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Graphics_Dwm"] }

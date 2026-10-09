@@ -1,0 +1,81 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following NEW packages will be installed:
+  libgbm-dev
+0 upgraded, 1 newly installed, 0 to remove and 89 not upgraded.
+Need to get 18.5 kB of archives.
+After this operation, 58.4 kB of additional disk space will be used.
+Get:1 http://deb.debian.org/debian bookworm/main arm64 libgbm-dev arm64 22.3.6-1+deb12u2 [18.5 kB]
+debconf: delaying package configuration, since apt-utils is not installed
+Fetched 18.5 kB in 0s (468 kB/s)
+Selecting previously unselected package libgbm-dev:arm64.
+(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 41851 files and directories currently installed.)
+Preparing to unpack .../libgbm-dev_22.3.6-1+deb12u2_arm64.deb ...
+Unpacking libgbm-dev:arm64 (22.3.6-1+deb12u2) ...
+Setting up libgbm-dev:arm64 (22.3.6-1+deb12u2) ...
+   Compiling glassboard v0.1.1 (/workspace/apps/desktop/src-tauri)
+    Finished `test` profile [unoptimized] target(s) in 3.19s
+     Running unittests src/main.rs (/target/debug/deps/glassboard-08ed492c1330f767)
+
+running 55 tests
+test capture::image::tests::binary_frame_preserves_dimensions_and_rgba_byte_order ... ok
+test capture::image::tests::crop_rejects_empty_overflowing_or_outside_regions ... ok
+test capture::image::tests::crop_rejects_regions_larger_than_the_image_limit ... ok
+test capture::image::tests::crop_preserves_pixels_and_includes_the_last_row_and_column ... ok
+test capture::screen::x11::tests::refuses_missing_ambiguous_and_invalid_monitor_geometry ... ok
+test capture::screen::x11::tests::permits_fractional_scale_truncation_at_negative_origins ... ok
+test capture::image::tests::png_decoding_preserves_pixels_and_rejects_garbage ... ok
+test capture::screen::x11::tests::resolves_scaled_bounds_without_reinterpreting_a_physical_cursor_as_logical ... ok
+test capture::tests::copy_requests_need_a_binary_body_and_a_numeric_capture_id ... ok
+test commands::tests::actions_keep_their_wire_names ... ok
+test commands::tests::global_commands_keep_their_wire_names ... ok
+test linux_startup::tests::accepts_x11_and_virtual_displays_without_a_session_type ... ok
+test linux_startup::tests::refuses_a_missing_or_empty_display ... ok
+test linux_startup::tests::refuses_wayland_even_with_an_xwayland_display ... ok
+test preference_saves::tests::failed_transaction_keeps_the_previous_pending_preferences ... ok
+test preference_saves::tests::rapid_changes_coalesce_and_flush_preserves_the_latest_selection ... ok
+test preference_saves::tests::shortcut_save_cannot_be_overwritten_by_an_older_background_snapshot ... ok
+test preferences::tests::older_preferences_default_to_rainbow_and_keep_color_and_shortcut ... ok
+test preferences::tests::out_of_range_drawing_preferences_are_rejected ... ok
+test preferences::tests::the_capture_shortcut_must_differ_from_the_toggle_shortcut ... ok
+test session::tests::a_frame_only_attaches_to_the_capture_it_was_taken_for ... ok
+test updates::tests::a_check_finds_nothing_or_a_version_to_download ... ok
+test updates::tests::checks_are_due_daily_or_hourly_after_a_failure ... ok
+test updates::tests::only_a_download_in_progress_becomes_ready ... ok
+test updates::tests::install_takes_the_download_exactly_once ... ok
+test updates::tests::only_a_download_in_progress_reports_progress ... ok
+test updates::tests::only_idle_and_failed_start_a_check ... ok
+test updates::tests::only_work_in_progress_can_fail ... ok
+test updates::tests::progress_is_a_whole_percent_of_a_known_size ... ok
+test updates::tests::status_serializes_as_the_settings_contract ... ok
+test windows::geometry::tests::capture_dock_preserves_native_coordinates_with_scaling_and_negative_origins ... ok
+test windows::geometry::tests::centers_the_toolbar_on_each_selected_edge ... ok
+test windows::geometry::tests::clamps_at_edges_and_handles_negative_monitor_origins_and_scaling ... ok
+test windows::geometry::tests::cursor_samples_use_window_css_coordinates_in_every_dock_position ... ok
+test windows::geometry::tests::error_panels_expand_inward_without_moving_the_toolbar ... ok
+test windows::geometry::tests::handles_scaled_negative_coordinates_and_short_displays ... ok
+test windows::geometry::tests::keeps_side_taskbar_and_small_screen_positions_in_the_work_area ... ok
+test windows::geometry::tests::opens_below_top_bar_and_above_bottom_taskbar ... ok
+test preferences::tests::missing_preferences_load_defaults_without_a_warning ... ok
+test windows::geometry::tests::proximity_includes_a_margin_around_the_window ... ok
+test windows::geometry::tests::tutorial_rounds_fractional_scales_down_on_negative_origins ... ok
+test windows::geometry::tests::tutorial_shrinks_to_a_short_display_and_drops_its_top_gap ... ok
+test windows::geometry::tests::tutorial_sits_centered_below_the_top_of_the_work_area ... ok
+test windows::tests::surfaces_keep_the_labels_and_urls_the_frontend_reads ... ok
+test session::tests::transitions_match_the_shared_fixture ... ok
+test preferences::tests::toggle_shortcuts_follow_the_shared_grammar ... ok
+test preferences::tests::files_from_before_the_capture_shortcut_take_its_default_unless_toggle_holds_it ... ok
+test preferences::tests::unreadable_preferences_are_moved_aside_before_defaults_are_saved ... ok
+test preferences::tests::saved_and_sent_preferences_keep_their_exact_json ... ok
+test preferences::tests::palette_upgrades_apply_only_to_files_saved_before_versions ... ok
+test preferences::tests::damaged_preferences_are_backed_up_and_repaired_once ... ok
+test preferences::tests::one_invalid_field_resets_only_that_field ... ok
+test preferences::tests::saved_preferences_replace_the_file_and_load_back ... ok
+test preference_saves::tests::updates_do_not_wait_for_a_slow_disk_write ... ok
+test preference_saves::tests::background_failure_is_reported_and_flush_retries_it ... ok
+
+test result: ok. 55 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+error: 'cargo-clippy' is not installed for the toolchain '1.93.0-aarch64-unknown-linux-gnu'.
+To install, run `rustup component add clippy`
