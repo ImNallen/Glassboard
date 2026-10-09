@@ -33,9 +33,11 @@ const base = import.meta.env.BASE_URL;
     <title>{title}: {tagline}</title>
   </head>
   <body>
-    <header class="wrap top">
+    <header class="wrap top landing-top">
       <a class="brand" href={base}><img src={appIcon.src} width="28" height="28" alt="" />Glassboard</a>
       <nav aria-label="Site">
+        <a href={release.notesUrl} title={`Version ${release.version}`}>Release notes</a>
+        <a href={`${base}install/`}>Installation</a>
         <a href={repo}><GitHubIcon size={18} />GitHub</a>
       </nav>
     </header>
@@ -46,22 +48,19 @@ const base = import.meta.env.BASE_URL;
           <p class="eyebrow">{linuxAvailable ? 'For macOS, Windows & Linux X11' : 'For macOS & Windows'}</p>
           <h1><span>Draw on your screen.</span> <span>Then get back to work.</span></h1>
           <p class="lede">Point things out over any app, or annotate a screenshot and copy it into a chat.</p>
-          <div class="actions">
+          <div class="actions" id="downloads">
             {release.downloads.map(download => (
-              <div class="download">
+              <div class="download" data-platform={download.platform}>
                 <a class="button primary" href={download.url}>Download for {download.label}</a>
                 <span>{download.architecture} · {download.format}</span>
               </div>
             ))}
+            <div class="demo desktop-demo">
+              <button class="button try-button" type="button" data-glassboard-try>Try Glassboard <span aria-hidden="true">→</span></button>
+              <span>Try it on this page</span>
+            </div>
           </div>
-          <div class="release-links">
-            <a href={release.notesUrl}>Version {release.version} · Release notes</a>
-            <a href={`${base}install/`}>Installation help</a>
-          </div>
-          <div class="secondary-actions">
-            <button class="source-link desktop-demo" type="button" data-glassboard-try>Try it on this page <span aria-hidden="true">→</span></button>
-            <a class="source-link" href={`${repo}#build-from-source`}>Build from source <span aria-hidden="true">↗</span></a>
-          </div>
+          <button class="source-link download-toggle" type="button" aria-expanded="false" aria-controls="downloads" hidden>Show all downloads</button>
         </div>
         <div class="screen" aria-hidden="true">
           <div class="bar"><span></span><span></span><span></span></div>
@@ -80,5 +79,9 @@ const base = import.meta.env.BASE_URL;
     </main>
 
     <TryIt client:only="svelte" />
+    <script>
+      import { enhancePlatformDownloads } from '../lib/platform-downloads.mjs';
+      enhancePlatformDownloads(document, navigator);
+    </script>
   </body>
 </html>
