@@ -10,7 +10,7 @@ const metadata = () => ({
   assets: release.downloads.map(download => ({ name: download.filename, state: 'uploaded', size: 100 })),
 });
 
-test('verifies both exact public download URLs without authorization and follows redirects', async () => {
+test('verifies every exact public download URL without authorization and follows redirects', async () => {
   const requests = [];
   await verifyPublicDownloads(async (url, options) => {
     requests.push({ url, options });
@@ -25,7 +25,7 @@ test('verifies both exact public download URLs without authorization and follows
     assert.equal(options.redirect, 'follow');
     assert(options.signal instanceof AbortSignal);
   }
-  assert.deepEqual(requests.slice(1).map(request => request.options.method), ['HEAD', 'HEAD']);
+  assert.deepEqual(requests.slice(1).map(request => request.options.method), release.downloads.map(() => 'HEAD'));
 });
 
 test('rejects an unpublished draft before checking installer URLs', async () => {
