@@ -6,3 +6,5 @@ apps/desktop/src-tauri/gen/
 .DS_Store
 *.local
 *.p12
+.audit/
+docs/

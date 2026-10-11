@@ -1,8 +1,22 @@
 use super::{
+    apply_windows, focus_drawing,
     geometry::{SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE},
-    Surface,
+    select_cursor_monitor,
+    toolbar::position_toolbar,
+    LiveOverlays, Surface,
 };
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use crate::{
+    session::Mode,
+    state::{report, snapshot, AppState},
+    Result,
+};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering::SeqCst},
+    Mutex, PoisonError,
+};
+use tauri::{Manager, Monitor, WebviewUrl, WebviewWindowBuilder, Wry};
+
+const OVERLAY_TITLE: &str = "Glassboard annotations";
 
 fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
@@ -34,14 +48,19 @@ fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::
     let _ = (window, surface);
     Ok(())
 }
+fn place_overlay(window: &tauri::WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
+    super::set_size(window, *monitor.size())?;
+    window.set_position(*monitor.position())
+}
 pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
-    for (index, monitor) in app.available_monitors()?.iter().enumerate() {
+    let monitors = app.available_monitors()?;
+    for (index, monitor) in monitors.iter().enumerate() {
         let surface = Surface::Overlay(index);
-        let window = window_builder(app, surface, "Glassboard annotations").build()?;
-        super::set_size(&window, *monitor.size())?;
-        window.set_position(*monitor.position())?;
+        let window = window_builder(app, surface, OVERLAY_TITLE).build()?;
+        place_overlay(&window, monitor)?;
         configure_overlay(&window, surface)?;
     }
+    app.manage(LiveOverlays(AtomicUsize::new(monitors.len())));
     for (surface, title, (width, height)) in [
         (Surface::Capture, "Glassboard Capture", (800.0, 600.0)),
         (Surface::Toolbar, "Glassboard", TOOLBAR_SIZE),
@@ -58,13 +77,97 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-fn window_builder<'a>(
-    app: &'a tauri::App,
+/// Fit the drawing windows to the displays, which can change while Glassboard runs.
+pub(crate) fn sync_overlays(app: &tauri::AppHandle) -> Result<()> {
+    let monitors = app.available_monitors()?;
+    let previous = app
+        .state::<LiveOverlays>()
+        .0
+        .fetch_min(monitors.len(), SeqCst);
+    for index in monitors.len()..previous {
+        if let Some(window) = Surface::Overlay(index).window(app) {
+            window.destroy()?;
+        }
+    }
+    {
+        let state = app.state::<AppState>();
+        let mut state = state.0.lock().unwrap();
+        if matches!(state.active_overlay, Surface::Overlay(index) if index >= monitors.len()) {
+            state.active_overlay = Surface::Overlay(0);
+        }
+    }
+    let live = previous.min(monitors.len());
+    for (index, monitor) in monitors.iter().enumerate().take(live) {
+        if let Some(window) = Surface::Overlay(index).window(app) {
+            place_overlay(&window, monitor)?;
+        }
+    }
+    let missing: Vec<_> = monitors.into_iter().enumerate().skip(live).collect();
+    if !missing.is_empty() {
+        add_overlays(app.clone(), missing);
+    }
+    Ok(())
+}
+/// Building a window on the main thread deadlocks on Windows, so drawing windows
+/// for new displays are built on another thread and join on the main thread.
+fn add_overlays(app: tauri::AppHandle, missing: Vec<(usize, Monitor)>) {
+    static BUILDING: Mutex<()> = Mutex::new(());
+    std::thread::spawn(move || {
+        let _building = BUILDING.lock().unwrap_or_else(PoisonError::into_inner);
+        for (index, monitor) in missing {
+            let surface = Surface::Overlay(index);
+            if surface.window(&app).is_some() {
+                continue;
+            }
+            let handle = app.clone();
+            let built = window_builder(&app, surface, OVERLAY_TITLE)
+                .build()
+                .and_then(|window| {
+                    app.run_on_main_thread(move || {
+                        if let Err(error) = join_overlay(&handle, &window, index, &monitor) {
+                            report(&handle, error);
+                        }
+                    })
+                });
+            if let Err(error) = built {
+                report(&app, error);
+            }
+        }
+    });
+}
+fn join_overlay(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    index: usize,
+    monitor: &Monitor,
+) -> Result<()> {
+    place_overlay(window, monitor)?;
+    configure_overlay(window, Surface::Overlay(index))?;
+    let live = &app.state::<LiveOverlays>().0;
+    // The displays changed again while this window was being built.
+    if live
+        .compare_exchange(index, index + 1, SeqCst, SeqCst)
+        .is_err()
+    {
+        return Ok(window.destroy()?);
+    }
+    // A capture that started meanwhile owns the active surface.
+    if snapshot(app).mode == Mode::Draw {
+        select_cursor_monitor(app);
+        position_toolbar(app)?;
+    }
+    apply_windows(app)?;
+    focus_drawing(app);
+    Ok(())
+}
+
+fn window_builder<'a, M: Manager<Wry>>(
+    manager: &'a M,
     surface: Surface,
     title: &str,
-) -> WebviewWindowBuilder<'a, tauri::Wry, tauri::App> {
+) -> WebviewWindowBuilder<'a, Wry, M> {
     WebviewWindowBuilder::new(
-        app,
+        manager,
         surface.label(),
         WebviewUrl::App(format!("index.html?surface={}", surface.url()).into()),
     )
