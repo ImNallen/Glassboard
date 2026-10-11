@@ -24,7 +24,7 @@ check_names = (
     "startup refusals", "native welcome and tutorial dismissal", "native drawing and pointer interception",
     "undo", "clear", "toolbar stacking and click-through",
     "capture excludes overlay and retains clipboard ownership", "annotated second copy replaces clipboard",
-    "tray Settings and autostart registration",
+    "tray Settings and autostart registration", "drawing overlays follow a display resize",
 )
 
 
@@ -66,11 +66,15 @@ def start(args, name, env=None):
     return process
 
 
-def window(title):
+def windows(title):
     result = command("xdotool", "search", "--onlyvisible", "--name", f"^{re.escape(title)}$", check=False)
     require(result.returncode in (0, 1), result.stderr.decode())
-    matches = result.stdout.splitlines()
-    return int(matches[-1]) if matches else None
+    return [int(match) for match in result.stdout.splitlines()]
+
+
+def window(title):
+    matches = windows(title)
+    return matches[-1] if matches else None
 
 
 def geometry(identifier):
@@ -362,6 +366,43 @@ def autostart():
     return "Tray menu opened Settings. Autostart enabled, reread its desktop registration, disabled, and reread the absence."
 
 
+def screen_size():
+    return tuple(int(value) for value in re.search(rb"dimensions:\s+(\d+)x(\d+)", command("xdpyinfo").stdout).groups())
+
+
+def resize_screen(size):
+    # Xvfb resizes the screen but reports an error because its only output keeps the startup mode.
+    command("xrandr", "--fb", f"{size[0]}x{size[1]}", check=False)
+    require(screen_size() == size, f"Xvfb did not resize its screen to {size}")
+
+
+def overlays_fit(size):
+    toggle(True)
+    observed = []
+    def covered():
+        observed[:] = [geometry(overlay)[2:] for overlay in windows("Glassboard annotations")]
+        return observed == [size]
+    try:
+        wait_for(covered, "")
+    except AssertionError:
+        raise AssertionError(f"Drawing overlay sizes {observed} do not match the {size[0]}x{size[1]} display") from None
+    screenshot(f"overlay-{size[0]}x{size[1]}")
+    toggle(False)
+
+
+def display_resize():
+    if window("Glassboard annotations"):
+        toggle(False)
+    full = screen_size()
+    smaller = (full[0] * 4 // 5, full[1] * 4 // 5)
+    overlays_fit(full)
+    resize_screen(smaller)
+    overlays_fit(smaller)
+    resize_screen(full)
+    overlays_fit(full)
+    return f"Overlays followed the display from {full[0]}x{full[1]} to {smaller[0]}x{smaller[1]} and back without a restart."
+
+
 failed = False
 try:
     check("startup refusals", refusals)
@@ -383,6 +424,7 @@ try:
     check("capture excludes overlay and retains clipboard ownership", lambda: capture(first_box, False, "first-copy", reference.crop(first_box)))
     check("annotated second copy replaces clipboard", lambda: capture(second_box, True, "second-copy", reference.crop(second_box)))
     check("tray Settings and autostart registration", autostart)
+    check("drawing overlays follow a display resize", display_resize)
 except Exception as error:
     failed = True
     print(f"FAIL {error}", file=sys.stderr, flush=True)

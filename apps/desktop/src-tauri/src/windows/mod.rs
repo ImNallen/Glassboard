@@ -4,7 +4,7 @@ mod setup;
 pub(crate) mod toolbar;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod z_order;
-pub(crate) use setup::create_windows;
+pub(crate) use setup::{create_windows, sync_overlays};
 
 use crate::{
     session::Mode,
@@ -13,6 +13,7 @@ use crate::{
 };
 use geometry::{top_center, Rect, TUTORIAL_SIZE};
 use serde::{Serialize, Serializer};
+use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use tauri::{Manager, PhysicalPosition, PhysicalRect, PhysicalSize};
 
 /// A webview window. The label names it to Tauri and `?surface=` tells the frontend what to render.
@@ -62,6 +63,18 @@ impl Serialize for Surface {
     }
 }
 
+/// How many drawing windows, from `overlay-0` up, cover a display and are ready to show.
+/// Windows still being built for a new display, or left by a removed one, are not counted.
+pub(crate) struct LiveOverlays(AtomicUsize);
+fn live_overlays(
+    app: &tauri::AppHandle,
+) -> impl Iterator<Item = (Surface, tauri::WebviewWindow)> + '_ {
+    (0..app.state::<LiveOverlays>().0.load(SeqCst)).filter_map(|index| {
+        let surface = Surface::Overlay(index);
+        surface.window(app).map(|window| (surface, window))
+    })
+}
+
 pub(crate) fn set_size(
     window: &tauri::WebviewWindow,
     size: impl Into<tauri::Size>,
@@ -101,16 +114,14 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
             capture.hide()
         }?;
     }
-    for (label, window) in app.webview_windows() {
-        if let Some(Surface::Overlay(_)) = Surface::parse(&label) {
-            window.set_ignore_cursor_events(state.mode != Mode::Draw)?;
-            window.set_focusable(state.mode == Mode::Draw)?;
-            if state.mode == Mode::Hidden {
-                window.hide()
-            } else {
-                window.show()
-            }?;
-        }
+    for (_, window) in live_overlays(app) {
+        window.set_ignore_cursor_events(state.mode != Mode::Draw)?;
+        window.set_focusable(state.mode == Mode::Draw)?;
+        if state.mode == Mode::Hidden {
+            window.hide()
+        } else {
+            window.show()
+        }?;
     }
     if let Some(toolbar) = Surface::Toolbar.window(app) {
         if state.mode != Mode::Hidden {
@@ -169,10 +180,7 @@ pub(crate) fn raise_toolbar(app: &tauri::AppHandle) {
 }
 pub(crate) fn select_cursor_monitor(app: &tauri::AppHandle) {
     if let Ok(cursor) = app.cursor_position() {
-        for (label, window) in app.webview_windows() {
-            let Some(overlay @ Surface::Overlay(_)) = Surface::parse(&label) else {
-                continue;
-            };
+        for (overlay, window) in live_overlays(app) {
             if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
                 if Rect::from(PhysicalRect { position, size }).contains(cursor.x, cursor.y, 0.0) {
                     app.state::<AppState>().0.lock().unwrap().active_overlay = overlay;

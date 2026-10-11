@@ -6,7 +6,7 @@ use crate::{
     windows::{
         apply_windows, focus_drawing, raise_toolbar, select_cursor_monitor,
         settings::position_settings,
-        sync_tutorial,
+        sync_overlays, sync_tutorial,
         toolbar::{position_toolbar, Toolbar},
         Surface,
     },
@@ -123,6 +123,7 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
     if (transition == Toggle && snapshot(app).mode == Mode::Hidden)
         || matches!(transition, Show | TutorialStart | ReplayTutorial)
     {
+        sync_overlays(app)?;
         select_cursor_monitor(app);
         position_toolbar(app)?;
     }
