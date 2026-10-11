@@ -4,8 +4,8 @@
 
 **Draw on your screen, then get back to work.**
 
-Glassboard is a small annotation tool for macOS and Windows. The 0.1.1 source tree
-also has experimental Linux X11 support. Press a shortcut to draw arrows, shapes,
+Glassboard is a small annotation tool for macOS and Windows, with experimental
+support for Linux X11 desktops. Press a shortcut to draw arrows, shapes,
 and text over anything on screen. Press it again and the drawings are
 cleared. You can also capture part of the screen, mark it up, and copy it to the
 clipboard, ready to paste into a chat or a coding agent.
@@ -17,26 +17,27 @@ and nothing is sent over the network.
 
 ## Download and install
 
-Download Glassboard for **macOS** or **Windows** at [glassboard.dev](https://glassboard.dev).
-The macOS download supports Apple silicon and Intel. The Windows installer is for
-64-bit Intel and AMD PCs.
+Download Glassboard for **macOS**, **Windows**, or **Linux** at [glassboard.dev](https://glassboard.dev).
+The macOS download supports Apple silicon and Intel. The Windows installer and the
+Linux AppImage are for 64-bit Intel and AMD PCs.
 
 - **macOS:** open the DMG, drag Glassboard into Applications, then open it from Applications.
 - **Windows:** run the setup EXE, finish installation, then launch Glassboard.
+- **Linux:** make the AppImage executable, then open it from an X11 session.
 
 The macOS app is signed and notarized. The Windows installer is currently unsigned,
 so Windows may show an **Unknown publisher** or SmartScreen warning. Download only
 from the Glassboard release linked on the site. Follow your organization's policy
 if installation is blocked.
 
-Linux support in the 0.1.1 source tree is experimental. The website keeps the
-published 0.1.0 downloads until the next release is public. To try Linux now,
-[build from source](#build-from-source). Use an X11 desktop session with a compositor
-and a system tray host. Wayland and XWayland sessions are not supported. Linux
-AppImages support automatic updates. Debian package users install a newer package
-manually. Keep Glassboard running until you paste a copied capture.
-Linux autostart writes to `~/.config/autostart`, even when `XDG_CONFIG_HOME`
-points elsewhere. Custom configuration paths need a manual desktop entry.
+Linux support is experimental. Use an X11 desktop session with a compositor and a
+system tray host. Wayland and XWayland sessions are not supported. The AppImage
+updates itself. A Debian package is also on the
+[GitHub releases](https://github.com/ImNallen/Glassboard/releases), but it doesn't
+update itself, so install newer packages manually. Keep Glassboard running until
+you paste a copied capture. Linux autostart writes to `~/.config/autostart`, even
+when `XDG_CONFIG_HOME` points elsewhere. Custom configuration paths need a manual
+desktop entry.
 
 On first launch, the tutorial walks you through drawing and switching back to work.
 Press **Cmd+Shift+A** on macOS or **Ctrl+Shift+A** on Windows or Linux to start drawing.
@@ -116,10 +117,9 @@ Linux release packages build on Ubuntu 24.04. Compatibility of those binaries
 with older distributions, including Debian 12, is unverified.
 
 On Linux, make the AppImage executable and open it, or install the Debian package
-with `sudo apt install ./Glassboard_0.1.1_amd64.deb`. Use the filename from your
-build. AppImage launching needs FUSE 2 support, or use
-`./Glassboard_0.1.1_amd64.AppImage --appimage-extract-and-run`. Sign in to an X11
-session before launching either package.
+with `sudo apt install ./Glassboard_<version>_amd64.deb`. AppImage launching needs
+FUSE 2 support, or use `./Glassboard_<version>_amd64.AppImage --appimage-extract-and-run`.
+Sign in to an X11 session before launching either package.
 
 > **macOS screenshot permission:** screen capture needs the **Screen Recording**
 > permission, which Glassboard requests the first time you take a screenshot. If you
@@ -128,8 +128,8 @@ session before launching either package.
 
 ## Known limitations
 
-- Glassboard only sees displays that were connected at launch. Restart it after
-  connecting, rearranging, or rescaling displays.
+- Display changes, such as a new resolution or a connected display, take effect the
+  next time you turn drawing on. Changes made while you're drawing wait until then.
 - Drawings stay at a fixed spot on screen. They don't move with windows or scroll with content.
 - To show your drawings in a video call, share your whole screen. Sharing a single window may leave them out.
 - Linux support is experimental and limited to X11. Compositors, tray hosts, real GPUs, and physical display layouts vary between desktops.
@@ -183,8 +183,9 @@ bash scripts/linux/verify.sh
 
 The runner builds the app in Ubuntu 24.04 and drives it on a virtual X11 desktop at
 normal and double display scales. It checks drawing, undo, clear, window ordering,
-capture, clipboard ownership, tray Settings, and autostart registration. Evidence
-is saved in `.audit/linux-x11`. It uses the Docker host's native CPU architecture.
+capture, clipboard ownership, tray Settings, autostart registration, and display
+resizing. Evidence is saved in `.audit/linux-x11`. It uses the Docker host's native
+CPU architecture.
 Physical displays, GPUs, login autostart, and signed updates need separate checks.
 
 ## License
