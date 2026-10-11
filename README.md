@@ -187,8 +187,6 @@ capture, clipboard ownership, tray Settings, and autostart registration. Evidenc
 is saved in `.audit/linux-x11`. It uses the Docker host's native CPU architecture.
 Physical displays, GPUs, login autostart, and signed updates need separate checks.
 
-For the release and website deployment steps, see [Publish a release](docs/releases.md).
-
 ## License
 
 Glassboard is free and open source under the [MIT License](LICENSE). Use it, fork it,
