@@ -2,7 +2,7 @@
 import manifest from '../data/release.json' with { type: 'json' };
 
 const repository = 'https://github.com/ImNallen/Glassboard';
-const platforms = {
+export const platforms = {
   macos: { label: 'macOS', architecture: 'Apple silicon and Intel', format: '.dmg' },
   windows: { label: 'Windows', architecture: '64-bit Intel and AMD', format: '.exe' },
   linux: { label: 'Linux (experimental X11)', architecture: '64-bit Intel and AMD', format: '.AppImage' },

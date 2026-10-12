@@ -37,6 +37,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run web sync:release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/configure-pages@v6
         id: pages
       - run: npm run ui check
