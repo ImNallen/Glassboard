@@ -161,7 +161,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     let mut problems = Vec::new();
     #[cfg(target_os = "macos")]
     problems.extend(
-        commands::migrate_login_item(app.handle())
+        commands::repair_login_item(app.handle())
             .err()
             .map(|e| e.to_string()),
     );

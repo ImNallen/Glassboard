@@ -302,6 +302,9 @@ pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool
         let item = login_item(&app)?;
         item.set_enabled(enabled)
             .map_err(|e| format!("Could not change the login item: {e}"))?;
+        if enabled && !crate::autostart::approved(&item.agent) {
+            return Err("macOS keeps Glassboard from opening at login. Allow it under System Settings > General > Login Items & Extensions".into());
+        }
         Ok(item.is_enabled())
     }
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -330,10 +333,10 @@ fn login_item(app: &tauri::AppHandle) -> Result<crate::autostart::LoginItem> {
     })
 }
 #[cfg(target_os = "macos")]
-pub(crate) fn migrate_login_item(app: &tauri::AppHandle) -> Result<()> {
+pub(crate) fn repair_login_item(app: &tauri::AppHandle) -> Result<()> {
     login_item(app)?
-        .migrate()
-        .map_err(|e| format!("Could not migrate the login item: {e}").into())
+        .repair()
+        .map_err(|e| format!("Could not repair the login item: {e}").into())
 }
 fn register(
     app: &tauri::AppHandle,
