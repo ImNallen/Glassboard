@@ -1,6 +1,6 @@
 use super::{
     apply_windows, focus_drawing,
-    geometry::{SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE},
+    geometry::{Rect, SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE},
     select_cursor_monitor,
     toolbar::position_toolbar,
     LiveOverlays, Surface,
@@ -49,8 +49,7 @@ fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::
     Ok(())
 }
 fn place_overlay(window: &tauri::WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
-    super::set_size(window, *monitor.size())?;
-    window.set_position(*monitor.position())
+    Rect::monitor(monitor).place(window, monitor.scale_factor())
 }
 pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
     let monitors = app.available_monitors()?;

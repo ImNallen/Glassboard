@@ -13,7 +13,7 @@ pub(crate) fn position_settings(
         .tray_by_id(TRAY_ID)
         .and_then(|tray| tray.rect().ok().flatten())
         .or_else(|| *app.state::<TrayAnchor>().0.lock().unwrap());
-    // Tray rectangles are physical coordinates on both macOS and Windows.
+    // Tray rectangles are in the pixels of the display showing the icon.
     let icon = rect.map(|rect| {
         let p = rect.position.to_physical::<f64>(1.0);
         let s = rect.size.to_physical::<f64>(1.0);
@@ -26,9 +26,11 @@ pub(crate) fn position_settings(
     });
     let monitor = icon
         .and_then(|icon| {
-            app.monitor_from_point(icon.x + icon.width / 2.0, icon.y + icon.height / 2.0)
-                .ok()
-                .flatten()
+            let (x, y) = (icon.x + icon.width / 2.0, icon.y + icon.height / 2.0);
+            app.available_monitors()
+                .ok()?
+                .into_iter()
+                .find(|monitor| Rect::monitor(monitor).contains(x, y, 0.0))
         })
         .or(app.primary_monitor()?)
         .ok_or("No display is available for settings")?;
@@ -45,5 +47,5 @@ pub(crate) fn position_settings(
         height: 0.0,
     });
     let size = work.fit(SETTINGS_SIZE, scale, 8.0, scale);
-    beside_icon(icon, work, size, scale).place(window)
+    Ok(beside_icon(icon, work, size, scale).place(window, scale)?)
 }

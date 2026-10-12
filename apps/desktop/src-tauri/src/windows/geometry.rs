@@ -1,13 +1,42 @@
-use crate::Result;
 use serde::{Deserialize, Serialize};
-use tauri::{PhysicalPosition, PhysicalRect, PhysicalSize};
+use tauri::{
+    LogicalPosition, LogicalSize, PhysicalPosition, PhysicalRect, PhysicalSize, Position, Size,
+};
 
 /// Logical window sizes. The toolbar's includes 12 logical pixels around it for its shadow.
 pub(crate) const TOOLBAR_SIZE: (f64, f64) = (744.0, 76.0);
 pub(crate) const SETTINGS_SIZE: (f64, f64) = (380.0, 620.0);
 pub(crate) const TUTORIAL_SIZE: (f64, f64) = (400.0, 330.0);
 
-/// A rectangle in physical pixels, unless a method says otherwise.
+/// The scale tao bakes into a "physical" coordinate. On macOS tao multiplies points by a
+/// display's scale: a monitor's own for its rectangle, the primary display's for the cursor,
+/// and a window's current one when placing it, which is the display it is leaving. Points are
+/// the one space every macOS display shares. Windows and Linux coordinates are pixels throughout.
+pub(crate) fn coordinate_scale(scale_factor: f64) -> f64 {
+    if cfg!(target_os = "macos") {
+        scale_factor
+    } else {
+        1.0
+    }
+}
+/// Multiplies a tao cursor position into the pixels of a display with `scale`.
+pub(crate) fn cursor_factor(scale: f64, primary_scale: f64) -> f64 {
+    coordinate_scale(scale) / coordinate_scale(primary_scale)
+}
+/// The index of the display under a tao cursor position, each given as its pixel
+/// rectangle and scale.
+pub(crate) fn monitor_under_cursor(
+    cursor: (f64, f64),
+    primary_scale: f64,
+    monitors: impl IntoIterator<Item = (Rect, f64)>,
+) -> Option<usize> {
+    monitors.into_iter().position(|(rect, scale)| {
+        let factor = cursor_factor(scale, primary_scale);
+        rect.contains(cursor.0 * factor, cursor.1 * factor, 0.0)
+    })
+}
+
+/// A rectangle in the pixels of one display, unless a method says otherwise.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub(crate) struct Rect {
     pub(crate) x: f64,
@@ -30,6 +59,13 @@ impl From<PhysicalRect<i32, u32>> for Rect {
 impl Rect {
     pub(crate) fn work_area(monitor: &tauri::Monitor) -> Self {
         (*monitor.work_area()).into()
+    }
+    pub(crate) fn monitor(monitor: &tauri::Monitor) -> Self {
+        PhysicalRect {
+            position: *monitor.position(),
+            size: *monitor.size(),
+        }
+        .into()
     }
     fn map(self, f: fn(f64) -> f64) -> Self {
         Self {
@@ -63,12 +99,40 @@ impl Rect {
             (size.1 * scale).min((self.height - inset * scale).max(min)),
         )
     }
-    pub(crate) fn place(self, window: &tauri::WebviewWindow) -> Result<()> {
-        window.set_position(PhysicalPosition::new(self.x, self.y))?;
-        Ok(super::set_size(
-            window,
-            PhysicalSize::new(self.width, self.height),
-        )?)
+    /// This rectangle of a display with `scale` in tao's shared space: points on macOS,
+    /// pixels elsewhere.
+    pub(crate) fn global(self, scale: f64) -> Self {
+        let scale = coordinate_scale(scale);
+        Self {
+            x: self.x / scale,
+            y: self.y / scale,
+            width: self.width / scale,
+            height: self.height / scale,
+        }
+    }
+    /// Moves and sizes a window to this rectangle of a display with `scale`.
+    pub(crate) fn place(self, window: &tauri::WebviewWindow, scale: f64) -> tauri::Result<()> {
+        let global = self.global(scale);
+        let (position, size): (Position, Size) = if cfg!(target_os = "macos") {
+            (
+                LogicalPosition::new(global.x, global.y).into(),
+                LogicalSize::new(global.width, global.height).into(),
+            )
+        } else {
+            (
+                PhysicalPosition::new(global.x, global.y).into(),
+                PhysicalSize::new(global.width, global.height).into(),
+            )
+        };
+        if cfg!(target_os = "macos") {
+            // AppKit keeps the bottom-left corner through a resize.
+            super::set_size(window, size)?;
+            window.set_position(position)
+        } else {
+            // Windows rescales a window that moves onto a display with another DPI.
+            window.set_position(position)?;
+            super::set_size(window, size)
+        }
     }
 }
 
@@ -112,6 +176,8 @@ pub(crate) struct TrackingLayout {
     pub(crate) dock: Rect,
     pub(crate) window: Rect,
     pub(crate) scale: f64,
+    /// See [`cursor_factor`].
+    pub(crate) cursor_factor: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
@@ -123,6 +189,7 @@ pub(crate) struct ToolbarPointer {
 
 impl TrackingLayout {
     pub(crate) fn pointer_at(&self, x: f64, y: f64, margin: f64) -> Option<ToolbarPointer> {
+        let (x, y) = (x * self.cursor_factor, y * self.cursor_factor);
         let near = self.dock.contains(x, y, margin * self.scale);
         if !near && !self.window.contains(x, y, 0.0) {
             return None;
@@ -226,6 +293,7 @@ mod tests {
                     dock: docked,
                     window,
                     scale,
+                    cursor_factor: 1.0,
                 };
                 let x = docked.x + 30.0 * scale;
                 let y = docked.y + 30.0 * scale;
@@ -240,6 +308,7 @@ mod tests {
                 dock: docked,
                 window,
                 scale,
+                cursor_factor: 1.0,
             };
             let (x, y) = match position {
                 ToolbarPosition::Left => (window.x + window.width - 30.0, window.y + 30.0),
@@ -300,6 +369,55 @@ mod tests {
         assert_eq!((side.y, side.height), (8.0, 434.0));
         let bottom = dock(ToolbarPosition::Bottom, small, 1.0, false);
         assert_eq!((bottom.x, bottom.width), (8.0, 484.0));
+    }
+    #[test]
+    fn cursor_samples_are_scaled_from_the_primary_display_to_the_toolbar_display() {
+        // A 1x display right of a 2x primary display, the toolbar docked left on it.
+        let docked = rect(968.0, 348.0, 76.0, 744.0);
+        let tracking = TrackingLayout {
+            dock: docked,
+            window: docked,
+            scale: 1.0,
+            cursor_factor: 0.5,
+        };
+        let pointer = tracking.pointer_at(2000.0, 800.0, 20.0).unwrap();
+        assert_eq!((pointer.near, pointer.x, pointer.y), (true, 32.0, 52.0));
+        assert!(tracking.pointer_at(1000.0, 400.0, 20.0).is_none());
+    }
+    #[test]
+    fn tao_coordinates_share_points_on_macos_and_pixels_elsewhere() {
+        let external = rect(960.0, 0.0, 2560.0, 1440.0);
+        let retina = rect(5120.0, 0.0, 1920.0, 1080.0);
+        if cfg!(target_os = "macos") {
+            assert_eq!(coordinate_scale(2.0), 2.0);
+            assert_eq!(cursor_factor(1.0, 2.0), 0.5);
+            assert_eq!(retina.global(2.0), rect(2560.0, 0.0, 960.0, 540.0));
+        } else {
+            assert_eq!(coordinate_scale(2.0), 1.0);
+            assert_eq!(cursor_factor(1.0, 2.0), 1.0);
+            assert_eq!(retina.global(2.0), retina);
+        }
+        assert_eq!(external.global(1.0), external);
+    }
+    #[test]
+    fn the_cursor_selects_the_display_it_is_on_across_scales() {
+        // A 2x primary display with a 1x display to its right.
+        let monitors = [
+            (rect(0.0, 0.0, 1920.0, 1080.0), 2.0),
+            (rect(960.0, 0.0, 2560.0, 1440.0), 1.0),
+        ];
+        let primary = if cfg!(target_os = "macos") { 2.0 } else { 1.0 };
+        assert_eq!(
+            monitor_under_cursor((800.0, 600.0), primary, monitors),
+            Some(0)
+        );
+        let far = if cfg!(target_os = "macos") {
+            (4005.3359375, 2588.4609375)
+        } else {
+            (2002.0, 1294.0)
+        };
+        assert_eq!(monitor_under_cursor(far, primary, monitors), Some(1));
+        assert_eq!(monitor_under_cursor((-1.0, 0.0), primary, monitors), None);
     }
     #[test]
     fn proximity_includes_a_margin_around_the_window() {
