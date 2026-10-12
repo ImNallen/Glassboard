@@ -100,10 +100,20 @@ pub(crate) fn suspend_global_shortcuts(app: tauri::AppHandle, suspended: bool) -
         next
     };
     match next {
-        ShortcutBinding::Suspended => app
-            .global_shortcut()
-            .unregister_all()
-            .map_err(|e| format!("Could not release the shortcuts: {e}").into()),
+        ShortcutBinding::Suspended => {
+            // `unregister_all` holds the plugin's shortcut map locked while it waits for the
+            // X11 hotkey thread, which needs that lock to deliver a pending press.
+            let shortcuts = app.global_shortcut();
+            let preferences = snapshot(&app).preferences;
+            let bound: Vec<Shortcut> = GlobalCommand::ALL
+                .into_iter()
+                .filter_map(|command| command.shortcut(&preferences).map(GlobalShortcut::parsed))
+                .filter(|&shortcut| shortcuts.is_registered(shortcut))
+                .collect();
+            shortcuts
+                .unregister_multiple(bound)
+                .map_err(|e| format!("Could not release the shortcuts: {e}").into())
+        }
         ShortcutBinding::Bound => {
             let unavailable = register_global_shortcuts(&app);
             app.state::<AppState>()
@@ -332,10 +342,18 @@ fn register(
 ) -> Result<()> {
     app.global_shortcut()
         .on_shortcut(shortcut.parsed(), move |app, _, event| {
-            if event.state() == ShortcutState::Pressed {
-                if let Err(e) = command.perform(app) {
-                    report(app, e);
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            // On X11 this runs on the hotkey thread, which the main thread waits for while
+            // (un)registering, so a window call here would deadlock.
+            let handle = app.clone();
+            if let Err(e) = app.run_on_main_thread(move || {
+                if let Err(e) = command.perform(&handle) {
+                    report(&handle, e);
                 }
+            }) {
+                report(app, e);
             }
         })
         .map_err(|e| format!("Could not register {}: {e}", shortcut.as_str()).into())
