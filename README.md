@@ -87,7 +87,7 @@ To open settings, click the menu bar or system tray icon. On Linux, select **Set
 For development or a local build, you'll need:
 
 - Node.js 22.12 or newer
-- Rust (stable)
+- [rustup](https://rustup.rs). It installs the Rust version pinned in `rust-toolchain.toml` on first use.
 - The [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
 
 The locked Rust dependencies require PipeWire 0.3.65 or newer. Ubuntu 22.04's
@@ -171,8 +171,8 @@ npm run check         # type checks
 npm test              # unit tests
 npm run build         # build everything
 
-cargo test   --manifest-path apps/desktop/src-tauri/Cargo.toml
-cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+cargo test   --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo clippy --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 ```
 
 The browser preview is good for UI work, but the overlay, global shortcut, and native

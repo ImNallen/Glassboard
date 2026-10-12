@@ -23,15 +23,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      - run: rustup toolchain install --no-self-update
       - name: Install Linux native dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf pkg-config libclang-dev libxcb1-dev libxrandr-dev libdbus-1-dev libpipewire-0.3-dev libwayland-dev libegl-dev libgbm-dev libssl-dev
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: apps/desktop/src-tauri
       - run: npm ci
@@ -39,8 +37,8 @@ jobs:
       - run: npm test --workspace apps/desktop
       - run: npm run build --workspace apps/desktop
       - run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
-      - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
-      - run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+      - run: cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+      - run: cargo clippy --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
       - run: npm run tauri --workspace apps/desktop -- build --debug --no-bundle
   web:
     runs-on: ubuntu-latest
