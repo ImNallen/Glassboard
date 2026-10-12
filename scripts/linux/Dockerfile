@@ -1,4 +1,4 @@
-FROM node:24-bookworm AS node
+FROM node:26-bookworm AS node
 # Match rust-toolchain.toml. rustup in the container follows that file, so a mismatch downloads a second toolchain.
 FROM rust:1.93.0-bookworm AS rust
 FROM ubuntu:24.04
