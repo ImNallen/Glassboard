@@ -2,12 +2,13 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { release } from '../src/lib/release.mjs';
 
-export async function verifyPublicDownloads(fetchRequest = fetch) {
+export async function verifyPublicDownloads(fetchRequest = fetch, token = process.env.GITHUB_TOKEN) {
   const apiUrl = `https://api.github.com/repos/ImNallen/Glassboard/releases/tags/${release.tag}`;
   const options = () => ({ redirect: 'follow', signal: AbortSignal.timeout(20_000) });
   const response = await fetchRequest(apiUrl, {
     ...options(),
-    headers: { Accept: 'application/vnd.github+json' },
+    // Shared runners exhaust the anonymous API limit. The installer requests below stay anonymous.
+    headers: { Accept: 'application/vnd.github+json', ...(token && { Authorization: `Bearer ${token}` }) },
   });
   assert(response.ok, `Release ${release.tag} is not publicly available (${response.status}). Publish the complete draft before deploying.`);
   const published = await response.json();

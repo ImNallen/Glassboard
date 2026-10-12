@@ -50,6 +50,8 @@ jobs:
         env:
           PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
       - run: npm run web verify:downloads
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/web/dist
@@ -67,3 +69,8 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v5
         id: deployment
+        env:
+          # Pages ignores a second deployment with the same build version, which deploy-pages
+          # takes from GITHUB_SHA. A release usually targets the commit main already deployed,
+          # but sync:release gives it new downloads.
+          GITHUB_SHA: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
