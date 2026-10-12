@@ -15,7 +15,7 @@ test('verifies every exact public download URL without authorization and follows
   await verifyPublicDownloads(async (url, options) => {
     requests.push({ url, options });
     return options.method === 'HEAD' ? new Response(null) : Response.json(metadata());
-  });
+  }, '');
   assert.deepEqual(requests.map(request => request.url), [
     `https://api.github.com/repos/ImNallen/Glassboard/releases/tags/${release.tag}`,
     ...release.downloads.map(download => download.url),
@@ -26,6 +26,15 @@ test('verifies every exact public download URL without authorization and follows
     assert(options.signal instanceof AbortSignal);
   }
   assert.deepEqual(requests.slice(1).map(request => request.options.method), release.downloads.map(() => 'HEAD'));
+});
+
+test('authorizes only the release metadata request when a token is set', async () => {
+  const authorization = [];
+  await verifyPublicDownloads(async (url, options) => {
+    authorization.push(new Headers(options.headers).get('authorization'));
+    return options.method === 'HEAD' ? new Response(null) : Response.json(metadata());
+  }, 'secret');
+  assert.deepEqual(authorization, ['Bearer secret', ...release.downloads.map(() => null)]);
 });
 
 test('rejects an unpublished draft before checking installer URLs', async () => {
