@@ -19,7 +19,8 @@ mod windows;
 use capture::{copy_capture, copy_capture_region, get_capture_image};
 use commands::{
     action, activate_overlay, expand_toolbar, get_autostart, get_session,
-    register_global_shortcuts, report_history, set_autostart, set_preferences, transition,
+    register_global_shortcuts, report_history, set_autostart, set_preferences,
+    suspend_global_shortcuts, transition, GlobalShortcuts, ShortcutBinding,
 };
 use preference_saves::PreferenceSaves;
 use preferences::Preferences;
@@ -115,6 +116,7 @@ fn main() {
             activate_overlay,
             report_history,
             set_preferences,
+            suspend_global_shortcuts,
             get_autostart,
             set_autostart,
             expand_toolbar,
@@ -159,7 +161,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     let mut problems = Vec::new();
     #[cfg(target_os = "macos")]
     problems.extend(
-        commands::migrate_login_item(app.handle())
+        commands::repair_login_item(app.handle())
             .err()
             .map(|e| e.to_string()),
     );
@@ -194,6 +196,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     windows::create_windows(app)?;
     tray::create_tray(app)?;
     let handle = app.handle();
+    app.manage(GlobalShortcuts(Mutex::new(ShortcutBinding::Bound)));
     let unavailable = register_global_shortcuts(handle);
     app.state::<AppState>()
         .0

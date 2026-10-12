@@ -12,6 +12,7 @@
   import ColorSettings from './ColorSettings.svelte';
   import ShortcutRecorder from './ShortcutRecorder.svelte';
   import { getAutostart, setAutostart } from './lib/autostart';
+  import { suspendGlobalShortcuts } from './lib/global-shortcuts';
   import { checkForUpdates, installUpdate, updateDetail, updateLabel, watchUpdates, type UpdateStatus } from './lib/updates';
   let { session, errors }: { session: Session; errors: Errors } = $props();
   type Tab = 'general' | 'colors' | 'keybindings';
@@ -91,6 +92,11 @@
     }
     catch (e) { errors.report(e); }
     finally { busy = false; }
+  }
+  /** Every recorder releases the global shortcuts, so pressing one while recording reaches the "already used" check instead of the OS. */
+  function record(recording: boolean, text: string) {
+    hint = recording ? text : '';
+    suspendGlobalShortcuts(recording).catch(errors.report);
   }
   function setGlobal(command: GlobalCommand, next: string) {
     const result = rebindGlobal(preferences, command, next);
@@ -213,14 +219,14 @@
           <div class="list">
             <div class="row binding">
               <ShortcutRecorder label="Toggle Glassboard" shortcut={preferences.shortcut} fallback={DEFAULT_SHORTCUT} physical active={windowVisible} disabled={busy}
-                onchange={next => setGlobal('toggle', next)} {errors} onrecord={recording => hint = recording ? GLOBAL_HINT : ''}>
+                onchange={next => setGlobal('toggle', next)} {errors} onrecord={recording => record(recording, GLOBAL_HINT)}>
                 <span class="row-icon"><Logo size={14}/></span>
                 <span class="row-label">Toggle Glassboard</span>
               </ShortcutRecorder>
             </div>
             <div class="row binding">
               <ShortcutRecorder label="Take screenshot" shortcut={preferences.captureShortcut} fallback={DEFAULT_CAPTURE_SHORTCUT} physical clearable active={windowVisible} disabled={busy}
-                onchange={next => setGlobal('capture', next)} {errors} onrecord={recording => hint = recording ? CAPTURE_HINT : ''}>
+                onchange={next => setGlobal('capture', next)} {errors} onrecord={recording => record(recording, CAPTURE_HINT)}>
                 <span class="row-icon"><Scan size={15} strokeWidth={1.9}/></span>
                 <span class="row-label">Take screenshot</span>
               </ShortcutRecorder>
@@ -239,7 +245,7 @@
                 {@const swatch = swatches[binding.id]}
                 <div class="row binding">
                   <ShortcutRecorder label={swatch?.name ?? binding.name} shortcut={keybinding(preferences.keybindings, binding.id)} fallback={binding.shortcut} clearable active={windowVisible} disabled={busy}
-                    onchange={next => setBinding(binding.id, next)} {errors} onrecord={recording => hint = recording ? LOCAL_HINT : ''}>
+                    onchange={next => setBinding(binding.id, next)} {errors} onrecord={recording => record(recording, LOCAL_HINT)}>
                     <span class="row-icon">{#if swatch}<span class="swatch" style:background={swatch.background}></span>{:else if Icon}<Icon size={15} strokeWidth={1.9}/>{/if}</span>
                     <span class="row-label">{swatch?.name ?? binding.name}{#if binding.description}<small>{binding.description}</small>{/if}</span>
                   </ShortcutRecorder>

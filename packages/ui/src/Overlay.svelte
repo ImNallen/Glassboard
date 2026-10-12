@@ -97,6 +97,13 @@
     const target = ctx && shapeAtPoint(ctx, shapes, point, now);
     if (target) { erasing.add(target.id); paint(); }
   }
+  /** Hit-test every 6px from the last pointer position, so a fast swipe cannot skip a thin stroke. */
+  function eraseTo(point: Point) {
+    const from = lastPointer ?? point;
+    const steps = Math.ceil(Math.hypot(point.x - from.x, point.y - from.y) / 6);
+    for (let i = 1; i <= steps; i++) eraseAt({ x: from.x + (point.x - from.x) * i / steps, y: from.y + (point.y - from.y) * i / steps });
+    lastPointer = point;
+  }
   function openText(origin: Point) {
     commitText();
     editor = { origin, hue: Math.random() * 360, text: '' };
@@ -122,6 +129,8 @@
     paint();
   }
   function editorKeydown(event: KeyboardEvent) {
+    // 229 is the composing keyCode; WKWebView can fire the confirming Enter after compositionend with isComposing already false.
+    if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); editor = null; paint(); return; }
     if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.stopPropagation(); commitText(); }
   }
@@ -147,17 +156,17 @@
     // pointerup that will not arrive, and leave the re-entry point out of the stroke.
     if (event.type === 'pointermove' && event.buttons === 0) { finish(); return; }
     const current = { x: event.clientX, y: event.clientY };
+    const coalesced = event.getCoalescedEvents?.() || [];
+    const samples = coalesced.length ? coalesced : [event];
     if (erasing) {
-      for (const sample of event.getCoalescedEvents?.() || [event]) eraseAt({ x: sample.clientX, y: sample.clientY });
-      lastPointer = current;
+      for (const sample of samples) eraseTo({ x: sample.clientX, y: sample.clientY });
       return;
     }
     if (!draft) return;
     if (lastPointer) shiftRainbow(draft, lastPointer, current);
     lastPointer = current;
     if (FREEHAND_TOOLS.includes(draft.tool)) {
-      const samples = event.getCoalescedEvents?.() || [];
-      for (const sample of samples.length ? samples : [event]) {
+      for (const sample of samples) {
         const last = draft.points[draft.points.length - 1];
         if (Math.hypot(sample.clientX - last.x, sample.clientY - last.y) >= .6) draft.points.push({ x: sample.clientX, y: sample.clientY });
       }
@@ -168,6 +177,12 @@
     if (event.pointerId !== pointer) return;
     move(event);
     finish();
+  }
+  /** Shift constrains a two-point draft; re-apply it from where the pointer last was instead of waiting for it to move. */
+  function shift(event: KeyboardEvent) {
+    if (event.key !== 'Shift' || !draft || !lastPointer || FREEHAND_TOOLS.includes(draft.tool)) return;
+    draft.points[1] = constrainEnd(draft.points[0], lastPointer, draft.tool, event.shiftKey);
+    paint();
   }
   // Pre-effects run during component initialization; all drawing state must exist first.
   // The generation travels with the session snapshot, so late-loading displays also reset.
@@ -203,7 +218,7 @@
     return () => { disposed = true; stop(); cancelAnimationFrame(frame); clearTimeout(fadeTimer); renderer.reset(); };
   });
 </script>
-<svelte:window onresize={paint} onblur={blur} />
+<svelte:window onresize={paint} onblur={blur} onkeydown={shift} onkeyup={shift} />
 {#if session.mode === 'draw' && showGlow}
   <div class="annotation-glow" aria-hidden="true"></div>
 {/if}

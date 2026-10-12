@@ -1,5 +1,6 @@
 use super::{
-    geometry::{dock, Rect, ToolbarPointer, TrackingLayout},
+    cursor_scale,
+    geometry::{cursor_factor, dock, Rect, ToolbarPointer, TrackingLayout},
     Surface,
 };
 use crate::{state::snapshot, Result};
@@ -53,13 +54,14 @@ pub(crate) fn position_toolbar(app: &tauri::AppHandle) -> Result<()> {
             let position = state.preferences.toolbar_position;
             let toolbar = app.state::<Toolbar>();
             let layout = dock(position, work, scale, toolbar.lock().expanded);
-            layout.place(&window)?;
+            layout.place(&window, scale)?;
             // Popover space must not enlarge the cursor-proximity area: otherwise
             // moving away into the transparent part of the window keeps it open.
             toolbar.lock().layout = Some(TrackingLayout {
                 dock: dock(position, work, scale, false),
                 window: layout,
                 scale,
+                cursor_factor: cursor_factor(scale, cursor_scale(app)),
             });
         }
     }

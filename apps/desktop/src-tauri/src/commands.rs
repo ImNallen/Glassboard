@@ -13,6 +13,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use tauri_plugin_autostart::ManagerExt;
@@ -58,6 +59,69 @@ impl GlobalCommand {
         match self {
             Self::Toggle => transition(app, Transition::Toggle),
             Self::Capture => perform(app, Action::Capture),
+        }
+    }
+}
+
+/// Whether the OS holds the global shortcuts. Settings suspends them while recording a
+/// shortcut, since the OS would otherwise perform a bound combination before the webview sees it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum ShortcutBinding {
+    Bound,
+    Suspended,
+}
+impl ShortcutBinding {
+    /// The state a request moves to, or `None` when it is already there, so repeated
+    /// requests register or unregister nothing twice.
+    fn request(self, suspended: bool) -> Option<Self> {
+        let target = if suspended {
+            Self::Suspended
+        } else {
+            Self::Bound
+        };
+        (target != self).then_some(target)
+    }
+}
+pub(crate) struct GlobalShortcuts(pub(crate) Mutex<ShortcutBinding>);
+impl GlobalShortcuts {
+    fn bound(&self) -> bool {
+        *self.0.lock().unwrap() == ShortcutBinding::Bound
+    }
+}
+#[tauri::command]
+pub(crate) fn suspend_global_shortcuts(app: tauri::AppHandle, suspended: bool) -> Result<()> {
+    let binding = app.state::<GlobalShortcuts>();
+    let next = {
+        let mut binding = binding.0.lock().unwrap();
+        let Some(next) = binding.request(suspended) else {
+            return Ok(());
+        };
+        *binding = next;
+        next
+    };
+    match next {
+        ShortcutBinding::Suspended => {
+            // `unregister_all` holds the plugin's shortcut map locked while it waits for the
+            // X11 hotkey thread, which needs that lock to deliver a pending press.
+            let shortcuts = app.global_shortcut();
+            let preferences = snapshot(&app).preferences;
+            let bound: Vec<Shortcut> = GlobalCommand::ALL
+                .into_iter()
+                .filter_map(|command| command.shortcut(&preferences).map(GlobalShortcut::parsed))
+                .filter(|&shortcut| shortcuts.is_registered(shortcut))
+                .collect();
+            shortcuts
+                .unregister_multiple(bound)
+                .map_err(|e| format!("Could not release the shortcuts: {e}").into())
+        }
+        ShortcutBinding::Bound => {
+            let unavailable = register_global_shortcuts(&app);
+            app.state::<AppState>()
+                .0
+                .lock()
+                .unwrap()
+                .unavailable_shortcuts = unavailable;
+            publish(&app)
         }
     }
 }
@@ -117,6 +181,8 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
             settings.set_focus()?;
         } else {
             settings.hide()?;
+            // Recording ends with Settings, even if the webview never said so.
+            suspend_global_shortcuts(app.clone(), false)?;
         }
         return Ok(());
     }
@@ -236,6 +302,9 @@ pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool
         let item = login_item(&app)?;
         item.set_enabled(enabled)
             .map_err(|e| format!("Could not change the login item: {e}"))?;
+        if enabled && !crate::autostart::approved(&item.agent) {
+            return Err("macOS keeps Glassboard from opening at login. Allow it under System Settings > General > Login Items & Extensions".into());
+        }
         Ok(item.is_enabled())
     }
     #[cfg(any(target_os = "windows", target_os = "linux"))]
@@ -264,10 +333,10 @@ fn login_item(app: &tauri::AppHandle) -> Result<crate::autostart::LoginItem> {
     })
 }
 #[cfg(target_os = "macos")]
-pub(crate) fn migrate_login_item(app: &tauri::AppHandle) -> Result<()> {
+pub(crate) fn repair_login_item(app: &tauri::AppHandle) -> Result<()> {
     login_item(app)?
-        .migrate()
-        .map_err(|e| format!("Could not migrate the login item: {e}").into())
+        .repair()
+        .map_err(|e| format!("Could not repair the login item: {e}").into())
 }
 fn register(
     app: &tauri::AppHandle,
@@ -276,10 +345,18 @@ fn register(
 ) -> Result<()> {
     app.global_shortcut()
         .on_shortcut(shortcut.parsed(), move |app, _, event| {
-            if event.state() == ShortcutState::Pressed {
-                if let Err(e) = command.perform(app) {
-                    report(app, e);
+            if event.state() != ShortcutState::Pressed {
+                return;
+            }
+            // On X11 this runs on the hotkey thread, which the main thread waits for while
+            // (un)registering, so a window call here would deadlock.
+            let handle = app.clone();
+            if let Err(e) = app.run_on_main_thread(move || {
+                if let Err(e) = command.perform(&handle) {
+                    report(&handle, e);
                 }
+            }) {
+                report(app, e);
             }
         })
         .map_err(|e| format!("Could not register {}: {e}", shortcut.as_str()).into())
@@ -316,7 +393,9 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
         .filter(|&command| parsed(command, &preferences) != parsed(command, &old))
         .collect();
     let saves = app.state::<PreferenceSaves>();
-    if !changed.is_empty() {
+    // Suspended shortcuts are registered on resume, from whatever the preferences hold then.
+    let rebound = !changed.is_empty() && app.state::<GlobalShortcuts>().bound();
+    if rebound {
         rebind(app, &saves, &changed, &old, &preferences)?;
     }
     let reposition = old.toolbar_position != preferences.toolbar_position;
@@ -329,7 +408,7 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
             .unavailable_shortcuts
             .retain(|command| !changed.contains(command));
     }
-    if changed.is_empty() {
+    if !rebound {
         saves.queue(preferences)?;
     }
     if reposition {
@@ -423,6 +502,14 @@ mod tests {
         );
         assert!(parse("interact").is_err());
         assert_eq!(serde_json::to_value(Action::Clear).unwrap(), "clear");
+    }
+    #[test]
+    fn suspending_and_resuming_shortcuts_converge_without_repeating_a_step() {
+        use ShortcutBinding::*;
+        assert_eq!(Bound.request(true), Some(Suspended));
+        assert_eq!(Suspended.request(true), None);
+        assert_eq!(Suspended.request(false), Some(Bound));
+        assert_eq!(Bound.request(false), None);
     }
     #[test]
     fn global_commands_keep_their_wire_names() {

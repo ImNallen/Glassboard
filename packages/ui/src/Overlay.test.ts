@@ -52,9 +52,18 @@ function paint() {
   pending.forEach(callback => callback(0));
 }
 
-function pointer(canvas: HTMLCanvasElement, type: string, x: number, y: number, init: MouseEventInit = {}) {
+/** `coalesced` stands in for the browser's `getCoalescedEvents`; jsdom has none, like a browser that omits it. */
+function pointer(canvas: HTMLCanvasElement, type: string, x: number, y: number, { coalesced, ...init }: MouseEventInit & { coalesced?: { x: number; y: number }[] } = {}) {
   const buttons = type === 'pointerup' || type === 'lostpointercapture' ? 0 : 1;
-  canvas.dispatchEvent(Object.assign(new MouseEvent(type, { clientX: x, clientY: y, button: 0, buttons, bubbles: true, ...init }), { pointerId: 1 }));
+  const event = Object.assign(new MouseEvent(type, { clientX: x, clientY: y, button: 0, buttons, bubbles: true, ...init }), { pointerId: 1 });
+  if (coalesced) Object.assign(event, { getCoalescedEvents: () => coalesced.map(point => ({ clientX: point.x, clientY: point.y })) });
+  canvas.dispatchEvent(event);
+  flushSync();
+  paint();
+}
+
+function key(target: EventTarget, type: 'keydown' | 'keyup', init: KeyboardEventInit) {
+  target.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init }));
   flushSync();
   paint();
 }
@@ -80,6 +89,34 @@ function setup() {
 
 /** Committed shapes passed to the last render; the draft travels separately. */
 const drawn = () => vi.mocked(render).mock.lastCall?.[1];
+const drafted = () => vi.mocked(render).mock.lastCall?.[2];
+
+/** Open the inline text editor at (10, 20) and type into it the way the browser would. */
+function typeText(text: string) {
+  const { store, canvas } = setup();
+  vi.mocked(canvas.getContext).mockReturnValue({ clearRect, save() {}, restore() {}, measureText: () => ({ width: 40 }) } as unknown as CanvasRenderingContext2D);
+  store.update(session => ({ ...session, preferences: { ...session.preferences, tool: 'text' } }));
+  flushSync();
+  pointer(canvas, 'pointerdown', 10, 20);
+  const editor = document.querySelector('textarea')!;
+  editor.value = text;
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  flushSync();
+  return editor;
+}
+
+/** Draw a thin vertical pen stroke at x = 60, then switch to the eraser with a hit test that only matches that stroke. */
+function strokeToErase() {
+  const { store, canvas } = setup();
+  pointer(canvas, 'pointerdown', 60, 0);
+  pointer(canvas, 'pointermove', 60, 100);
+  pointer(canvas, 'pointerup', 60, 100);
+  const [stroke] = drawn()!;
+  store.update(session => ({ ...session, preferences: { ...session.preferences, tool: 'eraser' } }));
+  flushSync();
+  vi.mocked(shapeAtPoint).mockImplementation((_ctx, shapes, point) => shapes.includes(stroke) && Math.abs(point.x - 60) <= 3 && point.y >= 0 && point.y <= 100 ? stroke : undefined);
+  return canvas;
+}
 
 it('mounts, draws, clears while frames are paused, and draws again after reopening', () => {
   const store = writable(structuredClone(defaults));
@@ -167,4 +204,60 @@ it('sets the inline text editor in the font the canvas draws committed text with
   const editor = document.querySelector('textarea')!;
   expect([editor.style.fontWeight, editor.style.fontSize, editor.style.fontFamily.replaceAll('"', "'")]).toEqual(['600', `${textFontSize(REGULAR_WIDTH)}px`, TEXT_FONT_FAMILY]);
   expect(editor.style.lineHeight).toBe(`${textLineHeight(REGULAR_WIDTH)}px`);
+});
+
+it('keeps composing text when the input method confirms a conversion with Enter', () => {
+  const editor = typeText('日本');
+  key(editor, 'keydown', { key: 'Enter', isComposing: true });
+  expect(document.querySelector('textarea')?.value).toBe('日本');
+  expect(drawn()).toHaveLength(0);
+  // WKWebView can deliver the confirming Enter after compositionend with isComposing already false.
+  key(editor, 'keydown', { key: 'Enter', keyCode: 229 });
+  expect(document.querySelector('textarea')?.value).toBe('日本');
+  expect(drawn()).toHaveLength(0);
+  key(editor, 'keydown', { key: 'Enter' });
+  expect(document.querySelector('textarea')).toBeNull();
+  expect(drawn()?.map(shape => shape.text)).toEqual(['日本']);
+});
+
+it('keeps composing text when the input method cancels a conversion with Escape', () => {
+  const editor = typeText('日本');
+  key(editor, 'keydown', { key: 'Escape', isComposing: true });
+  expect(document.querySelector('textarea')?.value).toBe('日本');
+  key(editor, 'keydown', { key: 'Escape' });
+  expect(document.querySelector('textarea')).toBeNull();
+  expect(drawn()).toHaveLength(0);
+});
+
+it('erases at the pointer when the browser reports no coalesced events', () => {
+  const canvas = strokeToErase();
+  pointer(canvas, 'pointerdown', 20, 50);
+  expect(drawn()).toHaveLength(1);
+  pointer(canvas, 'pointermove', 60, 50, { coalesced: [] });
+  pointer(canvas, 'pointerup', 60, 50, { coalesced: [] });
+  expect(drawn()).toHaveLength(0);
+});
+
+it('erases a thin stroke that a fast swipe crosses between two samples', () => {
+  const canvas = strokeToErase();
+  pointer(canvas, 'pointerdown', 20, 50);
+  pointer(canvas, 'pointermove', 100, 50);
+  pointer(canvas, 'pointerup', 100, 50);
+  expect(drawn()).toHaveLength(0);
+});
+
+it('snaps and releases a held shape when Shift changes without the pointer moving', () => {
+  const { store, canvas } = setup();
+  store.update(session => ({ ...session, preferences: { ...session.preferences, tool: 'rectangle' } }));
+  flushSync();
+  pointer(canvas, 'pointerdown', 10, 20);
+  pointer(canvas, 'pointermove', 110, 80);
+  expect(drafted()?.points[1]).toEqual({ x: 110, y: 80 });
+  key(window, 'keydown', { key: 'Shift', shiftKey: true });
+  expect(drafted()?.points[1]).toEqual({ x: 110, y: 120 });
+  key(window, 'keyup', { key: 'Shift', shiftKey: false });
+  expect(drafted()?.points[1]).toEqual({ x: 110, y: 80 });
+  key(window, 'keydown', { key: 'Shift', shiftKey: true });
+  pointer(canvas, 'lostpointercapture', 110, 80);
+  expect(drawn()?.[0].points[1]).toEqual({ x: 110, y: 120 });
 });

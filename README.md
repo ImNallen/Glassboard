@@ -10,8 +10,11 @@ and text over anything on screen. Press it again and the drawings are
 cleared. You can also capture part of the screen, mark it up, and copy it to the
 clipboard, ready to paste into a chat or a coding agent.
 
-Everything runs on your machine. There's no account, no server, no video recording,
-and nothing is sent over the network.
+Everything runs on your machine. There's no account, no server, and no video
+recording, and your drawings and captures never leave your computer. Glassboard goes
+online only to check [GitHub releases](https://github.com/ImNallen/Glassboard/releases)
+for updates once a day and to download them. Updates are signature-checked and
+install only when you choose to restart.
 
 [glassboard.dev](https://glassboard.dev) has a live demo you can draw on in the browser.
 
@@ -84,7 +87,7 @@ To open settings, click the menu bar or system tray icon. On Linux, select **Set
 For development or a local build, you'll need:
 
 - Node.js 22.12 or newer
-- Rust (stable)
+- [rustup](https://rustup.rs). It installs the Rust version pinned in `rust-toolchain.toml` on first use.
 - The [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your OS
 
 The locked Rust dependencies require PipeWire 0.3.65 or newer. Ubuntu 22.04's
@@ -168,8 +171,8 @@ npm run check         # type checks
 npm test              # unit tests
 npm run build         # build everything
 
-cargo test   --manifest-path apps/desktop/src-tauri/Cargo.toml
-cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
+cargo test   --locked --manifest-path apps/desktop/src-tauri/Cargo.toml
+cargo clippy --locked --all-targets --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings
 ```
 
 The browser preview is good for UI work, but the overlay, global shortcut, and native

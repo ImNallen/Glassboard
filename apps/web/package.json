@@ -10,6 +10,7 @@
     "preview": "astro preview",
     "check": "astro check",
     "test": "node --test scripts/*.test.mjs",
+    "sync:release": "node scripts/sync-release.mjs",
     "verify:downloads": "node scripts/verify-downloads.mjs",
     "astro": "astro"
   },

@@ -11,10 +11,10 @@ use crate::{
     state::{publish, snapshot, AppState},
     Result,
 };
-use geometry::{top_center, Rect, TUTORIAL_SIZE};
+use geometry::{monitor_under_cursor, top_center, Rect, TUTORIAL_SIZE};
 use serde::{Serialize, Serializer};
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
-use tauri::{Manager, PhysicalPosition, PhysicalRect, PhysicalSize};
+use tauri::Manager;
 
 /// A webview window. The label names it to Tauri and `?surface=` tells the frontend what to render.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -153,10 +153,7 @@ pub(crate) fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
                 let work = Rect::work_area(&monitor);
                 let scale = monitor.scale_factor();
                 let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
-                let frame = top_center(work, size, scale);
-                // Resize first: macOS keeps the bottom edge when resizing, so a later resize would shift the top.
-                set_size(&window, PhysicalSize::new(frame.width, frame.height))?;
-                window.set_position(PhysicalPosition::new(frame.x, frame.y))?;
+                top_center(work, size, scale).place(&window, scale)?;
             }
         }
         window.show()?;
@@ -178,16 +175,24 @@ pub(crate) fn raise_toolbar(app: &tauri::AppHandle) {
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
     let _ = app;
 }
+/// The scale tao applied to the cursor position.
+pub(crate) fn cursor_scale(app: &tauri::AppHandle) -> f64 {
+    app.primary_monitor()
+        .ok()
+        .flatten()
+        .map_or(1.0, |monitor| monitor.scale_factor())
+}
 pub(crate) fn select_cursor_monitor(app: &tauri::AppHandle) {
-    if let Ok(cursor) = app.cursor_position() {
-        for (overlay, window) in live_overlays(app) {
-            if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
-                if Rect::from(PhysicalRect { position, size }).contains(cursor.x, cursor.y, 0.0) {
-                    app.state::<AppState>().0.lock().unwrap().active_overlay = overlay;
-                    break;
-                }
-            }
-        }
+    let (Ok(cursor), Ok(monitors)) = (app.cursor_position(), app.available_monitors()) else {
+        return;
+    };
+    let live = app.state::<LiveOverlays>().0.load(SeqCst);
+    let monitors = monitors
+        .iter()
+        .take(live)
+        .map(|monitor| (Rect::monitor(monitor), monitor.scale_factor()));
+    if let Some(index) = monitor_under_cursor((cursor.x, cursor.y), cursor_scale(app), monitors) {
+        app.state::<AppState>().0.lock().unwrap().active_overlay = Surface::Overlay(index);
     }
 }
 

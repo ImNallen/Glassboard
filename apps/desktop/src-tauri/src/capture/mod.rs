@@ -6,8 +6,8 @@ use crate::{
     session::{ReadyCapture, Transition},
     state::{report, snapshot, AppState},
     windows::{
-        apply_windows,
-        geometry::{dock, Rect},
+        apply_windows, cursor_scale,
+        geometry::{coordinate_scale, dock, Rect},
         Surface,
     },
     Result,
@@ -53,11 +53,7 @@ fn capture_monitor(app: &tauri::AppHandle, origin: (i32, i32)) -> Result<tauri::
         .into_iter()
         .find(|monitor| {
             // XCap reports macOS displays in points and Windows displays in pixels.
-            let scale = if cfg!(target_os = "macos") {
-                monitor.scale_factor()
-            } else {
-                1.0
-            };
+            let scale = coordinate_scale(monitor.scale_factor());
             let position = monitor.position();
             let x = (position.x as f64 / scale).round() as i32;
             let y = (position.y as f64 / scale).round() as i32;
@@ -107,18 +103,11 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
     }
     check_permission()?;
     let cursor = app.cursor_position()?;
-    // Tao reports macOS cursor coordinates using the primary display's scale;
     // CoreGraphics/XCap expects global logical coordinates, including negative origins.
-    let coordinate_scale = if cfg!(target_os = "macos") {
-        app.primary_monitor()?
-            .ok_or("No display is available")?
-            .scale_factor()
-    } else {
-        1.0
-    };
+    let scale = coordinate_scale(cursor_scale(app));
     let capture_point = (
-        (cursor.x / coordinate_scale).round() as i32,
-        (cursor.y / coordinate_scale).round() as i32,
+        (cursor.x / scale).round() as i32,
+        (cursor.y / scale).round() as i32,
     );
     #[cfg(target_os = "linux")]
     let (position, size) = {
