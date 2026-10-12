@@ -2,7 +2,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { flushSync, mount, tick, unmount } from 'svelte';
 import Settings from './Settings.svelte';
-import { createPreviewSession, defaults, savePreferences, subscribe, useSession, type Session } from '@glassboard/ui/session';
+import { clearMocks, mockIPC } from '@tauri-apps/api/mocks';
+import { action, createPreviewSession, defaults, savePreferences, subscribe, useSession, type Session } from '@glassboard/ui/session';
 import { getAutostart } from './lib/autostart';
 import { createErrors } from '@glassboard/ui/errors';
 import { watchUpdates, type UpdateStatus } from './lib/updates';
@@ -16,6 +17,7 @@ let settings: ReturnType<typeof mount> | undefined;
 let stop = () => {};
 afterEach(async () => {
   vi.restoreAllMocks();
+  clearMocks();
   if (settings) await unmount(settings);
   settings = undefined;
   stop();
@@ -315,6 +317,38 @@ it('records, refuses, clears, and resets the global screenshot shortcut', async 
   await tick();
   expect(session().preferences.captureShortcut).toBe('Super+Control+Shift+KeyS');
   expect(document.querySelector<HTMLButtonElement>('.reset-all')!.disabled).toBe(true);
+});
+
+it('releases the global shortcuts while any binding records, and holds them again when recording stops', async () => {
+  const requests: unknown[] = [];
+  mockIPC((command, payload) => {
+    if (command === 'suspend_global_shortcuts') requests.push(payload);
+    if (command === 'get_autostart') return false;
+  });
+  vi.mocked(watchUpdates).mockImplementationOnce(async fn => { fn({ state: 'idle' }); return () => {}; });
+  useSession(createPreviewSession(), { native: true });
+  await action('settings');
+  const session = await setup();
+  row('Toggle Glassboard').click();
+  flushSync();
+  expect(requests).toEqual([{ suspended: true }]);
+  press('Escape', 'Escape');
+  expect(requests).toEqual([{ suspended: true }, { suspended: false }]);
+
+  row('Undo').click();
+  flushSync();
+  press('u', 'KeyU', { ctrlKey: true });
+  await tick();
+  expect(session().preferences.keybindings.undo).toBe('CommandOrControl+KeyU');
+  expect(requests).toEqual([{ suspended: true }, { suspended: false }, { suspended: true }, { suspended: false }]);
+
+  row('Redo').click();
+  flushSync();
+  expect(requests).toHaveLength(5);
+  await action('close-settings');
+  flushSync();
+  expect(requests.at(-1)).toEqual({ suspended: false });
+  expect(requests).toHaveLength(6);
 });
 
 it('dismisses a backend error from the status line', async () => {

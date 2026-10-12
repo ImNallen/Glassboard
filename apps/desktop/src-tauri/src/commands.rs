@@ -13,6 +13,7 @@ use crate::{
     Result,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use tauri_plugin_autostart::ManagerExt;
@@ -58,6 +59,59 @@ impl GlobalCommand {
         match self {
             Self::Toggle => transition(app, Transition::Toggle),
             Self::Capture => perform(app, Action::Capture),
+        }
+    }
+}
+
+/// Whether the OS holds the global shortcuts. Settings suspends them while recording a
+/// shortcut, since the OS would otherwise perform a bound combination before the webview sees it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum ShortcutBinding {
+    Bound,
+    Suspended,
+}
+impl ShortcutBinding {
+    /// The state a request moves to, or `None` when it is already there, so repeated
+    /// requests register or unregister nothing twice.
+    fn request(self, suspended: bool) -> Option<Self> {
+        let target = if suspended {
+            Self::Suspended
+        } else {
+            Self::Bound
+        };
+        (target != self).then_some(target)
+    }
+}
+pub(crate) struct GlobalShortcuts(pub(crate) Mutex<ShortcutBinding>);
+impl GlobalShortcuts {
+    fn bound(&self) -> bool {
+        *self.0.lock().unwrap() == ShortcutBinding::Bound
+    }
+}
+#[tauri::command]
+pub(crate) fn suspend_global_shortcuts(app: tauri::AppHandle, suspended: bool) -> Result<()> {
+    let binding = app.state::<GlobalShortcuts>();
+    let next = {
+        let mut binding = binding.0.lock().unwrap();
+        let Some(next) = binding.request(suspended) else {
+            return Ok(());
+        };
+        *binding = next;
+        next
+    };
+    match next {
+        ShortcutBinding::Suspended => app
+            .global_shortcut()
+            .unregister_all()
+            .map_err(|e| format!("Could not release the shortcuts: {e}").into()),
+        ShortcutBinding::Bound => {
+            let unavailable = register_global_shortcuts(&app);
+            app.state::<AppState>()
+                .0
+                .lock()
+                .unwrap()
+                .unavailable_shortcuts = unavailable;
+            publish(&app)
         }
     }
 }
@@ -117,6 +171,8 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
             settings.set_focus()?;
         } else {
             settings.hide()?;
+            // Recording ends with Settings, even if the webview never said so.
+            suspend_global_shortcuts(app.clone(), false)?;
         }
         return Ok(());
     }
@@ -316,7 +372,9 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
         .filter(|&command| parsed(command, &preferences) != parsed(command, &old))
         .collect();
     let saves = app.state::<PreferenceSaves>();
-    if !changed.is_empty() {
+    // Suspended shortcuts are registered on resume, from whatever the preferences hold then.
+    let rebound = !changed.is_empty() && app.state::<GlobalShortcuts>().bound();
+    if rebound {
         rebind(app, &saves, &changed, &old, &preferences)?;
     }
     let reposition = old.toolbar_position != preferences.toolbar_position;
@@ -329,7 +387,7 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
             .unavailable_shortcuts
             .retain(|command| !changed.contains(command));
     }
-    if changed.is_empty() {
+    if !rebound {
         saves.queue(preferences)?;
     }
     if reposition {
@@ -423,6 +481,14 @@ mod tests {
         );
         assert!(parse("interact").is_err());
         assert_eq!(serde_json::to_value(Action::Clear).unwrap(), "clear");
+    }
+    #[test]
+    fn suspending_and_resuming_shortcuts_converge_without_repeating_a_step() {
+        use ShortcutBinding::*;
+        assert_eq!(Bound.request(true), Some(Suspended));
+        assert_eq!(Suspended.request(true), None);
+        assert_eq!(Suspended.request(false), Some(Bound));
+        assert_eq!(Bound.request(false), None);
     }
     #[test]
     fn global_commands_keep_their_wire_names() {
