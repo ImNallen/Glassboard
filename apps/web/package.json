@@ -18,9 +18,9 @@
     "@astrojs/svelte": "^9.0.1",
     "@fontsource-variable/familjen-grotesk": "^5.3.0",
     "@glassboard/ui": "0.1.0",
-    "astro": "^7.3.5",
+    "astro": "^7.3.8",
     "html-to-image": "^1.11.13",
-    "svelte": "^5.57.1"
+    "svelte": "^5.57.2"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.4",
