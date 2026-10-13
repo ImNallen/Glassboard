@@ -163,7 +163,8 @@ jobs:
           gh release view "$TAG" --json tagName,isDraft,targetCommitish --jq '.' |
             jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' >/dev/null
           gh release upload "$TAG" "$dmg" --clobber
-  # Each platform writes latest.json on the draft, and a lost write would strand its users.
+  # Each platform writes latest.json on the draft, and a lost write would strand its users. This job runs last,
+  # so it is the only writer that can swap tauri-action's rate-limited api.github.com URLs for download URLs.
   updater-manifest:
     needs: [prepare, desktop]
     permissions:
@@ -180,11 +181,15 @@ jobs:
           BUILD_SHA: ${{ needs.prepare.outputs.sha }}
         run: |
           set -euo pipefail
-          gh release download "$TAG" --pattern latest.json
-          jq -e --arg v "$VERSION" '.version == $v and ([.platforms["darwin-aarch64"], .platforms["darwin-x86_64"], .platforms["windows-x86_64"], .platforms["linux-x86_64"]] | all(.url != null and (.signature // "") != ""))' latest.json
           release=$(gh release view "$TAG" --json tagName,isDraft,targetCommitish,url)
           jq -e --arg tag "$TAG" --arg sha "$BUILD_SHA" '.tagName == $tag and .isDraft == true and .targetCommitish == $sha' <<< "$release" >/dev/null
           url=$(jq -er .url <<< "$release")
+          gh release download "$TAG" --pattern latest.json --pattern '*.sig' --dir manifest
+          gh release view "$TAG" --json assets > manifest/assets.json
+          node scripts/updater-manifest.mjs manifest "$TAG" "$VERSION"
+          gh release upload "$TAG" manifest/latest.json --clobber
+          gh release download "$TAG" --pattern latest.json --dir uploaded
+          cmp manifest/latest.json uploaded/latest.json
           {
             echo "Draft release: [$TAG]($url)"
             echo "Build commit: \`$BUILD_SHA\`"

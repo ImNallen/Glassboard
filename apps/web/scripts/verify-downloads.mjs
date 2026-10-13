@@ -24,6 +24,22 @@ export async function verifyPublicDownloads(fetchRequest = fetch, token = proces
     const file = await fetchRequest(download.url, { ...options(), method: 'HEAD' });
     assert(file.ok, `${download.label} download is not publicly available (${file.status}): ${download.url}`);
   }
+
+  const manifestUrl = 'https://github.com/ImNallen/Glassboard/releases/latest/download/latest.json';
+  const manifestResponse = await fetchRequest(manifestUrl, options());
+  assert(manifestResponse.ok, `Updater manifest is not publicly available (${manifestResponse.status}): ${manifestUrl}`);
+  const manifest = await manifestResponse.json();
+  assert.equal(manifest?.version, release.version, 'The updater manifest names a different version.');
+  const platforms = Object.entries(manifest.platforms ?? {});
+  assert(platforms.length > 0, 'The updater manifest lists no platforms.');
+  const downloadPrefix = `https://github.com/ImNallen/Glassboard/releases/download/${release.tag}/`;
+  for (const [platform, entry] of platforms) {
+    assert(typeof entry?.url === 'string' && entry.url.startsWith(downloadPrefix), `Updater manifest ${platform} URL is not a ${release.tag} release download: ${entry?.url}`);
+  }
+  for (const url of new Set(platforms.map(([, entry]) => entry.url))) {
+    const file = await fetchRequest(url, { ...options(), method: 'HEAD' });
+    assert(file.ok, `Updater download is not publicly available (${file.status}): ${url}`);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
