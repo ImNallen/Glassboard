@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Palette, Power, Redo2, RefreshCw, RotateCcw, Scan, SlidersHorizontal, Trash2, Undo2, X } from '@lucide/svelte';
+  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Palette, Power, Redo2, RefreshCw, RotateCcw, Scan, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
@@ -265,7 +265,6 @@
     </div>
 
     <footer>
-      <button onclick={() => run('clear-all')}><Trash2 size={13}/>Clear all drawings</button>
       <button onclick={() => run('quit')}><Power size={13}/>Quit</button>
     </footer>
   </section>
@@ -350,7 +349,7 @@
   .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--gb-muted); }
   .status .dismiss:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .note.unavailable { color: var(--gb-error-text); }
-  footer { display: flex; justify-content: space-between; padding: 10px 12px; border-top: 1px solid var(--gb-divider); }
+  footer { display: flex; justify-content: flex-end; padding: 10px 12px; border-top: 1px solid var(--gb-divider); }
   footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--gb-secondary-text); }
   footer button:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
 </style>

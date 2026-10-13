@@ -14,9 +14,8 @@ pub(crate) const TRAY_ID: &str = "glassboard-tray";
 pub(crate) struct TrayAnchor(pub(crate) Mutex<Option<tauri::Rect>>);
 
 fn menu(app: &AppHandle, ready: bool) -> tauri::Result<Menu<tauri::Wry>> {
-    let clear = MenuItem::with_id(app, "clear", "Clear screen", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Glassboard", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&clear, &quit])?;
+    let menu = Menu::with_items(app, &[&quit])?;
     #[cfg(target_os = "linux")]
     menu.prepend(&MenuItem::with_id(
         app,
