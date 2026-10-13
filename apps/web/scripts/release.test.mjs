@@ -51,3 +51,9 @@ test('rejects invalid Linux installers and continues requiring macOS and Windows
   next.assets.toString = 'extra.AppImage';
   assert.throws(() => createRelease(next), /unsupported platform/);
 });
+
+test('rejects versions that are not plain x.y.z', () => {
+  for (const version of ['0.2.0-rc.1', '0.2.0+build.1', '0.02.0', '1.2']) {
+    assert.throws(() => createRelease({ ...metadata(), version }), /must name a version such as 0\.1\.0/);
+  }
+});

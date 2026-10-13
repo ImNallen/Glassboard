@@ -30,7 +30,6 @@ pub(crate) enum Action {
     Undo,
     Redo,
     Clear,
-    ClearAll,
     OpenGithub,
     ReportIssue,
     CheckForUpdates,
@@ -152,7 +151,6 @@ pub(crate) fn perform(app: &tauri::AppHandle, action: Action) -> Result<()> {
             "drawing-action",
             action,
         )?),
-        Action::ClearAll => Ok(app.emit("drawing-action", Action::Clear)?),
         Action::Session(session) => transition(app, session),
     }
 }
@@ -493,7 +491,6 @@ mod tests {
     #[test]
     fn actions_keep_their_wire_names() {
         let parse = |name: &str| serde_json::from_value::<Action>(name.into());
-        assert_eq!(parse("clear-all").unwrap(), Action::ClearAll);
         assert_eq!(parse("check-for-updates").unwrap(), Action::CheckForUpdates);
         assert_eq!(parse("install-update").unwrap(), Action::InstallUpdate);
         assert_eq!(
