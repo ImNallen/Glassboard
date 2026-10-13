@@ -10,7 +10,7 @@ const paths = {
   cargoLock: new URL('../apps/desktop/src-tauri/Cargo.lock', import.meta.url),
 };
 const tauriPath = new URL('../apps/desktop/src-tauri/tauri.conf.json', import.meta.url);
-const semver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const plainVersion = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 function json(source, label) {
   try {
@@ -21,8 +21,7 @@ function json(source, label) {
 }
 
 function version(value, label) {
-  const match = typeof value === 'string' && semver.exec(value);
-  if (!match || match[4]?.split('.').some(identifier => /^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith('0'))) {
+  if (typeof value !== 'string' || !plainVersion.test(value)) {
     throw new Error(`${label} has an invalid version: ${String(value)}`);
   }
   return value;
@@ -81,13 +80,10 @@ async function restore(originals) {
 async function main() {
   const args = process.argv.slice(2);
   const check = args.length === 1 && args[0] === '--check';
-  if (!check && (args.length !== 1 || (!['patch', 'minor', 'major'].includes(args[0]) && !semver.test(args[0])))) {
-    throw new Error('usage: npm run version:bump -- patch|minor|major|<semver> (or npm run version:check)');
+  if (!check && (args.length !== 1 || (!['patch', 'minor', 'major'].includes(args[0]) && !plainVersion.test(args[0])))) {
+    throw new Error('usage: npm run version:bump -- patch|minor|major|<x.y.z> (or npm run version:check)');
   }
-  const explicitVersion = !check && !['patch', 'minor', 'major'].includes(args[0]) ? version(args[0], 'requested version') : undefined;
-  if (explicitVersion?.includes('+')) {
-    throw new Error('requested version has build metadata, which npm version drops; use a version without +metadata');
-  }
+  const explicitVersion = !check && !['patch', 'minor', 'major'].includes(args[0]) ? args[0] : undefined;
   const originals = Object.fromEntries(await Promise.all(Object.entries(paths).map(async ([key, path]) => [key, await readFile(path)])));
   const plan = inspect(originals, await readFile(tauriPath, 'utf8'));
   if (check) {

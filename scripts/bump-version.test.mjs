@@ -53,7 +53,7 @@ async function assertVersions(root, expected) {
 }
 
 test('native npm bumps patch, minor, major, and an explicit version', async t => {
-  for (const [operation, expected] of [['patch', '0.1.1'], ['minor', '0.2.0'], ['major', '1.0.0'], ['0.2.0-rc.1', '0.2.0-rc.1']]) {
+  for (const [operation, expected] of [['patch', '0.1.1'], ['minor', '0.2.0'], ['major', '1.0.0'], ['0.3.0', '0.3.0']]) {
     await t.test(operation, async sub => {
       const root = await fixture(sub);
       const result = run(root, operation);
@@ -67,9 +67,8 @@ test('native npm bumps patch, minor, major, and an explicit version', async t =>
   }
 });
 
-test('prerelease becomes stable and repeating an exact version is idempotent', async t => {
+test('repeating an exact version is idempotent', async t => {
   const root = await fixture(t);
-  assert.equal(run(root, '0.2.0-rc.1').status, 0);
   assert.equal(run(root, '0.2.0').status, 0);
   await assertVersions(root, '0.2.0');
   const before = await snapshots(root);
@@ -87,9 +86,10 @@ test('command flags keep the lock current when inherited npm config disables it'
 test('validation rejects drift, malformed input, and a wrong Tauri pointer without writes', async t => {
   const root = await fixture(t);
   const before = await snapshots(root);
-  for (const argument of ['--from-git', '--patch', '1.2', 'patch extra', '0.2.0-01', '0.2.0-rc.01', '0.2.0+build.1']) {
+  for (const argument of ['--from-git', '--patch', '1.2', 'patch extra', '0.2.0-01', '0.2.0-rc.01', '0.2.0-rc.1', '0.2.0+build.1']) {
     const result = run(root, argument);
     assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /usage:/);
     assert.doesNotMatch(result.stdout, /Version bumped:/);
     assert.deepEqual(await snapshots(root), before);
   }
@@ -105,6 +105,15 @@ test('validation rejects drift, malformed input, and a wrong Tauri pointer witho
   assert.notEqual(run(root, 'patch').status, 0);
   assert.deepEqual(await snapshots(root), malformed);
   await writeFile(join(root, files.cargo), before.cargo);
+  await writeFile(join(root, files.desktop), before.desktop.toString('utf8').replace('"version": "0.1.0"', '"version": "0.2.0-rc.1"'));
+  const prerelease = await snapshots(root);
+  for (const argument of ['--check', 'patch']) {
+    const result = run(root, argument);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /desktop package\.json has an invalid version: 0\.2\.0-rc\.1/);
+  }
+  assert.deepEqual(await snapshots(root), prerelease);
+  await writeFile(join(root, files.desktop), before.desktop);
   await writeFile(join(root, 'apps/desktop/src-tauri/tauri.conf.json'), '{"version":"0.1.0"}\n');
   assert.notEqual(run(root, 'patch').status, 0);
   assert.deepEqual(await snapshots(root), before);

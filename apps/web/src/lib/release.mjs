@@ -10,7 +10,7 @@ export const platforms = {
 
 /** @param {{ version: string, assets: { macos: string, windows: string, linux?: string } }} metadata */
 export function createRelease(metadata) {
-  if (!/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?$/.test(metadata.version)) {
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(metadata.version)) {
     throw new Error('release.json must name a version such as 0.1.0.');
   }
   if (Object.keys(metadata.assets).some(platform => !Object.hasOwn(platforms, platform))) {
