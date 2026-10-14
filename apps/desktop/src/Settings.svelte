@@ -13,6 +13,7 @@
   import ShortcutRecorder from './ShortcutRecorder.svelte';
   import { getAutostart, setAutostart } from './lib/autostart';
   import { suspendGlobalShortcuts } from './lib/global-shortcuts';
+  import { getResourceUsage, usageLabel, type ResourceUsage } from './lib/usage';
   import { checkForUpdates, installUpdate, updateDetail, updateLabel, watchUpdates, type UpdateStatus } from './lib/updates';
   let { session, errors }: { session: Session; errors: Errors } = $props();
   type Tab = 'general' | 'colors' | 'keybindings';
@@ -43,6 +44,14 @@
   let autostart = $state<boolean | null>(null);
   let switchingAutostart = $state(false);
   $effect(() => { if (windowVisible) getAutostart().then(enabled => autostart = enabled).catch(errors.report); });
+  let usage = $state<ResourceUsage | null>(null);
+  $effect(() => {
+    if (!windowVisible) return;
+    const poll = () => getResourceUsage().then(next => usage = next).catch(error => { clearInterval(timer); errors.report(error); });
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => clearInterval(timer);
+  });
   let updateStatus = $state<UpdateStatus>({ state: 'idle' });
   // Background check failures stay in the button's tooltip. A check the user started, or any install
   // (Settings or the tray, which opens Settings when it fails), shows its failure until the next update step.
@@ -265,6 +274,7 @@
     </div>
 
     <footer>
+      {#if usage}<span class="usage" title="Memory and CPU used by Glassboard and its windows">{usageLabel(usage)}</span>{/if}
       <button onclick={() => run('quit')}><Power size={13}/>Quit</button>
     </footer>
   </section>
@@ -349,7 +359,8 @@
   .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--gb-muted); }
   .status .dismiss:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .note.unavailable { color: var(--gb-error-text); }
-  footer { display: flex; justify-content: flex-end; padding: 10px 12px; border-top: 1px solid var(--gb-divider); }
+  footer { display: flex; align-items: center; justify-content: flex-end; padding: 10px 12px; border-top: 1px solid var(--gb-divider); }
   footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--gb-secondary-text); }
   footer button:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
+  .usage { margin-right: auto; padding-left: 6px; font-size: 11px; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
 </style>
