@@ -14,6 +14,7 @@ mod startup_error;
 mod state;
 mod tray;
 mod updates;
+mod usage;
 mod windows;
 
 use capture::{copy_capture, copy_capture_region, get_capture_image};
@@ -123,7 +124,8 @@ fn main() {
             get_capture_image,
             copy_capture,
             copy_capture_region,
-            updates::get_update
+            updates::get_update,
+            usage::get_resource_usage
         ])
         .setup(|app| {
             if let Err(error) = setup(app) {
@@ -193,6 +195,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     app.manage(capture::CaptureClipboard::default());
     app.manage(TrayAnchor(Mutex::new(None)));
     app.manage(Toolbar::default());
+    app.manage(usage::Usage::default());
     windows::create_windows(app)?;
     tray::create_tray(app)?;
     let handle = app.handle();
