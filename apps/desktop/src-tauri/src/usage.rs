@@ -37,6 +37,9 @@ pub(crate) async fn get_resource_usage(app: tauri::AppHandle) -> ResourceUsage {
     usage
 }
 
+/// Settings polls every 2 seconds while open, so an older sample is from before it last closed.
+const STALE: Duration = Duration::from_secs(5);
+
 /// Percent of one core, as Activity Monitor and top report it. The total can
 /// shrink when a webview process exits, which reads as idle rather than negative.
 fn cpu_percent(
@@ -45,6 +48,9 @@ fn cpu_percent(
 ) -> Option<f32> {
     let (then, previous_cpu_time) = previous?;
     let wall = now.saturating_duration_since(then);
+    if wall > STALE {
+        return None;
+    }
     Some(cpu_time.saturating_sub(previous_cpu_time).as_secs_f32() / wall.as_secs_f32() * 100.0)
 }
 
@@ -144,6 +150,10 @@ mod tests {
         assert_eq!(
             cpu_percent(Some((start, cpu(900))), (at(2), cpu(400))),
             Some(0.0)
+        );
+        assert_eq!(
+            cpu_percent(Some((start, cpu(0))), (at(60), cpu(3000))),
+            None
         );
     }
 }
