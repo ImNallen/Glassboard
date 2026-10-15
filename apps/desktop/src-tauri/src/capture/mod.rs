@@ -6,7 +6,7 @@ use crate::{
     session::{ReadyCapture, Transition},
     state::{report, snapshot, AppState},
     windows::{
-        apply_windows, cursor_scale,
+        apply_windows, capture_window_ready, cursor_scale, ensure_window,
         geometry::{coordinate_scale, dock, Rect},
         Surface,
     },
@@ -15,7 +15,7 @@ use crate::{
 pub(crate) use image::CaptureRegion;
 use std::{
     borrow::Cow,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, PoisonError},
 };
 use tauri::{LogicalPosition, LogicalSize, Manager, PhysicalPosition, PhysicalSize};
 
@@ -96,10 +96,12 @@ pub(crate) fn fail(app: &tauri::AppHandle, error: impl std::fmt::Display) {
 
 pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
     if snapshot(app).capture.is_some() {
-        if let Some(window) = Surface::Capture.window(app) {
+        return ensure_window(app, Surface::Capture, |app, window| {
+            apply_windows(app)?;
+            flush_pending_present(app)?;
             let _ = window.set_focus();
-        }
-        return Ok(());
+            Ok(())
+        });
     }
     check_permission()?;
     let cursor = app.cursor_position()?;
@@ -135,6 +137,10 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
         (position, size)
     };
     let id = app.state::<AppState>().0.lock().unwrap().begin_capture();
+    ensure_window(app, Surface::Capture, |app, _| {
+        apply_windows(app)?;
+        flush_pending_present(app)
+    })?;
     apply_windows(app)?;
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -167,9 +173,57 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
     Ok(())
 }
 
+struct PendingPresent {
+    id: u32,
+    position: (i32, i32),
+    size: (u32, u32),
+    image: ::image::RgbaImage,
+}
+
+static PRESENT: Mutex<Option<PendingPresent>> = Mutex::new(None);
+
+fn flush_pending_present(app: &tauri::AppHandle) -> Result<()> {
+    let pending = PRESENT
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .take();
+    match pending {
+        Some(pending) if current(app, pending.id) => finish_present(
+            app,
+            pending.id,
+            pending.position,
+            pending.size,
+            pending.image,
+        ),
+        _ => Ok(()),
+    }
+}
+
 /// Sizes the capture window to the captured display and attaches the frame to
 /// capture `id`. A frame for a capture that was cancelled meanwhile is dropped.
 fn present(
+    app: &tauri::AppHandle,
+    id: u32,
+    position: (i32, i32),
+    size: (u32, u32),
+    image: ::image::RgbaImage,
+) -> Result<()> {
+    {
+        let mut pending = PRESENT.lock().unwrap_or_else(PoisonError::into_inner);
+        if !capture_window_ready() || Surface::Capture.window(app).is_none() {
+            *pending = Some(PendingPresent {
+                id,
+                position,
+                size,
+                image,
+            });
+            return Ok(());
+        }
+    }
+    finish_present(app, id, position, size, image)
+}
+
+fn finish_present(
     app: &tauri::AppHandle,
     id: u32,
     position: (i32, i32),
