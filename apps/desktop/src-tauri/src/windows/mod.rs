@@ -4,14 +4,16 @@ mod setup;
 pub(crate) mod toolbar;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod z_order;
-pub(crate) use setup::{create_windows, sync_overlays};
+pub(crate) use setup::{create_windows, drop_window, ensure_window, sync_overlays};
 
 use crate::{
     session::Mode,
     state::{publish, snapshot, AppState},
     Result,
 };
-use geometry::{monitor_under_cursor, top_center, Rect, TUTORIAL_SIZE};
+use geometry::{
+    monitor_under_cursor, top_center, Rect, SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE,
+};
 use serde::{Serialize, Serializer};
 use std::sync::atomic::{AtomicUsize, Ordering::SeqCst};
 use tauri::Manager;
@@ -55,6 +57,15 @@ impl Surface {
         app: &impl Manager<R>,
     ) -> Option<tauri::WebviewWindow<R>> {
         app.get_webview_window(&self.label())
+    }
+    pub(crate) fn title_and_size(self) -> Option<(&'static str, (f64, f64))> {
+        match self {
+            Self::Overlay(_) => None,
+            Self::Capture => Some(("Glassboard Capture", (800.0, 600.0))),
+            Self::Toolbar => Some(("Glassboard", TOOLBAR_SIZE)),
+            Self::Settings => Some(("Glassboard Settings", SETTINGS_SIZE)),
+            Self::Tutorial => Some(("Welcome to Glassboard", TUTORIAL_SIZE)),
+        }
     }
 }
 impl Serialize for Surface {
@@ -109,10 +120,12 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
             .as_ref()
             .is_some_and(|capture| capture.ready.is_some())
         {
-            capture.show()
+            capture.show()?;
+        } else if state.capture.is_some() {
+            capture.hide()?;
         } else {
-            capture.hide()
-        }?;
+            capture.destroy()?;
+        }
     }
     for (_, window) in live_overlays(app) {
         window.set_ignore_cursor_events(state.mode != Mode::Draw)?;
@@ -131,9 +144,7 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
         }?;
     }
     if !state.settings_open || state.capture.is_some() {
-        if let Some(settings) = Surface::Settings.window(app) {
-            settings.hide()?;
-        }
+        drop_window(app, Surface::Settings)?;
     }
     sync_tutorial(app)?;
     app.state::<toolbar::Toolbar>()
@@ -144,21 +155,19 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
 /// Keep the small guide on the active display without covering the drawing toolbar.
 pub(crate) fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
-    if let Some(window) = Surface::Tutorial.window(app) {
-        if state.tutorial.is_none() || state.capture.is_some() {
-            return Ok(window.hide()?);
-        }
-        if let Some(overlay) = state.active_overlay.window(app) {
-            if let Some(monitor) = overlay.current_monitor()? {
-                let work = Rect::work_area(&monitor);
-                let scale = monitor.scale_factor();
-                let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
-                top_center(work, size, scale).place(&window, scale)?;
-            }
-        }
-        window.show()?;
+    if state.tutorial.is_none() || state.capture.is_some() {
+        return Ok(drop_window(app, Surface::Tutorial)?);
     }
-    Ok(())
+    let window = ensure_window(app, Surface::Tutorial)?;
+    if let Some(overlay) = state.active_overlay.window(app) {
+        if let Some(monitor) = overlay.current_monitor()? {
+            let work = Rect::work_area(&monitor);
+            let scale = monitor.scale_factor();
+            let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
+            top_center(work, size, scale).place(&window, scale)?;
+        }
+    }
+    Ok(window.show()?)
 }
 pub(crate) fn focus_drawing(app: &tauri::AppHandle) {
     let state = snapshot(app);
@@ -219,5 +228,24 @@ mod tests {
         for label in ["overlay-", "overlay-x", "main"] {
             assert_eq!(Surface::parse(label), None);
         }
+    }
+
+    #[test]
+    fn fixed_windows_have_titles_and_sizes() {
+        use super::geometry::{SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE};
+        assert_eq!(Overlay(0).title_and_size(), None);
+        assert_eq!(
+            Capture.title_and_size(),
+            Some(("Glassboard Capture", (800.0, 600.0)))
+        );
+        assert_eq!(Toolbar.title_and_size(), Some(("Glassboard", TOOLBAR_SIZE)));
+        assert_eq!(
+            Settings.title_and_size(),
+            Some(("Glassboard Settings", SETTINGS_SIZE))
+        );
+        assert_eq!(
+            Tutorial.title_and_size(),
+            Some(("Welcome to Glassboard", TUTORIAL_SIZE))
+        );
     }
 }

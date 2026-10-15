@@ -31,7 +31,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 use tray::TrayAnchor;
 use windows::{
-    apply_windows, select_cursor_monitor,
+    apply_windows, ensure_window, select_cursor_monitor,
     toolbar::{position_toolbar, watch_toolbar_proximity, Toolbar},
     Surface,
 };
@@ -249,6 +249,14 @@ fn reopen(app: &tauri::AppHandle) {
         }
         Surface::Toolbar
     };
+    if matches!(
+        target,
+        Surface::Settings | Surface::Tutorial | Surface::Capture
+    ) {
+        if let Err(error) = ensure_window(app, target) {
+            report(app, error);
+        }
+    }
     if let Some(window) = target.window(app) {
         let _ = window.set_focus();
     }

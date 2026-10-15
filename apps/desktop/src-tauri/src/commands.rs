@@ -4,7 +4,7 @@ use crate::{
     session::{HistoryAvailability, Mode, Session, Transition, TutorialStep},
     state::{publish, report, snapshot, AppState},
     windows::{
-        apply_windows, focus_drawing, raise_toolbar, select_cursor_monitor,
+        apply_windows, ensure_window, focus_drawing, raise_toolbar, select_cursor_monitor,
         settings::position_settings,
         sync_overlays, sync_tutorial,
         toolbar::{position_toolbar, Toolbar},
@@ -162,10 +162,8 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
         update_preferences(app, preferences)?;
     }
     if matches!(transition, Settings | CloseSettings) {
-        let settings = Surface::Settings
-            .window(app)
-            .ok_or("Settings window is unavailable")?;
         if transition == Settings {
+            let settings = ensure_window(app, Surface::Settings)?;
             position_settings(app, &settings)?;
         }
         app.state::<AppState>()
@@ -175,10 +173,12 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
             .transition(transition);
         apply_windows(app)?;
         if transition == Settings {
+            let settings = Surface::Settings
+                .window(app)
+                .ok_or("Settings window is unavailable")?;
             settings.show()?;
             settings.set_focus()?;
         } else {
-            settings.hide()?;
             // Recording ends with Settings, even if the webview never said so.
             suspend_global_shortcuts(app.clone(), false)?;
         }

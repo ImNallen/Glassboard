@@ -1,8 +1,5 @@
 use super::{
-    apply_windows, focus_drawing,
-    geometry::{Rect, SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE},
-    select_cursor_monitor,
-    toolbar::position_toolbar,
+    apply_windows, focus_drawing, geometry::Rect, select_cursor_monitor, toolbar::position_toolbar,
     LiveOverlays, Surface,
 };
 use crate::{
@@ -60,18 +57,32 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
         configure_overlay(&window, surface)?;
     }
     app.manage(LiveOverlays(AtomicUsize::new(monitors.len())));
-    for (surface, title, (width, height)) in [
-        (Surface::Capture, "Glassboard Capture", (800.0, 600.0)),
-        (Surface::Toolbar, "Glassboard", TOOLBAR_SIZE),
-        (Surface::Settings, "Glassboard Settings", SETTINGS_SIZE),
-        (Surface::Tutorial, "Welcome to Glassboard", TUTORIAL_SIZE),
-    ] {
-        let window = window_builder(app, surface, title)
-            .inner_size(width, height)
-            .build()?;
-        #[cfg(target_os = "linux")]
-        super::set_size(&window, tauri::LogicalSize::new(width, height))?;
-        configure_overlay(&window, surface)?;
+    ensure_window(app, Surface::Toolbar)?;
+    Ok(())
+}
+
+pub(crate) fn ensure_window(
+    app: &impl Manager<Wry>,
+    surface: Surface,
+) -> tauri::Result<tauri::WebviewWindow<Wry>> {
+    if let Some(window) = surface.window(app) {
+        return Ok(window);
+    }
+    let (title, (width, height)) = surface
+        .title_and_size()
+        .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
+    let window = window_builder(app, surface, title)
+        .inner_size(width, height)
+        .build()?;
+    #[cfg(target_os = "linux")]
+    super::set_size(&window, tauri::LogicalSize::new(width, height))?;
+    configure_overlay(&window, surface)?;
+    Ok(window)
+}
+
+pub(crate) fn drop_window(app: &impl Manager<Wry>, surface: Surface) -> tauri::Result<()> {
+    if let Some(window) = surface.window(app) {
+        window.destroy()?;
     }
     Ok(())
 }

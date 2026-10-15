@@ -6,7 +6,7 @@ use crate::{
     session::{ReadyCapture, Transition},
     state::{report, snapshot, AppState},
     windows::{
-        apply_windows, cursor_scale,
+        apply_windows, cursor_scale, ensure_window,
         geometry::{coordinate_scale, dock, Rect},
         Surface,
     },
@@ -135,6 +135,7 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
         (position, size)
     };
     let id = app.state::<AppState>().0.lock().unwrap().begin_capture();
+    ensure_window(app, Surface::Capture)?;
     apply_windows(app)?;
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
