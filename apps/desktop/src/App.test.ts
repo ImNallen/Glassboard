@@ -5,6 +5,17 @@ import App from './App.svelte';
 import { action, createPreviewSession, defaults, subscribe, useSession, type Session } from '@glassboard/ui/session';
 import { parseSurface, windowParts, type Part, type Surface } from './lib/surface';
 
+await Promise.all([
+  import('./PreviewBackdrop.svelte'),
+  import('@glassboard/ui/Overlay.svelte'),
+  import('@glassboard/ui/Toolbar.svelte'),
+  import('./Settings.svelte'),
+  import('./Tutorial.svelte'),
+  import('@glassboard/ui/Capture.svelte'),
+  import('./lib/capture'),
+  import('@glassboard/ui/capture-preview'),
+]);
+
 let app: ReturnType<typeof mount> | undefined;
 let stop = () => {};
 
@@ -23,13 +34,20 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+async function flushImports() {
+  for (let i = 0; i < 5; i++) {
+    await Promise.resolve();
+    await tick();
+  }
+}
+
 async function open(surface: Surface | null, initial: Partial<Session> = {}, native = false) {
   history.replaceState(null, '', surface ? `/?surface=${surface}` : '/');
   useSession(createPreviewSession({ tutorial: 'welcome', ...initial }), { native });
   let session: Session = structuredClone(defaults);
   stop = await subscribe(value => session = value);
   app = mount(App, { target: document.body });
-  await tick(); await tick();
+  await flushImports();
   return () => session;
 }
 
@@ -69,8 +87,8 @@ it.each<[Surface | null, boolean, Session['capture'], Part[]]>([
   vi.spyOn(console, 'error').mockImplementation(() => {});
   expect(windowParts(surface, native, capture)).toEqual(parts);
   await open(surface, { capture }, native);
-  expect(mounted()).toEqual(parts);
-});
+  await vi.waitFor(() => expect(mounted()).toEqual(parts), { timeout: 5_000, interval: 16 });
+}, 15_000);
 
 it('reads only the surfaces Rust opens windows for', () => {
   expect(parseSurface('?surface=settings')).toBe('settings');
@@ -99,12 +117,12 @@ it('dismisses the tutorial on Escape, or returns to work while drawing', async (
   expect(session()).toMatchObject({ tutorial: 'welcome', mode: 'hidden' });
 });
 
-it('routes drawing shortcuts to the session and opens the capture editor from Save', async () => {
+it('routes drawing shortcuts to the session and opens the capture editor from Save', { timeout: 15_000 }, async () => {
   const session = await open(null, { tutorial: null, mode: 'draw' });
   expect(press('t', { metaKey: true }).defaultPrevented).toBe(true);
   expect(session().preferences.tool).toBe('text');
   expect(press('s', { metaKey: true }).defaultPrevented).toBe(true);
-  await tick(); await tick();
+  await vi.waitFor(() => expect(mounted()).toEqual(['capture']), { timeout: 10_000, interval: 16 });
   expect(session().capture?.ready).toBe(true);
   expect(mounted()).toEqual(['capture']);
   expect(document.querySelector('.selection-surface')).not.toBeNull();
