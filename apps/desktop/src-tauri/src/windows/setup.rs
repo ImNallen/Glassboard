@@ -122,23 +122,30 @@ fn finish_lazy_window(
     generation: usize,
     after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()>,
 ) -> Result<()> {
-    if surface == Surface::Capture && CAPTURE_GENERATION.load(SeqCst) != generation {
+    let state = snapshot(app);
+    if surface == Surface::Capture
+        && CAPTURE_GENERATION.load(SeqCst) != generation
+        && !keep_lazy_window(surface, &state)
+    {
         mark_capture_joined(surface, false);
-        if snapshot(app).capture.is_none() && surface.window(app).is_some() {
+        if surface.window(app).is_some() {
             window.destroy()?;
         }
         return Ok(());
     }
-    if !keep_lazy_window(surface, &snapshot(app)) {
+    if !keep_lazy_window(surface, &state) {
         return Ok(drop_window(app, surface)?);
     }
-    if let Some((width, height)) = size {
-        join_fixed_window(window, surface, width, height)?;
-    } else if surface == Surface::Capture && !capture_window_ready() {
-        let (_, (width, height)) = surface
-            .title_and_size()
-            .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
-        join_fixed_window(window, surface, width, height)?;
+    let needs_join = surface != Surface::Capture || !capture_window_ready();
+    if needs_join {
+        if let Some((width, height)) = size {
+            join_fixed_window(window, surface, width, height)?;
+        } else if surface == Surface::Capture {
+            let (_, (width, height)) = surface
+                .title_and_size()
+                .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
+            join_fixed_window(window, surface, width, height)?;
+        }
     }
     after(app, window)
 }
@@ -151,10 +158,14 @@ pub(crate) fn ensure_window(
     after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()> + Send + 'static,
 ) -> Result<()> {
     if let Some(window) = surface.window(app) {
-        if !keep_lazy_window(surface, &snapshot(app)) {
-            return Ok(drop_window(app, surface)?);
-        }
-        return after(app, &window);
+        return finish_lazy_window(
+            app,
+            &window,
+            surface,
+            None,
+            CAPTURE_GENERATION.load(SeqCst),
+            after,
+        );
     }
     if !SETUP_COMPLETE.load(SeqCst) {
         let window = build_window(app, surface)?;

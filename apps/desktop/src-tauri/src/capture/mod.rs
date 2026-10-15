@@ -96,10 +96,12 @@ pub(crate) fn fail(app: &tauri::AppHandle, error: impl std::fmt::Display) {
 
 pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
     if snapshot(app).capture.is_some() {
-        if let Some(window) = Surface::Capture.window(app) {
+        return ensure_window(app, Surface::Capture, |app, window| {
+            apply_windows(app)?;
+            flush_pending_present(app)?;
             let _ = window.set_focus();
-        }
-        return Ok(());
+            Ok(())
+        });
     }
     check_permission()?;
     let cursor = app.cursor_position()?;
