@@ -208,7 +208,7 @@ fn present(
 ) -> Result<()> {
     {
         let mut pending = PRESENT.lock().unwrap_or_else(PoisonError::into_inner);
-        if !capture_window_ready() {
+        if !capture_window_ready() || Surface::Capture.window(app).is_none() {
             *pending = Some(PendingPresent {
                 id,
                 position,

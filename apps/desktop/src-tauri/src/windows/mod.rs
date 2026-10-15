@@ -115,19 +115,29 @@ pub(crate) fn set_size(
     window.set_size(size)
 }
 
+/// Whether a lazily created surface still belongs on screen.
+pub(crate) fn keep_lazy_window(surface: Surface, state: &crate::session::Session) -> bool {
+    match surface {
+        Surface::Settings => state.settings_open && state.capture.is_none(),
+        Surface::Tutorial => state.tutorial.is_some() && state.capture.is_none(),
+        Surface::Capture => state.capture.is_some(),
+        Surface::Toolbar | Surface::Overlay(_) => true,
+    }
+}
+
 pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
     let state = snapshot(app);
-    if let Some(capture) = Surface::Capture.window(app) {
+    if state.capture.is_none() {
+        drop_window(app, Surface::Capture)?;
+    } else if let Some(capture) = Surface::Capture.window(app) {
         if state
             .capture
             .as_ref()
             .is_some_and(|capture| capture.ready.is_some())
         {
             capture.show()?;
-        } else if state.capture.is_some() {
-            capture.hide()?;
         } else {
-            drop_window(app, Surface::Capture)?;
+            capture.hide()?;
         }
     }
     for (_, window) in live_overlays(app) {
@@ -233,6 +243,29 @@ mod tests {
         for label in ["overlay-", "overlay-x", "main"] {
             assert_eq!(Surface::parse(label), None);
         }
+    }
+
+    #[test]
+    fn lazy_windows_follow_the_session_that_apply_windows_uses() {
+        use crate::{
+            preferences::Preferences,
+            session::{Session, Transition},
+        };
+        let keep = |surface, session: &Session| super::keep_lazy_window(surface, session);
+        let mut session = Session::new(Preferences::default());
+        session.transition(Transition::Settings);
+        assert!(keep(Settings, &session));
+        assert!(!keep(Capture, &session));
+        session.transition(Transition::CloseSettings);
+        assert!(!keep(Settings, &session));
+        session.tutorial = Some(crate::session::TutorialStep::Welcome);
+        assert!(keep(Tutorial, &session));
+        session.begin_capture();
+        assert!(keep(Capture, &session));
+        assert!(!keep(Settings, &session));
+        assert!(!keep(Tutorial, &session));
+        session.transition(Transition::CancelCapture);
+        assert!(!keep(Capture, &session));
     }
 
     #[test]

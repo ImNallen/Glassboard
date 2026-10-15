@@ -1,6 +1,6 @@
 use super::{
-    apply_windows, focus_drawing, geometry::Rect, select_cursor_monitor, toolbar::position_toolbar,
-    LiveOverlays, Surface,
+    apply_windows, focus_drawing, geometry::Rect, keep_lazy_window, select_cursor_monitor,
+    toolbar::position_toolbar, LiveOverlays, Surface,
 };
 use crate::{
     session::Mode,
@@ -63,6 +63,8 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
 
 static SETUP_COMPLETE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_JOINED: AtomicBool = AtomicBool::new(false);
+// drop_window bumps this so a late join cannot mark a destroyed or replaced Capture ready.
+static CAPTURE_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) fn capture_window_ready() -> bool {
     CAPTURE_JOINED.load(SeqCst)
@@ -112,6 +114,35 @@ fn join_fixed_window(
     Ok(())
 }
 
+fn finish_lazy_window(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow<Wry>,
+    surface: Surface,
+    size: Option<(f64, f64)>,
+    generation: usize,
+    after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()>,
+) -> Result<()> {
+    if surface == Surface::Capture && CAPTURE_GENERATION.load(SeqCst) != generation {
+        mark_capture_joined(surface, false);
+        if snapshot(app).capture.is_none() && surface.window(app).is_some() {
+            window.destroy()?;
+        }
+        return Ok(());
+    }
+    if !keep_lazy_window(surface, &snapshot(app)) {
+        return Ok(drop_window(app, surface)?);
+    }
+    if let Some((width, height)) = size {
+        join_fixed_window(window, surface, width, height)?;
+    } else if surface == Surface::Capture && !capture_window_ready() {
+        let (_, (width, height)) = surface
+            .title_and_size()
+            .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
+        join_fixed_window(window, surface, width, height)?;
+    }
+    after(app, window)
+}
+
 /// Build Settings, Tutorial, or Capture if missing. Safe during setup on this
 /// thread; after setup, `build()` runs on a worker like `add_overlays`.
 pub(crate) fn ensure_window(
@@ -120,6 +151,9 @@ pub(crate) fn ensure_window(
     after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()> + Send + 'static,
 ) -> Result<()> {
     if let Some(window) = surface.window(app) {
+        if !keep_lazy_window(surface, &snapshot(app)) {
+            return Ok(drop_window(app, surface)?);
+        }
         return after(app, &window);
     }
     if !SETUP_COMPLETE.load(SeqCst) {
@@ -130,10 +164,13 @@ pub(crate) fn ensure_window(
     std::thread::spawn(move || {
         static BUILDING: Mutex<()> = Mutex::new(());
         let _building = BUILDING.lock().unwrap_or_else(PoisonError::into_inner);
+        let generation = CAPTURE_GENERATION.load(SeqCst);
         if let Some(window) = surface.window(&app) {
             let handle = app.clone();
             let posted = app.run_on_main_thread(move || {
-                if let Err(error) = after(&handle, &window) {
+                if let Err(error) =
+                    finish_lazy_window(&handle, &window, surface, None, generation, after)
+                {
                     report(&handle, error);
                 }
             });
@@ -151,9 +188,14 @@ pub(crate) fn ensure_window(
             .build()
             .and_then(|window| {
                 app.run_on_main_thread(move || {
-                    if let Err(error) = join_fixed_window(&window, surface, width, height)
-                        .and_then(|()| after(&handle, &window))
-                    {
+                    if let Err(error) = finish_lazy_window(
+                        &handle,
+                        &window,
+                        surface,
+                        Some((width, height)),
+                        generation,
+                        after,
+                    ) {
                         report(&handle, error);
                     }
                 })
@@ -166,6 +208,9 @@ pub(crate) fn ensure_window(
 }
 
 pub(crate) fn drop_window(app: &impl Manager<Wry>, surface: Surface) -> tauri::Result<()> {
+    if surface == Surface::Capture {
+        CAPTURE_GENERATION.fetch_add(1, SeqCst);
+    }
     mark_capture_joined(surface, false);
     if let Some(window) = surface.window(app) {
         window.destroy()?;
