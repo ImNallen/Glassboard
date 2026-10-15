@@ -100,11 +100,16 @@ fn build_window(
 }
 
 fn join_fixed_window(
+    app: &tauri::AppHandle,
     window: &tauri::WebviewWindow,
     surface: Surface,
     width: f64,
     height: f64,
 ) -> Result<()> {
+    if surface == Surface::Capture && surface.window(app).is_none() {
+        mark_capture_joined(surface, false);
+        return Ok(());
+    }
     #[cfg(target_os = "linux")]
     super::set_size(window, tauri::LogicalSize::new(width, height))?;
     #[cfg(not(target_os = "linux"))]
@@ -123,10 +128,9 @@ fn finish_lazy_window(
     after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()>,
 ) -> Result<()> {
     let state = snapshot(app);
-    if surface == Surface::Capture
-        && CAPTURE_GENERATION.load(SeqCst) != generation
-        && !keep_lazy_window(surface, &state)
-    {
+    let stale_capture =
+        surface == Surface::Capture && CAPTURE_GENERATION.load(SeqCst) != generation;
+    if stale_capture && !keep_lazy_window(surface, &state) {
         mark_capture_joined(surface, false);
         if surface.window(app).is_some() {
             window.destroy()?;
@@ -136,15 +140,19 @@ fn finish_lazy_window(
     if !keep_lazy_window(surface, &state) {
         return Ok(drop_window(app, surface)?);
     }
+    if surface == Surface::Capture && surface.window(app).is_none() {
+        mark_capture_joined(surface, false);
+        return Ok(());
+    }
     let needs_join = surface != Surface::Capture || !capture_window_ready();
     if needs_join {
         if let Some((width, height)) = size {
-            join_fixed_window(window, surface, width, height)?;
+            join_fixed_window(app, window, surface, width, height)?;
         } else if surface == Surface::Capture {
             let (_, (width, height)) = surface
                 .title_and_size()
                 .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
-            join_fixed_window(window, surface, width, height)?;
+            join_fixed_window(app, window, surface, width, height)?;
         }
     }
     after(app, window)
