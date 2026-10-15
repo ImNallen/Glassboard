@@ -63,7 +63,6 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
 
 static SETUP_COMPLETE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_JOINED: AtomicBool = AtomicBool::new(false);
-// Tauri looks up webviews by label, so a late handle can alias a replacement.
 static CAPTURE_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) fn capture_window_ready() -> bool {
