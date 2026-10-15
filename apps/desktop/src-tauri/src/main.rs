@@ -31,7 +31,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 use tray::TrayAnchor;
 use windows::{
-    apply_windows, ensure_window, select_cursor_monitor,
+    apply_windows, ensure_window, mark_setup_complete, select_cursor_monitor,
     toolbar::{position_toolbar, watch_toolbar_proximity, Toolbar},
     Surface,
 };
@@ -229,6 +229,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         report(handle, problems.join(" "));
     }
     watch_toolbar_proximity(handle.clone());
+    mark_setup_complete();
     Ok(())
 }
 
@@ -253,9 +254,13 @@ fn reopen(app: &tauri::AppHandle) {
         target,
         Surface::Settings | Surface::Tutorial | Surface::Capture
     ) {
-        if let Err(error) = ensure_window(app, target) {
+        if let Err(error) = ensure_window(app, target, |_, window| {
+            let _ = window.set_focus();
+            Ok(())
+        }) {
             report(app, error);
         }
+        return;
     }
     if let Some(window) = target.window(app) {
         let _ = window.set_focus();

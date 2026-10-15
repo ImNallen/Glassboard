@@ -163,8 +163,18 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
     }
     if matches!(transition, Settings | CloseSettings) {
         if transition == Settings {
-            let settings = ensure_window(app, Surface::Settings)?;
-            position_settings(app, &settings)?;
+            return ensure_window(app, Surface::Settings, |app, settings| {
+                position_settings(app, settings)?;
+                app.state::<AppState>()
+                    .0
+                    .lock()
+                    .unwrap()
+                    .transition(Settings);
+                apply_windows(app)?;
+                settings.show()?;
+                settings.set_focus()?;
+                Ok(())
+            });
         }
         app.state::<AppState>()
             .0
@@ -172,16 +182,8 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
             .unwrap()
             .transition(transition);
         apply_windows(app)?;
-        if transition == Settings {
-            let settings = Surface::Settings
-                .window(app)
-                .ok_or("Settings window is unavailable")?;
-            settings.show()?;
-            settings.set_focus()?;
-        } else {
-            // Recording ends with Settings, even if the webview never said so.
-            suspend_global_shortcuts(app.clone(), false)?;
-        }
+        // Recording ends with Settings, even if the webview never said so.
+        suspend_global_shortcuts(app.clone(), false)?;
         return Ok(());
     }
     if (transition == Toggle && snapshot(app).mode == Mode::Hidden)

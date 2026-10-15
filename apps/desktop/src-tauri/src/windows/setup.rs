@@ -8,7 +8,7 @@ use crate::{
     Result,
 };
 use std::sync::{
-    atomic::{AtomicUsize, Ordering::SeqCst},
+    atomic::{AtomicBool, AtomicUsize, Ordering::SeqCst},
     Mutex, PoisonError,
 };
 use tauri::{Manager, Monitor, WebviewUrl, WebviewWindowBuilder, Wry};
@@ -57,17 +57,22 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
         configure_overlay(&window, surface)?;
     }
     app.manage(LiveOverlays(AtomicUsize::new(monitors.len())));
-    ensure_window(app, Surface::Toolbar)?;
+    build_window(app, Surface::Toolbar)?;
     Ok(())
 }
 
-pub(crate) fn ensure_window(
+static SETUP_COMPLETE: AtomicBool = AtomicBool::new(false);
+
+/// After this, `WebviewWindowBuilder::build` must run off the event-loop thread
+/// on Windows or it deadlocks inside commands and handlers.
+pub(crate) fn mark_setup_complete() {
+    SETUP_COMPLETE.store(true, SeqCst);
+}
+
+fn build_window(
     app: &impl Manager<Wry>,
     surface: Surface,
 ) -> tauri::Result<tauri::WebviewWindow<Wry>> {
-    if let Some(window) = surface.window(app) {
-        return Ok(window);
-    }
     let (title, (width, height)) = surface
         .title_and_size()
         .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
@@ -78,6 +83,72 @@ pub(crate) fn ensure_window(
     super::set_size(&window, tauri::LogicalSize::new(width, height))?;
     configure_overlay(&window, surface)?;
     Ok(window)
+}
+
+fn join_fixed_window(
+    window: &tauri::WebviewWindow,
+    surface: Surface,
+    width: f64,
+    height: f64,
+) -> Result<()> {
+    #[cfg(target_os = "linux")]
+    super::set_size(window, tauri::LogicalSize::new(width, height))?;
+    #[cfg(not(target_os = "linux"))]
+    let _ = (width, height);
+    Ok(configure_overlay(window, surface)?)
+}
+
+/// Build Settings, Tutorial, or Capture if missing. Safe during setup on this
+/// thread; after setup, `build()` runs on a worker like `add_overlays`.
+pub(crate) fn ensure_window(
+    app: &tauri::AppHandle,
+    surface: Surface,
+    after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()> + Send + 'static,
+) -> Result<()> {
+    if let Some(window) = surface.window(app) {
+        return after(app, &window);
+    }
+    if !SETUP_COMPLETE.load(SeqCst) {
+        let window = build_window(app, surface)?;
+        return after(app, &window);
+    }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        static BUILDING: Mutex<()> = Mutex::new(());
+        let _building = BUILDING.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(window) = surface.window(&app) {
+            let handle = app.clone();
+            let posted = app.run_on_main_thread(move || {
+                if let Err(error) = after(&handle, &window) {
+                    report(&handle, error);
+                }
+            });
+            if let Err(error) = posted {
+                report(&app, error);
+            }
+            return;
+        }
+        let (title, (width, height)) = surface
+            .title_and_size()
+            .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
+        let handle = app.clone();
+        let built = window_builder(&app, surface, title)
+            .inner_size(width, height)
+            .build()
+            .and_then(|window| {
+                app.run_on_main_thread(move || {
+                    if let Err(error) = join_fixed_window(&window, surface, width, height)
+                        .and_then(|()| after(&handle, &window))
+                    {
+                        report(&handle, error);
+                    }
+                })
+            });
+        if let Err(error) = built {
+            report(&app, error);
+        }
+    });
+    Ok(())
 }
 
 pub(crate) fn drop_window(app: &impl Manager<Wry>, surface: Surface) -> tauri::Result<()> {

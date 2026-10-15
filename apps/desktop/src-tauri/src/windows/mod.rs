@@ -4,7 +4,9 @@ mod setup;
 pub(crate) mod toolbar;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod z_order;
-pub(crate) use setup::{create_windows, drop_window, ensure_window, sync_overlays};
+pub(crate) use setup::{
+    create_windows, drop_window, ensure_window, mark_setup_complete, sync_overlays,
+};
 
 use crate::{
     session::Mode,
@@ -158,16 +160,18 @@ pub(crate) fn sync_tutorial(app: &tauri::AppHandle) -> Result<()> {
     if state.tutorial.is_none() || state.capture.is_some() {
         return Ok(drop_window(app, Surface::Tutorial)?);
     }
-    let window = ensure_window(app, Surface::Tutorial)?;
-    if let Some(overlay) = state.active_overlay.window(app) {
-        if let Some(monitor) = overlay.current_monitor()? {
-            let work = Rect::work_area(&monitor);
-            let scale = monitor.scale_factor();
-            let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
-            top_center(work, size, scale).place(&window, scale)?;
+    ensure_window(app, Surface::Tutorial, |app, window| {
+        let state = snapshot(app);
+        if let Some(overlay) = state.active_overlay.window(app) {
+            if let Some(monitor) = overlay.current_monitor()? {
+                let work = Rect::work_area(&monitor);
+                let scale = monitor.scale_factor();
+                let size = work.fit(TUTORIAL_SIZE, scale, 0.0, 0.0);
+                top_center(work, size, scale).place(window, scale)?;
+            }
         }
-    }
-    Ok(window.show()?)
+        Ok(window.show()?)
+    })
 }
 pub(crate) fn focus_drawing(app: &tauri::AppHandle) {
     let state = snapshot(app);
