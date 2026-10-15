@@ -63,7 +63,7 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
 
 static SETUP_COMPLETE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_JOINED: AtomicBool = AtomicBool::new(false);
-// drop_window bumps this so a late join cannot mark a destroyed or replaced Capture ready.
+// Tauri looks up webviews by label, so a late handle can alias a replacement.
 static CAPTURE_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) fn capture_window_ready() -> bool {
@@ -99,63 +99,79 @@ fn build_window(
     Ok(window)
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum LazyFinish {
+    DestroyWithoutBump,
+    Skip,
+    Drop,
+    Proceed,
+}
+
+fn lazy_finish_action(stale: bool, keep: bool) -> LazyFinish {
+    match (stale, keep) {
+        (true, false) => LazyFinish::DestroyWithoutBump,
+        (true, true) => LazyFinish::Skip,
+        (false, false) => LazyFinish::Drop,
+        (false, true) => LazyFinish::Proceed,
+    }
+}
+
 fn join_fixed_window(
     app: &tauri::AppHandle,
-    window: &tauri::WebviewWindow,
     surface: Surface,
     width: f64,
     height: f64,
 ) -> Result<()> {
-    if surface == Surface::Capture && surface.window(app).is_none() {
+    let Some(window) = surface.window(app) else {
         mark_capture_joined(surface, false);
         return Ok(());
-    }
+    };
     #[cfg(target_os = "linux")]
-    super::set_size(window, tauri::LogicalSize::new(width, height))?;
+    super::set_size(&window, tauri::LogicalSize::new(width, height))?;
     #[cfg(not(target_os = "linux"))]
     let _ = (width, height);
-    configure_overlay(window, surface)?;
+    configure_overlay(&window, surface)?;
     mark_capture_joined(surface, true);
     Ok(())
 }
 
 fn finish_lazy_window(
     app: &tauri::AppHandle,
-    window: &tauri::WebviewWindow<Wry>,
     surface: Surface,
     size: Option<(f64, f64)>,
     generation: usize,
     after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()>,
 ) -> Result<()> {
     let state = snapshot(app);
-    let stale_capture =
-        surface == Surface::Capture && CAPTURE_GENERATION.load(SeqCst) != generation;
-    if stale_capture && !keep_lazy_window(surface, &state) {
-        mark_capture_joined(surface, false);
-        if surface.window(app).is_some() {
-            window.destroy()?;
+    let stale = surface == Surface::Capture && CAPTURE_GENERATION.load(SeqCst) != generation;
+    match lazy_finish_action(stale, keep_lazy_window(surface, &state)) {
+        LazyFinish::DestroyWithoutBump => {
+            mark_capture_joined(surface, false);
+            if let Some(live) = surface.window(app) {
+                live.destroy()?;
+            }
+            return Ok(());
         }
-        return Ok(());
-    }
-    if !keep_lazy_window(surface, &state) {
-        return Ok(drop_window(app, surface)?);
-    }
-    if surface == Surface::Capture && surface.window(app).is_none() {
-        mark_capture_joined(surface, false);
-        return Ok(());
+        LazyFinish::Skip => return Ok(()),
+        LazyFinish::Drop => return Ok(drop_window(app, surface)?),
+        LazyFinish::Proceed => {}
     }
     let needs_join = surface != Surface::Capture || !capture_window_ready();
     if needs_join {
         if let Some((width, height)) = size {
-            join_fixed_window(app, window, surface, width, height)?;
+            join_fixed_window(app, surface, width, height)?;
         } else if surface == Surface::Capture {
             let (_, (width, height)) = surface
                 .title_and_size()
                 .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
-            join_fixed_window(app, window, surface, width, height)?;
+            join_fixed_window(app, surface, width, height)?;
         }
     }
-    after(app, window)
+    let Some(live) = surface.window(app) else {
+        mark_capture_joined(surface, false);
+        return Ok(());
+    };
+    after(app, &live)
 }
 
 /// Build Settings, Tutorial, or Capture if missing. Safe during setup on this
@@ -165,15 +181,8 @@ pub(crate) fn ensure_window(
     surface: Surface,
     after: impl FnOnce(&tauri::AppHandle, &tauri::WebviewWindow<Wry>) -> Result<()> + Send + 'static,
 ) -> Result<()> {
-    if let Some(window) = surface.window(app) {
-        return finish_lazy_window(
-            app,
-            &window,
-            surface,
-            None,
-            CAPTURE_GENERATION.load(SeqCst),
-            after,
-        );
+    if surface.window(app).is_some() {
+        return finish_lazy_window(app, surface, None, CAPTURE_GENERATION.load(SeqCst), after);
     }
     if !SETUP_COMPLETE.load(SeqCst) {
         let window = build_window(app, surface)?;
@@ -184,12 +193,10 @@ pub(crate) fn ensure_window(
         static BUILDING: Mutex<()> = Mutex::new(());
         let _building = BUILDING.lock().unwrap_or_else(PoisonError::into_inner);
         let generation = CAPTURE_GENERATION.load(SeqCst);
-        if let Some(window) = surface.window(&app) {
+        if surface.window(&app).is_some() {
             let handle = app.clone();
             let posted = app.run_on_main_thread(move || {
-                if let Err(error) =
-                    finish_lazy_window(&handle, &window, surface, None, generation, after)
-                {
+                if let Err(error) = finish_lazy_window(&handle, surface, None, generation, after) {
                     report(&handle, error);
                 }
             });
@@ -205,11 +212,10 @@ pub(crate) fn ensure_window(
         let built = window_builder(&app, surface, title)
             .inner_size(width, height)
             .build()
-            .and_then(|window| {
+            .and_then(|_| {
                 app.run_on_main_thread(move || {
                     if let Err(error) = finish_lazy_window(
                         &handle,
-                        &window,
                         surface,
                         Some((width, height)),
                         generation,
@@ -341,4 +347,20 @@ fn window_builder<'a, M: Manager<Wry>>(
     .skip_taskbar(true)
     .resizable(false)
     .visible(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{lazy_finish_action, LazyFinish};
+
+    #[test]
+    fn stale_callbacks_never_join_or_after() {
+        assert_eq!(
+            lazy_finish_action(true, false),
+            LazyFinish::DestroyWithoutBump
+        );
+        assert_eq!(lazy_finish_action(true, true), LazyFinish::Skip);
+        assert_eq!(lazy_finish_action(false, false), LazyFinish::Drop);
+        assert_eq!(lazy_finish_action(false, true), LazyFinish::Proceed);
+    }
 }
