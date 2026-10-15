@@ -4,7 +4,7 @@ use crate::{
     session::{HistoryAvailability, Mode, Session, Transition, TutorialStep},
     state::{publish, report, snapshot, AppState},
     windows::{
-        apply_windows, focus_drawing, raise_toolbar, select_cursor_monitor,
+        apply_windows, ensure_window, focus_drawing, raise_toolbar, select_cursor_monitor,
         settings::position_settings,
         sync_overlays, sync_tutorial,
         toolbar::{position_toolbar, Toolbar},
@@ -162,11 +162,19 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
         update_preferences(app, preferences)?;
     }
     if matches!(transition, Settings | CloseSettings) {
-        let settings = Surface::Settings
-            .window(app)
-            .ok_or("Settings window is unavailable")?;
         if transition == Settings {
-            position_settings(app, &settings)?;
+            app.state::<AppState>()
+                .0
+                .lock()
+                .unwrap()
+                .transition(Settings);
+            apply_windows(app)?;
+            return ensure_window(app, Surface::Settings, |app, settings| {
+                position_settings(app, settings)?;
+                settings.show()?;
+                settings.set_focus()?;
+                Ok(())
+            });
         }
         app.state::<AppState>()
             .0
@@ -174,14 +182,8 @@ pub(crate) fn transition(app: &tauri::AppHandle, transition: Transition) -> Resu
             .unwrap()
             .transition(transition);
         apply_windows(app)?;
-        if transition == Settings {
-            settings.show()?;
-            settings.set_focus()?;
-        } else {
-            settings.hide()?;
-            // Recording ends with Settings, even if the webview never said so.
-            suspend_global_shortcuts(app.clone(), false)?;
-        }
+        // Recording ends with Settings, even if the webview never said so.
+        suspend_global_shortcuts(app.clone(), false)?;
         return Ok(());
     }
     if (transition == Toggle && snapshot(app).mode == Mode::Hidden)
