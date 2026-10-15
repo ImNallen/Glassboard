@@ -1,11 +1,5 @@
 # Working in this repository
 
-## Git is handled by the maintainer
-
-Do not commit, push, create branches, or open or edit pull requests. Leave changes
-in the working tree and describe them in your final message. The maintainer reviews
-and commits everything themselves.
-
 ## Layout
 
 npm workspaces: `apps/desktop` (Tauri + Svelte desktop app), `apps/web` (Astro
