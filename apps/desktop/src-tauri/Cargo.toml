@@ -28,6 +28,11 @@ image = { version = "0.25.10", default-features = false, features = ["png"] }
 [profile.dev.package.xcap]
 opt-level = 3
 
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+
 # macOS 27's dyld rejects proc-macro dylibs that rustc strips in release builds
 # ("mis-aligned LINKEDIT string pool"). Build-time code never ships in the app.
 [profile.release.build-override]
