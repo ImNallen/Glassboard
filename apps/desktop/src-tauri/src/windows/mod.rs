@@ -5,7 +5,8 @@ pub(crate) mod toolbar;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod z_order;
 pub(crate) use setup::{
-    create_windows, drop_window, ensure_window, mark_setup_complete, sync_overlays,
+    capture_window_ready, create_windows, drop_window, ensure_window, mark_setup_complete,
+    sync_overlays,
 };
 
 use crate::{
@@ -126,7 +127,7 @@ pub(crate) fn apply_windows(app: &tauri::AppHandle) -> Result<()> {
         } else if state.capture.is_some() {
             capture.hide()?;
         } else {
-            capture.destroy()?;
+            drop_window(app, Surface::Capture)?;
         }
     }
     for (_, window) in live_overlays(app) {

@@ -6,7 +6,7 @@ use crate::{
     session::{ReadyCapture, Transition},
     state::{report, snapshot, AppState},
     windows::{
-        apply_windows, cursor_scale, ensure_window,
+        apply_windows, capture_window_ready, cursor_scale, ensure_window,
         geometry::{coordinate_scale, dock, Rect},
         Surface,
     },
@@ -208,7 +208,7 @@ fn present(
 ) -> Result<()> {
     {
         let mut pending = PRESENT.lock().unwrap_or_else(PoisonError::into_inner);
-        if Surface::Capture.window(app).is_none() {
+        if !capture_window_ready() {
             *pending = Some(PendingPresent {
                 id,
                 position,

@@ -62,6 +62,17 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
 }
 
 static SETUP_COMPLETE: AtomicBool = AtomicBool::new(false);
+static CAPTURE_JOINED: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn capture_window_ready() -> bool {
+    CAPTURE_JOINED.load(SeqCst)
+}
+
+fn mark_capture_joined(surface: Surface, joined: bool) {
+    if surface == Surface::Capture {
+        CAPTURE_JOINED.store(joined, SeqCst);
+    }
+}
 
 /// After this, `WebviewWindowBuilder::build` must run off the event-loop thread
 /// on Windows or it deadlocks inside commands and handlers.
@@ -82,6 +93,7 @@ fn build_window(
     #[cfg(target_os = "linux")]
     super::set_size(&window, tauri::LogicalSize::new(width, height))?;
     configure_overlay(&window, surface)?;
+    mark_capture_joined(surface, true);
     Ok(window)
 }
 
@@ -95,7 +107,9 @@ fn join_fixed_window(
     super::set_size(window, tauri::LogicalSize::new(width, height))?;
     #[cfg(not(target_os = "linux"))]
     let _ = (width, height);
-    Ok(configure_overlay(window, surface)?)
+    configure_overlay(window, surface)?;
+    mark_capture_joined(surface, true);
+    Ok(())
 }
 
 /// Build Settings, Tutorial, or Capture if missing. Safe during setup on this
@@ -152,6 +166,7 @@ pub(crate) fn ensure_window(
 }
 
 pub(crate) fn drop_window(app: &impl Manager<Wry>, surface: Surface) -> tauri::Result<()> {
+    mark_capture_joined(surface, false);
     if let Some(window) = surface.window(app) {
         window.destroy()?;
     }
