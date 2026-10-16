@@ -22,16 +22,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # A deploy started from a release runs on the release's tag ref, and Pages keeps serving the
+  # previous site. Dispatching from main deploys the new downloads the way a push to main does.
+  redeploy:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref "$DEFAULT_BRANCH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
   build:
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pages: read
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event_name == 'release' && github.event.repository.default_branch || github.sha }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -58,7 +69,6 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -69,8 +79,3 @@ jobs:
     steps:
       - uses: actions/deploy-pages@v5
         id: deployment
-        env:
-          # Pages ignores a second deployment with the same build version, which deploy-pages
-          # takes from GITHUB_SHA. A release usually targets the commit main already deployed,
-          # but sync:release gives it new downloads.
-          GITHUB_SHA: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
