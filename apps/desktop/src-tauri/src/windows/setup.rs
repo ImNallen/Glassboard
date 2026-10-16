@@ -346,6 +346,9 @@ fn window_builder<'a, M: Manager<Wry>>(
     .skip_taskbar(true)
     .resizable(false)
     .visible(false)
+    // On Windows a webview built focused grabs focus while hidden, and its late
+    // blur would close Settings right after show. Callers focus on show instead.
+    .focused(!cfg!(windows))
 }
 
 #[cfg(test)]
