@@ -1,6 +1,6 @@
 [package]
 name = "glassboard"
-version = "0.1.5"
+version = "0.1.6"
 description = "A quiet tool for directing attention"
 authors = ["Glassboard"]
 edition = "2021"
