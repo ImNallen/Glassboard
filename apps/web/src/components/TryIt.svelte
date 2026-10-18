@@ -50,7 +50,14 @@
   }
   let drawing = $derived(session.mode === 'draw');
   let capturing = $derived(Boolean(session.capture));
-  $effect(() => { document.documentElement.classList.toggle('annotating', enabled && (drawing || capturing)); });
+  $effect(() => {
+    const root = document.documentElement, annotating = enabled && (drawing || capturing);
+    // Measure the scrollbar gutter while it is still reserved; global.css pads the page by
+    // it once the gutter is released, so the content holds still under the overlay.
+    // clientWidth would miss an empty gutter on a page too short to scroll.
+    if (annotating && !root.classList.contains('annotating')) root.style.setProperty('--scrollbar-width', `${window.innerWidth - root.getBoundingClientRect().width}px`);
+    root.classList.toggle('annotating', annotating);
+  });
   onMount(() => {
     // Match the page's demo button breakpoint and end any active session on phones.
     const desktop = matchMedia('(min-width: 761px)');
