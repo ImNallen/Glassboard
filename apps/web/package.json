@@ -15,10 +15,10 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/svelte": "^9.0.1",
+    "@astrojs/svelte": "^9.1.0",
     "@fontsource-variable/familjen-grotesk": "^5.3.0",
     "@glassboard/ui": "0.1.0",
-    "astro": "^7.3.8",
+    "astro": "^7.4.0",
     "html-to-image": "^1.11.13",
     "svelte": "^5.57.2"
   },
