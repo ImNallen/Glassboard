@@ -17,6 +17,7 @@ export const TOOL_SHORTCUTS: readonly { id: Tool; command: string; name: string;
   { id: 'pen', command: 'tool-pen', name: 'Pen', shortcut: 'CommandOrControl+Digit2' },
   { id: 'rectangle', command: 'tool-rectangle', name: 'Square', shortcut: 'CommandOrControl+Digit3' },
   { id: 'ellipse', command: 'tool-ellipse', name: 'Circle', shortcut: 'CommandOrControl+Digit4' },
+  { id: 'step', command: 'tool-step', name: 'Step', shortcut: 'CommandOrControl+Digit5' },
   { id: 'eraser', command: 'tool-eraser', name: 'Eraser', shortcut: 'CommandOrControl+KeyE' },
   { id: 'text', command: 'tool-text', name: 'Text', shortcut: 'CommandOrControl+KeyT' },
   { id: 'highlighter', command: 'tool-highlighter', name: 'Highlighter', shortcut: 'CommandOrControl+KeyH' },

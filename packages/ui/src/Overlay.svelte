@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, shiftRainbow, shapeAtPoint, textFont, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, nextStep, placeStep, shiftRainbow, shapeAtPoint, textFont, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
   import { gradientStrip } from './lib/swatches';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
@@ -147,6 +147,7 @@
     lastPointer = point;
     if (tool === 'eraser') { erasing = new Set(); eraseAt(point); return; }
     draft = createShape(session.preferences, session.cycleIndex, lastPointer);
+    if (tool === 'step') { draft.step = nextStep(history.shapes); placeStep(draft, point); }
     paint();
   }
   function move(event: PointerEvent) {
@@ -165,7 +166,8 @@
     if (!draft) return;
     if (lastPointer) shiftRainbow(draft, lastPointer, current);
     lastPointer = current;
-    if (FREEHAND_TOOLS.includes(draft.tool)) {
+    if (draft.tool === 'step') placeStep(draft, current);
+    else if (FREEHAND_TOOLS.includes(draft.tool)) {
       for (const sample of samples) {
         const last = draft.points[draft.points.length - 1];
         if (Math.hypot(sample.clientX - last.x, sample.clientY - last.y) >= .6) draft.points.push({ x: sample.clientX, y: sample.clientY });
@@ -180,7 +182,7 @@
   }
   /** Shift constrains a two-point draft; re-apply it from where the pointer last was instead of waiting for it to move. */
   function shift(event: KeyboardEvent) {
-    if (event.key !== 'Shift' || !draft || !lastPointer || FREEHAND_TOOLS.includes(draft.tool)) return;
+    if (event.key !== 'Shift' || !draft || !lastPointer || FREEHAND_TOOLS.includes(draft.tool) || draft.tool === 'step') return;
     draft.points[1] = constrainEnd(draft.points[0], lastPointer, draft.tool, event.shiftKey);
     paint();
   }

@@ -43,7 +43,7 @@ async function hover(node: HTMLElement) {
 
 it.each(['bottom', 'left', 'right'] as const)('shows tool and color shortcuts outside the %s scrolling toolbar', async position => {
   await setup(position);
-  expect([...document.querySelectorAll('.tool-group button')].map(node => node.getAttribute('aria-label'))).toEqual(['Arrow', 'Pen', 'Square', 'Circle', 'Eraser', 'Text', 'Highlighter']);
+  expect([...document.querySelectorAll('.tool-group button')].map(node => node.getAttribute('aria-label'))).toEqual(['Arrow', 'Pen', 'Square', 'Circle', 'Step', 'Eraser', 'Text', 'Highlighter']);
   const pen = button('Pen');
   expect(pen.hasAttribute('title')).toBe(false);
   await hover(pen);

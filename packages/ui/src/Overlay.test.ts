@@ -261,3 +261,19 @@ it('snaps and releases a held shape when Shift changes without the pointer movin
   pointer(canvas, 'lostpointercapture', 110, 80);
   expect(drawn()?.[0].points[1]).toEqual({ x: 110, y: 120 });
 });
+
+it('places a numbered step on a plain click and moves it while dragging', () => {
+  const { store, canvas } = setup();
+  store.update(session => ({ ...session, preferences: { ...session.preferences, tool: 'step' } }));
+  flushSync();
+  pointer(canvas, 'pointerdown', 50, 40);
+  pointer(canvas, 'pointerup', 50, 40);
+  pointer(canvas, 'pointerdown', 100, 100);
+  pointer(canvas, 'pointermove', 120, 90, { shiftKey: true });
+  expect(drafted()?.points).toEqual([{ x: 106, y: 76 }, { x: 134, y: 104 }]);
+  pointer(canvas, 'pointerup', 120, 90);
+  expect(drawn()?.map(shape => [shape.step, shape.points])).toEqual([
+    [1, [{ x: 36, y: 26 }, { x: 64, y: 54 }]],
+    [2, [{ x: 106, y: 76 }, { x: 134, y: 104 }]],
+  ]);
+});
