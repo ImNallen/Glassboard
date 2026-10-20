@@ -18,6 +18,7 @@ pub(crate) enum Tool {
     Arrow,
     Rectangle,
     Ellipse,
+    Step,
     Highlighter,
     Text,
     Eraser,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, rainbowAxis, shiftRainbow, render, shapeOpacity, textFontSize, textLineHeight, type Shape, type Tool } from './drawing';
+import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, nextStep, placeStep, rainbowAxis, shiftRainbow, render, shapeAtPoint, shapeOpacity, textFontSize, textLineHeight, TEXT_FONT_FAMILY, type Shape, type Tool } from './drawing';
 const arrow = (): Shape => ({ id: 'one', tool: 'arrow', color: '#ff6259', width: 4, points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] });
 describe('auto-fade', () => {
   it('retains the renderable array until a deadline is due, including during fading', () => {
@@ -300,5 +300,47 @@ describe('pen and text tools', () => {
     expect(calls.filter(call => call === 'fillText')).toHaveLength(2);
     expect(calls).not.toContain('stroke');
     expect(calls).not.toContain('fill');
+  });
+});
+
+describe('step tool', () => {
+  const step = (n: number, color = '#f46b78'): Shape => {
+    const shape = createShape({ tool: 'step', color, colorMode: 'solid' }, 0, { x: 0, y: 0 });
+    shape.step = n; placeStep(shape, { x: 50, y: 40 });
+    return shape;
+  };
+  it('numbers one past the highest step present, ignoring other shapes', () => {
+    expect(nextStep([])).toBe(1);
+    expect(nextStep([arrow()])).toBe(1);
+    expect(nextStep([step(1), arrow(), step(3)])).toBe(4);
+  });
+  it('places a 14 px badge around the center at Regular width', () => {
+    const shape = step(1);
+    expect(shape.points).toEqual([{ x: 36, y: 26 }, { x: 64, y: 54 }]);
+    expect(rainbowAxis(shape)).toEqual([{ x: 36, y: 26 }, { x: 64, y: 54 }]);
+  });
+  it('hits anywhere inside the badge and misses outside it', () => {
+    let circle = { x: 0, y: 0, r: 0 };
+    const ctx = {
+      save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), beginPath: vi.fn(),
+      ellipse: (x: number, y: number, rx: number) => { circle = { x, y, r: rx }; },
+      isPointInPath: (x: number, y: number) => Math.hypot(x - circle.x, y - circle.y) <= circle.r,
+      isPointInStroke: () => false,
+    } as unknown as CanvasRenderingContext2D;
+    const shape = step(1);
+    expect(shapeAtPoint(ctx, [shape], { x: 50, y: 40 }, 0)).toBe(shape);
+    expect(shapeAtPoint(ctx, [shape], { x: 60, y: 48 }, 0)).toBe(shape);
+    expect(shapeAtPoint(ctx, [shape], { x: 64, y: 54 }, 0)).toBeUndefined();
+  });
+  it.each([['#f46b78', '#ffffff'], ['#000000', '#ffffff'], ['#ffffff', '#1c1c1e'], ['#f2c85b', '#1c1c1e']])('fills a %s badge and centers its number in %s', (color, label) => {
+    const fills: unknown[] = [];
+    const ctx = {
+      setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), ellipse: vi.fn(), stroke: vi.fn(), fillStyle: '', font: '',
+      measureText: () => ({ actualBoundingBoxAscent: 11, actualBoundingBoxDescent: 1 }),
+      fill() { fills.push(['fill', this.fillStyle]); },
+      fillText(text: string, x: number, y: number, maxWidth: number) { fills.push([text, this.fillStyle, this.font, x, y, maxWidth]); },
+    };
+    render(ctx as unknown as CanvasRenderingContext2D, [step(12, color)], null, 100, 100, 1, 0);
+    expect(fills).toEqual([['fill', color], ['12', label, `700 15px ${TEXT_FONT_FAMILY}`, 50, 45, 21]]);
   });
 });

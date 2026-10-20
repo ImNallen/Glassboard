@@ -45,7 +45,7 @@ function path(ctx: CanvasRenderingContext2D, shape: Shape) {
     const width = Math.abs(end.x - start.x), height = Math.abs(end.y - start.y);
     const radius = Math.min(shape.width * 2, width / 2, height / 2);
     ctx.roundRect(Math.min(start.x, end.x), Math.min(start.y, end.y), width, height, radius);
-  } else if (shape.tool === 'ellipse') {
+  } else if (shape.tool === 'ellipse' || shape.tool === 'step') {
     ctx.ellipse((start.x + end.x) / 2, (start.y + end.y) / 2, Math.abs(end.x - start.x) / 2, Math.abs(end.y - start.y) / 2, 0, 0, Math.PI * 2);
   } else if (shape.tool === 'text') {
     ctx.rect(Math.min(start.x, end.x), Math.min(start.y, end.y), Math.abs(end.x - start.x), Math.abs(end.y - start.y));
@@ -98,13 +98,33 @@ export function shapeAtPoint(ctx: CanvasRenderingContext2D, shapes: Shape[], poi
       const shape = shapes[i];
       if (!shape.points.length || shapeOpacity(shape, now) === 0) continue;
       path(ctx, shape);
-      ctx.lineWidth = (shape.tool === 'arrow' ? 0 : shape.width * (shape.tool === 'highlighter' ? 5 : 1)) + 12;
-      const filled = shape.tool === 'arrow' || shape.tool === 'text';
+      const solid = shape.tool === 'arrow' || shape.tool === 'step';
+      ctx.lineWidth = (solid ? 0 : shape.width * (shape.tool === 'highlighter' ? 5 : 1)) + 12;
+      const filled = solid || shape.tool === 'text';
       if ((filled && ctx.isPointInPath(point.x, point.y)) || ctx.isPointInStroke(point.x, point.y)) return shape;
     }
   } finally {
     ctx.restore();
   }
+}
+
+/** Near-black on light fills such as white or yellow, white on everything else, including rainbow gradients. */
+function stepLabelColor(shape: Shape): string {
+  if (shape.colorMode === 'rainbow') return '#ffffff';
+  const rgb = parseInt(shape.color.slice(1), 16);
+  return ((rgb >> 16) & 255) * .299 + ((rgb >> 8) & 255) * .587 + (rgb & 255) * .114 > 186 ? '#1c1c1e' : '#ffffff';
+}
+
+function drawStepLabel(ctx: CanvasRenderingContext2D, shape: Shape) {
+  const [start, end] = shape.points, radius = Math.abs(end.x - start.x) / 2, label = String(shape.step ?? '');
+  ctx.font = `700 ${Math.round(radius * 1.1)}px ${TEXT_FONT_FAMILY}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = stepLabelColor(shape);
+  // Center the digits' ink rather than the font's em box, so the number sits in the middle of the badge.
+  const metrics = ctx.measureText(label);
+  const x = (start.x + end.x) / 2, y = (start.y + end.y) / 2 + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2;
+  ctx.fillText(label, x, y, radius * 1.5);
 }
 
 function applyShadow(ctx: CanvasRenderingContext2D, scale: number) {
@@ -149,17 +169,19 @@ export function render(ctx: CanvasRenderingContext2D, shapes: Shape[], draft: Sh
       ctx.stroke();
     } else {
       // Feather the same stroke color up to 3 px outward, including every rainbow segment.
+      const solid = shape.tool === 'arrow' || shape.tool === 'step';
       ctx.strokeStyle = color;
       ctx.globalAlpha = .055 * opacity;
       for (let spread = 6; spread >= 1; spread--) {
-        ctx.lineWidth = (shape.tool === 'arrow' ? 0 : shape.width) + spread;
+        ctx.lineWidth = (solid ? 0 : shape.width) + spread;
         ctx.stroke();
       }
       ctx.globalAlpha = opacity;
       applyShadow(ctx, scale);
-      if (shape.tool === 'arrow') {
+      if (solid) {
         ctx.fillStyle = color;
         ctx.fill();
+        if (shape.tool === 'step') drawStepLabel(ctx, shape);
       } else {
         ctx.lineWidth = shape.width;
         ctx.strokeStyle = color;

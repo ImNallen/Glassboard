@@ -53,7 +53,7 @@ permissions and first-use instructions, or browse the
 
 ## Features
 
-- **Draw over anything:** arrow, pen, square, circle, text, highlighter, and eraser, with undo and redo.
+- **Draw over anything:** arrow, pen, square, circle, numbered step, text, highlighter, and eraser, with undo and redo.
 - **Starts clean every time:** leaving annotation mode clears every display. You can also
   set drawings to fade out after 3, 5, or 10 seconds.
 - **Screenshot and annotate:** freeze the screen, select a region, draw on it, and copy
@@ -73,13 +73,14 @@ On Windows and Linux, use **Ctrl** wherever **Cmd** appears. Linux calls the Win
 | Open the screenshot tool from anywhere (global, configurable) | Cmd+Ctrl+Shift+S (Super+Ctrl+Shift+S on Linux, Win+Ctrl+Shift+S on Windows) |
 | Capture a screenshot region | Cmd+S |
 | Copy the capture and close | Cmd+C |
-| Arrow / Pen / Square / Circle | Cmd+1 / 2 / 3 / 4 |
+| Arrow / Pen / Square / Circle / Step | Cmd+1 / 2 / 3 / 4 / 5 |
 | Eraser / Text / Highlighter | Cmd+E / T / H |
 | Choose a color | 1–8 |
 | Undo / Redo | Cmd+Z / Cmd+Shift+Z |
 | Hide the overlay or cancel a capture | Esc |
 
 Hold **Shift** while dragging to snap arrows to 45° or draw perfect squares and circles.
+Click with the Step tool to drop numbered badges in order: 1, 2, 3.
 To open settings, click the menu bar or system tray icon. On Linux, select **Settings** from the tray menu.
 
 ## Build from source

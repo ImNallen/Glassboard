@@ -1,5 +1,5 @@
 import preferenceDefaults from '../../contract/preference-defaults.json';
-export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'highlighter' | 'text' | 'eraser';
+export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'step' | 'highlighter' | 'text' | 'eraser';
 /** Freehand tools append points as the pointer moves instead of anchoring a start and end. */
 export const FREEHAND_TOOLS: readonly Tool[] = ['pen', 'highlighter'];
 export type ColorMode = 'solid' | 'rainbow' | 'cycle';
@@ -21,6 +21,8 @@ export type Shape = {
   fadeSeconds?: AutoFadeSeconds;
   expiresAt?: number;
   text?: string;
+  /** A step badge's number, fixed when placed so fading or erasing never renumbers the others. */
+  step?: number;
 };
 
 type DrawingStyle = {
@@ -56,6 +58,15 @@ export function shiftRainbow(shape: Shape, from: Point, to: Point) {
   if (shape.colorMode === 'rainbow') {
     shape.hue = ((shape.hue ?? 0) + Math.hypot(to.x - from.x, to.y - from.y) * .6) % 360;
   }
+}
+
+/** Regular width gives a 14 px badge. */
+export function stepRadius(width: number): number { return 6 + width * 2; }
+export function nextStep(shapes: readonly Shape[]): number { return 1 + Math.max(0, ...shapes.map(shape => shape.step ?? 0)); }
+/** A step badge stores its bounding box, so hit-testing, rainbow bounds, and capture export treat it like any closed shape. */
+export function placeStep(shape: Shape, center: Point) {
+  const radius = stepRadius(shape.width);
+  shape.points = [{ x: center.x - radius, y: center.y - radius }, { x: center.x + radius, y: center.y + radius }];
 }
 
 /** Use consistent bounds for closed shapes while preserving an arrow's direction. */
