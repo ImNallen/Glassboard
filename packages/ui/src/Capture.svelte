@@ -83,8 +83,9 @@
     } catch (cause) { if (!disposed) error = String(cause); }
     finally { busy = false; }
   }
+  // The editor forces fade off for its own drawings; put back the real setting and keep every other edit.
   function save(preferences: Preferences) {
-    return savePreferences({ ...session.preferences, tool: preferences.tool, color: preferences.color, colorMode: preferences.colorMode });
+    return savePreferences({ ...preferences, autoFadeSeconds: session.preferences.autoFadeSeconds });
   }
   function keydown(event: KeyboardEvent) {
     captureKeydown(event, { copy, cancel, keybindings: session.preferences.keybindings });
