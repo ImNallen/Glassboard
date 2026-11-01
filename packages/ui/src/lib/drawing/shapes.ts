@@ -1,4 +1,5 @@
 import preferenceDefaults from '../../contract/preference-defaults.json';
+import strokeWidths from '../../contract/stroke-sizes.json';
 export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'step' | 'highlighter' | 'text' | 'eraser';
 /** Freehand tools append points as the pointer moves instead of anchoring a start and end. */
 export const FREEHAND_TOOLS: readonly Tool[] = ['pen', 'highlighter'];
@@ -6,7 +7,18 @@ export type ColorMode = 'solid' | 'rainbow' | 'cycle';
 export type AutoFadeSeconds = 0 | 3 | 5 | 10;
 export const AUTO_FADE_OPTIONS: readonly AutoFadeSeconds[] = [0, 3, 5, 10];
 export const FADE_MS = 500;
-export const REGULAR_WIDTH = 4;
+/** One size scales a whole mark: stroke, arrowhead, corners, highlighter band, text, and step badge. */
+export type StrokeSize = keyof typeof strokeWidths;
+/** Smallest first, the order the toolbar cycles and the size keys step through. */
+export const STROKE_SIZES = Object.keys(strokeWidths) as StrokeSize[];
+export const STROKE_SIZE_NAMES: Record<StrokeSize, string> = { small: 'Small', medium: 'Medium', large: 'Large' };
+/** The pixel width a new shape stores, so changing the size never resizes drawn marks. */
+export function strokeWidth(size: StrokeSize): number { return strokeWidths[size]; }
+/** The neighbouring size toward `step`, staying put at either end. */
+export function stepStrokeSize(size: StrokeSize, step: -1 | 1): StrokeSize {
+  const index = STROKE_SIZES.indexOf(size) + step;
+  return STROKE_SIZES[Math.max(0, Math.min(STROKE_SIZES.length - 1, index))];
+}
 export type Point = { x: number; y: number };
 export type Shape = {
   id: string;
@@ -29,6 +41,7 @@ type DrawingStyle = {
   tool: Tool;
   color: string;
   colorMode: ColorMode;
+  size: StrokeSize;
   autoFadeSeconds?: AutoFadeSeconds;
   rainbowColors?: readonly string[];
   cycleColors?: readonly string[];
@@ -44,7 +57,7 @@ export function createShape(style: DrawingStyle, cycleIndex: number, start: Poin
   return {
     id: crypto.randomUUID(),
     tool: style.tool,
-    width: REGULAR_WIDTH,
+    width: strokeWidth(style.size),
     color: style.colorMode === 'cycle' ? cycleColor(cycleIndex, style.cycleColors) : style.color,
     colorMode: style.colorMode,
     hue: style.colorMode === 'rainbow' ? Math.random() * 360 : 0,
@@ -60,7 +73,7 @@ export function shiftRainbow(shape: Shape, from: Point, to: Point) {
   }
 }
 
-/** Regular width gives a 14 px badge. */
+/** Medium width gives a 14 px badge. */
 export function stepRadius(width: number): number { return 6 + width * 2; }
 export function nextStep(shapes: readonly Shape[]): number { return 1 + Math.max(0, ...shapes.map(shape => shape.step ?? 0)); }
 /** A step badge stores its bounding box, so hit-testing, rainbow bounds, and capture export treat it like any closed shape. */

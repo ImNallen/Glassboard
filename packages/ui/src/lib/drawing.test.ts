@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, nextStep, placeStep, rainbowAxis, shiftRainbow, render, shapeAtPoint, shapeOpacity, textFontSize, textLineHeight, TEXT_FONT_FAMILY, type Shape, type Tool } from './drawing';
+import { DrawingHistory, constrainEnd, createShape, cycleColor, CYCLE_COLORS, nextStep, placeStep, rainbowAxis, shiftRainbow, render, shapeAtPoint, shapeOpacity, stepStrokeSize, textFontSize, TEXT_FONT_FAMILY, type Shape, type StrokeSize, type Tool } from './drawing';
+import { defaultPreferences } from './session-model';
 const arrow = (): Shape => ({ id: 'one', tool: 'arrow', color: '#ff6259', width: 4, points: [{ x: 0, y: 0 }, { x: 40, y: 20 }] });
 describe('auto-fade', () => {
   it('retains the renderable array until a deadline is due, including during fading', () => {
@@ -14,7 +15,7 @@ describe('auto-fade', () => {
     expect(history.shapes).not.toBe(shapes);
   });
   it.each([3, 5, 10] as const)('starts the %ss timer on completion and fades only at the end', seconds => {
-    const draft = createShape({ ...arrow(), colorMode: 'rainbow', autoFadeSeconds: seconds }, 0, { x: 0, y: 0 });
+    const draft = createShape({ ...arrow(), colorMode: 'rainbow', size: 'medium', autoFadeSeconds: seconds }, 0, { x: 0, y: 0 });
     expect(shapeOpacity(draft, 999999)).toBe(1);
     const history = new DrawingHistory();
     history.add(draft, 1000);
@@ -137,7 +138,7 @@ describe('annotation history', () => {
 });
 
 describe('rainbow and cycling colors', () => {
-  const style = { tool: 'arrow' as const, color: '#ffffff' };
+  const style = { tool: 'arrow' as const, color: '#ffffff', size: 'medium' as const };
 
   it('cycles through the palette without changing existing shapes', () => {
     const shapes = Array.from({ length: CYCLE_COLORS.length + 1 }, (_, i) => createShape({ ...style, colorMode: 'cycle' }, i, { x: 0, y: 0 }));
@@ -212,7 +213,7 @@ describe('rainbow and cycling colors', () => {
   });
 });
 describe('custom Rainbow and Shifting colors', () => {
-  const style = { tool: 'arrow' as const, color: '#ffffff' };
+  const style = { tool: 'arrow' as const, color: '#ffffff', size: 'medium' as const };
   function rainbowStops(shape: Shape) {
     const stops = vi.fn();
     const ctx = {
@@ -276,12 +277,9 @@ describe('pen and text tools', () => {
     expect(constrainEnd({ x: 0, y: 0 }, { x: 30, y: 7 }, 'pen', true)).toEqual({ x: 30, y: 7 });
     expect(constrainEnd({ x: 0, y: 0 }, { x: 30, y: 7 }, 'rectangle', true)).toEqual({ x: 30, y: 30 });
   });
-  it('uses Regular text size and keeps the text on the committed shape', () => {
+  it('keeps the text on the committed shape', () => {
     const history = new DrawingHistory();
-    const shape = createShape({ tool: 'text', color: '#000000', colorMode: 'solid' }, 0, { x: 10, y: 20 });
-    expect(shape.width).toBe(4);
-    expect(textFontSize(shape.width)).toBe(24);
-    expect(textLineHeight(shape.width)).toBe(30);
+    const shape = createShape({ tool: 'text', color: '#000000', colorMode: 'solid', size: 'medium' }, 0, { x: 10, y: 20 });
     shape.text = 'Hello'; shape.points.push({ x: 90, y: 50 });
     history.add(shape, 0);
     expect(history.shapes[0].text).toBe('Hello');
@@ -305,7 +303,7 @@ describe('pen and text tools', () => {
 
 describe('step tool', () => {
   const step = (n: number, color = '#f46b78'): Shape => {
-    const shape = createShape({ tool: 'step', color, colorMode: 'solid' }, 0, { x: 0, y: 0 });
+    const shape = createShape({ tool: 'step', color, colorMode: 'solid', size: 'medium' }, 0, { x: 0, y: 0 });
     shape.step = n; placeStep(shape, { x: 50, y: 40 });
     return shape;
   };
@@ -314,7 +312,7 @@ describe('step tool', () => {
     expect(nextStep([arrow()])).toBe(1);
     expect(nextStep([step(1), arrow(), step(3)])).toBe(4);
   });
-  it('places a 14 px badge around the center at Regular width', () => {
+  it('places a 14 px badge around the center at Medium size', () => {
     const shape = step(1);
     expect(shape.points).toEqual([{ x: 36, y: 26 }, { x: 64, y: 54 }]);
     expect(rainbowAxis(shape)).toEqual([{ x: 36, y: 26 }, { x: 64, y: 54 }]);
@@ -342,5 +340,26 @@ describe('step tool', () => {
     };
     render(ctx as unknown as CanvasRenderingContext2D, [step(12, color)], null, 100, 100, 1, 0);
     expect(fills).toEqual([['fill', color], ['12', label, `700 15px ${TEXT_FONT_FAMILY}`, 50, 45, 21]]);
+  });
+});
+
+describe('drawing size', () => {
+  const draw = (tool: Tool, size: StrokeSize) => createShape({ tool, color: '#000000', colorMode: 'solid', size }, 0, { x: 50, y: 40 });
+  it('defaults to Medium, which draws at the 4 px width shapes have always used', () => {
+    expect(defaultPreferences.size).toBe('medium');
+    expect(draw('arrow', defaultPreferences.size).width).toBe(4);
+  });
+  it.each([['small', 2, 18, 20], ['medium', 4, 24, 28], ['large', 8, 36, 44]] as const)('draws %s marks %i px wide, with %i px text and %i px step badges', (size, width, font, badge) => {
+    expect(draw('arrow', size).width).toBe(width);
+    expect(textFontSize(draw('text', size).width)).toBe(font);
+    const step = draw('step', size);
+    placeStep(step, { x: 50, y: 40 });
+    expect(step.points[1].x - step.points[0].x).toBe(badge);
+  });
+  it('steps one size at a time and stays put at either end', () => {
+    expect(stepStrokeSize('medium', 1)).toBe('large');
+    expect(stepStrokeSize('medium', -1)).toBe('small');
+    expect(stepStrokeSize('large', 1)).toBe('large');
+    expect(stepStrokeSize('small', -1)).toBe('small');
   });
 });

@@ -12,7 +12,7 @@
     { tool: 'highlighter', from: { x: .11, y: .31 }, to: { x: .46, y: .31 }, start: 2250, duration: 650 },
   ];
   const HOLD_UNTIL = 4600, LOOP = 6200, SAMPLES = 48;
-  const style = { tool: 'arrow' as Tool, color: '#f46b78', colorMode: 'rainbow' as const, autoFadeSeconds: 0 as const };
+  const style = { tool: 'arrow' as Tool, color: '#f46b78', colorMode: 'rainbow' as const, size: 'medium' as const, autoFadeSeconds: 0 as const };
 
   let host: HTMLDivElement;
   let canvas: HTMLCanvasElement;

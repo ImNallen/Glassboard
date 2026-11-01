@@ -72,6 +72,31 @@ impl TryFrom<u8> for AutoFadeSeconds {
     }
 }
 
+const STROKE_SIZES_JSON: &str =
+    include_str!("../../../../packages/ui/src/contract/stroke-sizes.json");
+/// Size names from the shared contract. Its pixel widths belong to the webviews.
+static STROKE_SIZES: LazyLock<Vec<String>> = LazyLock::new(|| {
+    serde_json::from_str::<Map<String, Value>>(STROKE_SIZES_JSON)
+        .expect("stroke-sizes.json is an object")
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect()
+});
+
+/// A drawing size from `contract/stroke-sizes.json`, saved by name.
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
+#[serde(try_from = "String")]
+pub(crate) struct StrokeSize(String);
+impl TryFrom<String> for StrokeSize {
+    type Error = &'static str;
+    fn try_from(size: String) -> std::result::Result<Self, Self::Error> {
+        STROKE_SIZES
+            .contains(&size)
+            .then_some(Self(size))
+            .ok_or(INVALID_DRAWING)
+    }
+}
+
 /// In-app binding overrides by command id; an empty shortcut unbinds the command.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(try_from = "BTreeMap<String, String>")]
@@ -158,6 +183,7 @@ pub(crate) struct Preferences {
     pub(crate) tool: Tool,
     pub(crate) color: HexColor,
     pub(crate) color_mode: ColorMode,
+    pub(crate) size: StrokeSize,
     /// Toggles drawing. Saved files keep the name from when it was the only global shortcut.
     pub(crate) shortcut: GlobalShortcut,
     pub(crate) capture_shortcut: CaptureShortcut,
@@ -371,7 +397,7 @@ mod tests {
     fn hex(color: &str) -> HexColor {
         HexColor(color.into())
     }
-    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
+    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
     fn shortcut(text: &str) -> GlobalShortcut {
         String::from(text).try_into().unwrap()
     }
@@ -459,6 +485,9 @@ mod tests {
             ("colorMode", json!("neon")),
             ("toolbarPosition", json!("top")),
             ("autoFadeSeconds", json!(4)),
+            ("size", json!("huge")),
+            ("size", json!("Medium")),
+            ("size", json!(4)),
             ("color", json!("")),
             ("color", json!("#fff")),
             ("color", json!("#12345678")),
@@ -668,6 +697,34 @@ mod tests {
         assert_eq!(picked.color, hex("#3388ff"));
         picked.save_to(&dir).unwrap();
         assert_eq!(load_from(&dir).0.color, hex("#3388ff"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn every_contract_size_parses_and_files_without_one_load_medium() {
+        for size in STROKE_SIZES.iter() {
+            assert_eq!(with("size", json!(size)).unwrap().size.0, *size);
+        }
+        let preferences = Preferences::parse(json!({"tool": "pen"})).unwrap();
+        assert_eq!(preferences.size, StrokeSize("medium".into()));
+    }
+    #[test]
+    fn an_unknown_size_resets_only_the_size() {
+        let dir = scratch_dir("size");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            json!({"version": 1, "tool": "pen", "size": "xl"}).to_string(),
+        )
+        .unwrap();
+        let (preferences, warning) = load_from(&dir);
+        assert!(warning.is_some());
+        assert_eq!(
+            preferences,
+            Preferences {
+                tool: Tool::Pen,
+                ..Preferences::default()
+            }
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

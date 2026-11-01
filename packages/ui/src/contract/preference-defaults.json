@@ -2,6 +2,7 @@
   "tool": "arrow",
   "color": "#f46b78",
   "colorMode": "rainbow",
+  "size": "medium",
   "shortcut": "CommandOrControl+Shift+A",
   "captureShortcut": "Super+Control+Shift+KeyS",
   "keybindings": {},
