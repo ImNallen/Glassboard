@@ -74,7 +74,6 @@ impl TryFrom<u8> for AutoFadeSeconds {
 
 const STROKE_SIZES_JSON: &str =
     include_str!("../../../../packages/ui/src/contract/stroke-sizes.json");
-/// Size names from the shared contract. Its pixel widths belong to the webviews.
 static STROKE_SIZES: LazyLock<Vec<String>> = LazyLock::new(|| {
     serde_json::from_str::<Map<String, Value>>(STROKE_SIZES_JSON)
         .expect("stroke-sizes.json is an object")
@@ -83,7 +82,6 @@ static STROKE_SIZES: LazyLock<Vec<String>> = LazyLock::new(|| {
         .collect()
 });
 
-/// A drawing size from `contract/stroke-sizes.json`, saved by name.
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 #[serde(try_from = "String")]
 pub(crate) struct StrokeSize(String);

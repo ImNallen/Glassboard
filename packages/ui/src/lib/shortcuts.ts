@@ -35,7 +35,6 @@ export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMod
   { command: 'color-blue', name: 'Blue', colorMode: 'solid', slot: 5, shortcut: 'Digit8' },
 ];
 
-/** `[` and `]` step the drawing size, as brush-size keys do in Photoshop and Krita. */
 export const SIZE_SHORTCUTS: readonly { command: string; name: string; step: -1 | 1; shortcut: string }[] = [
   { command: 'size-smaller', name: 'Smaller size', step: -1, shortcut: 'BracketLeft' },
   { command: 'size-larger', name: 'Larger size', step: 1, shortcut: 'BracketRight' },
@@ -124,7 +123,6 @@ export function colorShortcut(event: KeyEvent, keybindings?: Keybindings, mac = 
   return choice.slot === undefined ? { colorMode: choice.colorMode } : { colorMode: choice.colorMode, color: swatchColor(swatches, choice.slot) };
 }
 
-/** The direction a size shortcut steps, if the event is one. */
 export function sizeShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac): -1 | 1 | undefined {
   const command = commandFor(event, keybindings, mac);
   return SIZE_SHORTCUTS.find(size => size.command === command)?.step;

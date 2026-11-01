@@ -7,14 +7,10 @@ export type ColorMode = 'solid' | 'rainbow' | 'cycle';
 export type AutoFadeSeconds = 0 | 3 | 5 | 10;
 export const AUTO_FADE_OPTIONS: readonly AutoFadeSeconds[] = [0, 3, 5, 10];
 export const FADE_MS = 500;
-/** One size scales a whole mark: stroke, arrowhead, corners, highlighter band, text, and step badge. */
 export type StrokeSize = keyof typeof strokeWidths;
-/** Smallest first, the order the toolbar cycles and the size keys step through. */
-export const STROKE_SIZES = Object.keys(strokeWidths) as StrokeSize[];
+export const STROKE_SIZES = (Object.keys(strokeWidths) as StrokeSize[]).sort((a, b) => strokeWidths[a] - strokeWidths[b]);
 export const STROKE_SIZE_NAMES: Record<StrokeSize, string> = { small: 'Small', medium: 'Medium', large: 'Large' };
-/** The pixel width a new shape stores, so changing the size never resizes drawn marks. */
 export function strokeWidth(size: StrokeSize): number { return strokeWidths[size]; }
-/** The neighbouring size toward `step`, staying put at either end. */
 export function stepStrokeSize(size: StrokeSize, step: -1 | 1): StrokeSize {
   const index = STROKE_SIZES.indexOf(size) + step;
   return STROKE_SIZES[Math.max(0, Math.min(STROKE_SIZES.length - 1, index))];
@@ -73,7 +69,6 @@ export function shiftRainbow(shape: Shape, from: Point, to: Point) {
   }
 }
 
-/** Medium width gives a 14 px badge. */
 export function stepRadius(width: number): number { return 6 + width * 2; }
 export function nextStep(shapes: readonly Shape[]): number { return 1 + Math.max(0, ...shapes.map(shape => shape.step ?? 0)); }
 /** A step badge stores its bounding box, so hit-testing, rainbow bounds, and capture export treat it like any closed shape. */

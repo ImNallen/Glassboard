@@ -83,7 +83,6 @@
     } catch (cause) { if (!disposed) error = String(cause); }
     finally { busy = false; }
   }
-  // The editor forces fade off for its own drawings; put back the real setting and keep every other edit.
   function save(preferences: Preferences) {
     return savePreferences({ ...preferences, autoFadeSeconds: session.preferences.autoFadeSeconds });
   }
