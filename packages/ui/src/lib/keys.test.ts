@@ -118,4 +118,35 @@ describe('drawingKeydown', () => {
     drawingKeydown(press('7'), custom, { run: vi.fn(), save, toggleShortcut: false });
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ colorMode: 'solid', color: '#8b5cf6' }));
   });
+  it('steps the drawing size with [ and ], stopping at either end', () => {
+    const save = vi.fn(), handlers = { run: vi.fn(), save, toggleShortcut: false };
+    const larger = press(']', { code: 'BracketRight' });
+    drawingKeydown(larger, session('draw'), handlers);
+    expect(larger.defaultPrevented).toBe(true);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ size: 'large' }));
+    drawingKeydown(press('[', { code: 'BracketLeft' }), session('draw'), handlers);
+    expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ size: 'small' }));
+    save.mockClear();
+    const largest = session('draw'), smallest = session('draw');
+    largest.preferences.size = 'large'; smallest.preferences.size = 'small';
+    const atEnd = press(']', { code: 'BracketRight' });
+    drawingKeydown(atEnd, largest, handlers);
+    drawingKeydown(press('[', { code: 'BracketLeft' }), smallest, handlers);
+    expect(atEnd.defaultPrevented).toBe(true);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it('ignores the size keys while hidden or typing, and follows rebound and unbound sizes', () => {
+    const save = vi.fn(), handlers = { run: vi.fn(), save, toggleShortcut: false };
+    drawingKeydown(press(']', { code: 'BracketRight' }), session('hidden'), handlers);
+    drawingKeydown(press(']', { code: 'BracketRight' }, document.createElement('textarea')), session('draw'), handlers);
+    expect(save).not.toHaveBeenCalled();
+    const rebound = session('draw');
+    rebound.preferences.keybindings = { 'size-larger': 'Alt+Equal', 'size-smaller': '' };
+    drawingKeydown(press(']', { code: 'BracketRight' }), rebound, handlers);
+    drawingKeydown(press('[', { code: 'BracketLeft' }), rebound, handlers);
+    expect(save).not.toHaveBeenCalled();
+    drawingKeydown(press('=', { code: 'Equal', altKey: true }), rebound, handlers);
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ size: 'large' }));
+  });
 });

@@ -4,7 +4,7 @@ use tauri::{
 };
 
 /// Logical window sizes. The toolbar's includes 12 logical pixels around it for its shadow.
-pub(crate) const TOOLBAR_SIZE: (f64, f64) = (744.0, 76.0);
+pub(crate) const TOOLBAR_SIZE: (f64, f64) = (780.0, 76.0);
 pub(crate) const SETTINGS_SIZE: (f64, f64) = (380.0, 620.0);
 pub(crate) const TUTORIAL_SIZE: (f64, f64) = (400.0, 330.0);
 
@@ -323,15 +323,15 @@ mod tests {
         let work = rect(0.0, 24.0, 1440.0, 836.0);
         assert_eq!(
             dock(ToolbarPosition::Bottom, work, 1.0, false),
-            rect(348.0, 776.0, 744.0, 76.0)
+            rect(330.0, 776.0, 780.0, 76.0)
         );
         assert_eq!(
             dock(ToolbarPosition::Left, work, 1.0, false),
-            rect(8.0, 70.0, 76.0, 744.0)
+            rect(8.0, 52.0, 76.0, 780.0)
         );
         assert_eq!(
             dock(ToolbarPosition::Right, work, 1.0, false),
-            rect(1356.0, 70.0, 76.0, 744.0)
+            rect(1356.0, 52.0, 76.0, 780.0)
         );
     }
     #[test]
@@ -362,7 +362,7 @@ mod tests {
         let work = rect(-2880.0, 48.0, 2880.0, 1672.0);
         assert_eq!(
             dock(ToolbarPosition::Bottom, work, 2.0, false),
-            rect(-2184.0, 1552.0, 1488.0, 152.0)
+            rect(-2220.0, 1552.0, 1560.0, 152.0)
         );
         let small = rect(0.0, 0.0, 500.0, 450.0);
         let side = dock(ToolbarPosition::Left, small, 1.0, false);

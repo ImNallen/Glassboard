@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
-  import { DrawingHistory, OverlayRenderer, REGULAR_WIDTH, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, nextStep, placeStep, shiftRainbow, shapeAtPoint, textFont, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { DrawingHistory, OverlayRenderer, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, nextStep, placeStep, shiftRainbow, shapeAtPoint, strokeWidth, textFont, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
   import { gradientStrip } from './lib/swatches';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
@@ -18,9 +18,9 @@
   let fadeTimer: ReturnType<typeof setTimeout> | undefined;
   // The text tool edits inline; the canvas only draws the text once it is committed.
   let editor = $state<{ origin: Point; hue: number; text: string } | null>(null);
-  const editorWidth = REGULAR_WIDTH;
-  const editorFontSize = textFontSize(editorWidth);
-  const editorLineHeight = textLineHeight(editorWidth);
+  let editorWidth = $derived(strokeWidth(session.preferences.size));
+  let editorFontSize = $derived(textFontSize(editorWidth));
+  let editorLineHeight = $derived(textLineHeight(editorWidth));
   let editorColor = $derived(session.preferences.colorMode === 'cycle' ? cycleColor(session.cycleIndex, session.preferences.cycleColors) : session.preferences.color);
   let editorSize = $derived.by(() => {
     const ctx = editor && canvas?.getContext('2d');

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Palette, Power, Redo2, RefreshCw, RotateCcw, Scan, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
+  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Minus, Palette, Plus, Power, Redo2, RefreshCw, RotateCcw, Scan, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
@@ -23,7 +23,7 @@
     { id: 'keybindings', label: 'Keybindings', icon: Keyboard },
   ];
   const POSITIONS: readonly { id: ToolbarPosition; label: string }[] = [{ id: 'left', label: 'Left' }, { id: 'bottom', label: 'Bottom' }, { id: 'right', label: 'Right' }];
-  const ICONS: Record<string, typeof Keyboard> = { undo: Undo2, redo: Redo2, hide: EyeOff, capture: Scan, copy: Copy, ...Object.fromEntries(TOOL_SHORTCUTS.map(tool => [tool.command, TOOL_ICONS[tool.id]])) };
+  const ICONS: Record<string, typeof Keyboard> = { undo: Undo2, redo: Redo2, hide: EyeOff, 'size-smaller': Minus, 'size-larger': Plus, capture: Scan, copy: Copy, ...Object.fromEntries(TOOL_SHORTCUTS.map(tool => [tool.command, TOOL_ICONS[tool.id]])) };
   const REPOSITORY_URL = 'https://github.com/ImNallen/Glassboard';
   const GLOBAL_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels.`;
   const CAPTURE_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels, ${platformMac ? '⌫' : 'Backspace'} clears.`;

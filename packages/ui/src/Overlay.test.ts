@@ -4,7 +4,7 @@ import { flushSync, mount, unmount } from 'svelte';
 import { fromStore, writable } from 'svelte/store';
 import Overlay from './Overlay.svelte';
 import { defaults, reportHistory } from './lib/session';
-import { REGULAR_WIDTH, render, shapeAtPoint, TEXT_FONT_FAMILY, textFontSize, textLineHeight } from './lib/drawing';
+import { render, shapeAtPoint, TEXT_FONT_FAMILY } from './lib/drawing';
 
 vi.mock('./lib/session', async importOriginal => ({
   ...await importOriginal<typeof import('./lib/session')>(),
@@ -202,8 +202,34 @@ it('sets the inline text editor in the font the canvas draws committed text with
   flushSync();
   pointer(canvas, 'pointerdown', 10, 20);
   const editor = document.querySelector('textarea')!;
-  expect([editor.style.fontWeight, editor.style.fontSize, editor.style.fontFamily.replaceAll('"', "'")]).toEqual(['600', `${textFontSize(REGULAR_WIDTH)}px`, TEXT_FONT_FAMILY]);
-  expect(editor.style.lineHeight).toBe(`${textLineHeight(REGULAR_WIDTH)}px`);
+  expect([editor.style.fontWeight, editor.style.fontSize, editor.style.fontFamily.replaceAll('"', "'")]).toEqual(['600', '24px', TEXT_FONT_FAMILY]);
+  expect(editor.style.lineHeight).toBe('30px');
+});
+
+it('sizes the text editor and the committed text from the current size', () => {
+  const { store, canvas } = setup();
+  vi.mocked(canvas.getContext).mockReturnValue({ clearRect, save() {}, restore() {}, measureText: () => ({ width: 40 }) } as unknown as CanvasRenderingContext2D);
+  store.update(session => ({ ...session, preferences: { ...session.preferences, tool: 'text', size: 'large' } }));
+  flushSync();
+  pointer(canvas, 'pointerdown', 10, 20);
+  const editor = document.querySelector('textarea')!;
+  expect([editor.style.fontSize, editor.style.lineHeight]).toEqual(['36px', '45px']);
+  editor.value = 'Big'; editor.dispatchEvent(new Event('input', { bubbles: true }));
+  key(editor, 'keydown', { key: 'Enter' });
+  expect(drawn()?.map(shape => [shape.text, shape.width])).toEqual([['Big', 8]]);
+});
+
+it('keeps drawn marks and a drag in progress at the size they started with', () => {
+  const { store, canvas } = setup();
+  draw(canvas);
+  pointer(canvas, 'pointerdown', 10, 20);
+  pointer(canvas, 'pointermove', 60, 50);
+  store.update(session => ({ ...session, preferences: { ...session.preferences, size: 'large' } }));
+  flushSync();
+  pointer(canvas, 'pointermove', 110, 80);
+  pointer(canvas, 'pointerup', 110, 80);
+  draw(canvas);
+  expect(drawn()?.map(shape => shape.width)).toEqual([4, 4, 8]);
 });
 
 it('keeps composing text when the input method confirms a conversion with Enter', () => {

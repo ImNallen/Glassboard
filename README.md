@@ -54,6 +54,9 @@ permissions and first-use instructions, or browse the
 ## Features
 
 - **Draw over anything:** arrow, pen, square, circle, numbered step, text, highlighter, and eraser, with undo and redo.
+- **Three sizes:** the Size button on the toolbar switches new marks between Small, Medium,
+  and Large. Lines, arrowheads, the highlighter, text, and step badges all scale. Marks
+  already on screen keep their size.
 - **Starts clean every time:** leaving annotation mode clears every display. You can also
   set drawings to fade out after 3, 5, or 10 seconds.
 - **Screenshot and annotate:** freeze the screen, select a region, draw on it, and copy
@@ -61,7 +64,7 @@ permissions and first-use instructions, or browse the
 - **Out of the way:** the toolbar shrinks to a small pill on the left, right, or bottom
   edge of the screen and follows your system's light or dark mode.
 - **Multiple displays:** each display gets its own drawing surface.
-- **Keyboard-friendly:** every tool and color has a shortcut.
+- **Keyboard-friendly:** every tool, color, and size has a shortcut.
 
 ## Shortcuts
 
@@ -76,6 +79,7 @@ On Windows and Linux, use **Ctrl** wherever **Cmd** appears. Linux calls the Win
 | Arrow / Pen / Square / Circle / Step | Cmd+1 / 2 / 3 / 4 / 5 |
 | Eraser / Text / Highlighter | Cmd+E / T / H |
 | Choose a color | 1–8 |
+| Smaller / larger size | [ / ] |
 | Undo / Redo | Cmd+Z / Cmd+Shift+Z |
 | Hide the overlay or cancel a capture | Esc |
 

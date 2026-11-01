@@ -84,7 +84,7 @@
     finally { busy = false; }
   }
   function save(preferences: Preferences) {
-    return savePreferences({ ...session.preferences, tool: preferences.tool, color: preferences.color, colorMode: preferences.colorMode });
+    return savePreferences({ ...preferences, autoFadeSeconds: session.preferences.autoFadeSeconds });
   }
   function keydown(event: KeyboardEvent) {
     captureKeydown(event, { copy, cancel, keybindings: session.preferences.keybindings });

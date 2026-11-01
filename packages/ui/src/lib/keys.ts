@@ -1,4 +1,5 @@
-import { colorShortcut, commandFor, matchesShortcut, platformMac, toolShortcut } from './shortcuts';
+import { colorShortcut, commandFor, matchesShortcut, platformMac, sizeShortcut, toolShortcut } from './shortcuts';
+import { stepStrokeSize } from './drawing';
 import { isEditableTarget } from './selection';
 import { native, type Action, type Preferences, type Session } from './session';
 
@@ -13,7 +14,7 @@ type Handlers = {
 
 /**
  * Routes a keydown event to the user's bindings: show/hide (browser only, optional),
- * return to work, capture, undo/redo, colors, and tools. Keys typed into form controls are left alone.
+ * return to work, capture, undo/redo, size, colors, and tools. Keys typed into form controls are left alone.
  */
 export function drawingKeydown(event: KeyboardEvent, session: Session, { run, save, capture, toggleShortcut = !native }: Handlers) {
   if (event.defaultPrevented) return;
@@ -29,6 +30,13 @@ export function drawingKeydown(event: KeyboardEvent, session: Session, { run, sa
     return;
   }
   if (command === 'hide' || command === 'undo' || command === 'redo') { event.preventDefault(); run(command); return; }
+  const step = sizeShortcut(event, keybindings, platformMac);
+  if (step) {
+    event.preventDefault();
+    const size = stepStrokeSize(session.preferences.size, step);
+    if (size !== session.preferences.size) save({ ...session.preferences, size });
+    return;
+  }
   const color = colorShortcut(event, keybindings, platformMac, session.preferences.swatches);
   if (color) { event.preventDefault(); save({ ...session.preferences, ...color }); return; }
   const tool = toolShortcut(event, keybindings, platformMac);
