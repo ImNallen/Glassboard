@@ -2,12 +2,12 @@
   import { Scan, Undo2, Redo2, Trash2, Infinity as InfinityIcon, X } from '@lucide/svelte';
   import { onMount, tick } from 'svelte';
   import { createToolbarHints } from './lib/toolbar-hints.svelte';
-  import { COLOR_SHORTCUTS, keyLabel, TOOL_SHORTCUTS } from './lib/shortcuts';
+  import { COLOR_SHORTCUTS, keyLabel, SIZE_SHORTCUTS, TOOL_SHORTCUTS } from './lib/shortcuts';
   import { rainbowPreview, sameColor, shiftingPreview, swatchColor, swatchName } from './lib/swatches';
   import { TOOL_ICONS } from './lib/tool-icons';
   import type { Errors } from './lib/errors.svelte';
   import { action, expandToolbar, savePreferences, toolbarPointer, type Action, type Preferences, type Session } from './lib/session';
-  import { AUTO_FADE_OPTIONS, type Tool } from './lib/drawing';
+  import { AUTO_FADE_OPTIONS, STROKE_SIZE_NAMES, STROKE_SIZES, strokeWidth, type Tool } from './lib/drawing';
   /**
    * `host` is where the toolbar lives: its own native window, which reports the cursor and resizes to fit; a web page; or the screenshot editor.
    * `pinned` keeps the toolbar open instead of collapsing to the pill when the cursor is away; hosts without a native window use it.
@@ -65,6 +65,9 @@
   let keybindings = $derived(session.preferences.keybindings);
   let colors = $derived(COLOR_SHORTCUTS.flatMap(({ command, slot }) => slot === undefined ? []
     : [{ command, color: swatchColor(session.preferences.swatches, slot), name: swatchName(session.preferences.swatches, slot) }]));
+  let size = $derived(session.preferences.size);
+  let nextSize = $derived(STROKE_SIZES[(STROKE_SIZES.indexOf(size) + 1) % STROKE_SIZES.length]);
+  let sizeKeys = $derived(SIZE_SHORTCUTS.map(({ command }) => keyLabel(keybindings, command)).filter(Boolean).join(' '));
   let fadeSeconds = $derived(session.preferences.autoFadeSeconds);
   let nextFade = $derived(AUTO_FADE_OPTIONS[(AUTO_FADE_OPTIONS.indexOf(fadeSeconds) + 1) % AUTO_FADE_OPTIONS.length]);
   const fadeLabel = (seconds: number) => seconds === 0 ? 'Until you return to work' : `${seconds}s`;
@@ -109,6 +112,9 @@
       {/each}
     </div>
     <div class="divider"></div>
+    <button class="icon-button" onclick={() => change({ size: nextSize })} use:hint={{ label: `Size: ${STROKE_SIZE_NAMES[size]}`, key: sizeKeys, description: `Click for ${STROKE_SIZE_NAMES[nextSize]}` }} aria-label={`Size: ${STROKE_SIZE_NAMES[size]}. Switch to ${STROKE_SIZE_NAMES[nextSize]}`}>
+      <span class="size-sample" style:height={`${strokeWidth(size)}px`} aria-hidden="true"></span>
+    </button>
     {#if host !== 'capture'}<button class="icon-button fade-button" class:active={fadeSeconds !== 0} onclick={() => change({ autoFadeSeconds: nextFade })} use:hint={{ label: `Auto-fade: ${fadeLabel(fadeSeconds)}`, description: `Click for ${fadeLabel(nextFade)}` }} aria-label={`Auto-fade: ${fadeLabel(fadeSeconds)}. Switch to ${fadeLabel(nextFade)}`}>
       {#if fadeSeconds === 0}<InfinityIcon size={19}/>{:else}<span>{fadeSeconds}s</span>{/if}
     </button>

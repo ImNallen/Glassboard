@@ -179,3 +179,25 @@ it('reveals on a nearby pointer in a page, but leaves that to the native window 
     document.body.replaceChildren();
   }
 });
+
+it.each(['window', 'page', 'capture'] as const)('in a %s host, cycles the drawing size from Small to Large and back', async host => {
+  const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: null });
+  const current = fromStore(store);
+  const onsave = vi.fn(async (preferences: Session['preferences']) => store.update(session => ({ ...session, preferences })));
+  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, errors: createErrors(() => current.current), host, onsave, pinned: true } });
+  await tick();
+  const sizeButton = () => document.querySelector<HTMLButtonElement>('button[aria-label^="Size:"]')!;
+  const seen = [];
+  for (let i = 0; i < 4; i++) {
+    seen.push(sizeButton().getAttribute('aria-label'));
+    sizeButton().click();
+    await vi.advanceTimersByTimeAsync(0); await tick();
+  }
+  expect(seen).toEqual(['Size: Medium. Switch to Large', 'Size: Large. Switch to Small', 'Size: Small. Switch to Medium', 'Size: Medium. Switch to Large']);
+  expect(onsave.mock.calls.map(([preferences]) => preferences.size)).toEqual(['large', 'small', 'medium', 'large']);
+  await hover(sizeButton());
+  const tip = document.querySelector('[role="tooltip"]')!;
+  expect(tip.querySelector('.tooltip-heading span')?.textContent).toBe('Size: Large');
+  expect(tip.querySelector('kbd')?.textContent).toBe('[ ]');
+  expect(tip.textContent).toContain('Click for Small');
+});

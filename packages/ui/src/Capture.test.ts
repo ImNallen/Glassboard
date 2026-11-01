@@ -142,6 +142,14 @@ it('uses permanent capture drawings without changing live fade or dock preferenc
   expect(copyRegion).not.toHaveBeenCalled();
 });
 
+it('saves a size change from the screenshot editor and keeps the live fade', async () => {
+  const app = await setup();
+  (document.querySelector('button[aria-label^="Size:"]') as HTMLButtonElement).click();
+  await vi.waitFor(() => expect(app.state().preferences).toMatchObject({ size: 'large', autoFadeSeconds: 5 }));
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: '[', code: 'BracketLeft', bubbles: true, cancelable: true }));
+  await vi.waitFor(() => expect(app.state().preferences).toMatchObject({ size: 'medium', autoFadeSeconds: 5 }));
+});
+
 it('cancels selection without writing anything to the clipboard', async () => {
   const app = await setup();
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));

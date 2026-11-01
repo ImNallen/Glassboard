@@ -35,11 +35,18 @@ export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMod
   { command: 'color-blue', name: 'Blue', colorMode: 'solid', slot: 5, shortcut: 'Digit8' },
 ];
 
+/** `[` and `]` step the drawing size, as brush-size keys do in Photoshop and Krita. */
+export const SIZE_SHORTCUTS: readonly { command: string; name: string; step: -1 | 1; shortcut: string }[] = [
+  { command: 'size-smaller', name: 'Smaller size', step: -1, shortcut: 'BracketLeft' },
+  { command: 'size-larger', name: 'Larger size', step: 1, shortcut: 'BracketRight' },
+];
+
 /** Every in-app binding with its default. Global shortcuts live in `Preferences.shortcut` and `Preferences.captureShortcut`. */
 export const KEYBINDINGS: readonly { id: string; group: KeybindingGroup; name: string; shortcut: string; description?: string }[] = [
   { id: 'undo', group: 'Drawing', name: 'Undo', shortcut: 'CommandOrControl+KeyZ' },
   { id: 'redo', group: 'Drawing', name: 'Redo', shortcut: 'CommandOrControl+Shift+KeyZ' },
   { id: 'hide', group: 'Drawing', name: 'Close Glassboard', shortcut: 'Escape' },
+  ...SIZE_SHORTCUTS.map(size => ({ id: size.command, group: 'Drawing' as const, name: size.name, shortcut: size.shortcut })),
   ...TOOL_SHORTCUTS.map(tool => ({ id: tool.command, group: 'Tools' as const, name: tool.name, shortcut: tool.shortcut })),
   ...COLOR_SHORTCUTS.map(color => ({ id: color.command, group: 'Colors' as const, name: color.name, shortcut: color.shortcut })),
   { id: 'capture', group: 'Screenshot', name: 'Take screenshot', shortcut: 'CommandOrControl+KeyS' },
@@ -115,6 +122,12 @@ export function colorShortcut(event: KeyEvent, keybindings?: Keybindings, mac = 
   const choice = COLOR_SHORTCUTS.find(choice => choice.command === command);
   if (!choice) return;
   return choice.slot === undefined ? { colorMode: choice.colorMode } : { colorMode: choice.colorMode, color: swatchColor(swatches, choice.slot) };
+}
+
+/** The direction a size shortcut steps, if the event is one. */
+export function sizeShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac): -1 | 1 | undefined {
+  const command = commandFor(event, keybindings, mac);
+  return SIZE_SHORTCUTS.find(size => size.command === command)?.step;
 }
 
 export function toolShortcut(event: KeyEvent, keybindings?: Keybindings, mac = platformMac): Tool | undefined {
