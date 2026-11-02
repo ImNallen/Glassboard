@@ -105,7 +105,6 @@
   .banner button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .banner kbd { font: inherit; font-size: 11px; line-height: 1; padding: 3px 5px; border-radius: 4px; background: #143d331f; }
   @keyframes banner-in { from { opacity: 0; } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
   /* No keyboard to speak of: drop the Esc hint and sit closer to the toolbar. */
   @media (hover: none) { .banner { bottom: 76px; } .banner kbd { display: none; } }
   @media (max-width: 640px) { .banner { left: 12px; right: 12px; width: auto; max-width: none; transform: none; padding: 8px 8px 8px 14px; font-size: 13px; } .banner button { padding: 0 12px; } .banner kbd { display: none; } }

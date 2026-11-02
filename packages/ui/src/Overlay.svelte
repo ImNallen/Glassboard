@@ -245,7 +245,6 @@
     animation: annotation-glow-in 180ms ease-out both;
   }
   @keyframes annotation-glow-in { from { opacity: 0; } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .annotation-glow { animation: none; } }
   canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; cursor: crosshair; touch-action: none; -webkit-user-select: none; user-select: none; }
   canvas.text-tool { cursor: text; }
   canvas.eraser-tool { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%23000' stroke-width='3'/%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%23fff' stroke-width='1.5'/%3E%3C/svg%3E") 11 11, cell; }

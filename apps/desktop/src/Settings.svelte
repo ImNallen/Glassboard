@@ -338,11 +338,11 @@
   .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; }
   .button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .switch { position: relative; flex-shrink: 0; width: 34px; height: 20px; margin-right: 4px; padding: 0; border-radius: 10px; background: color-mix(in srgb, var(--gb-text) 18%, transparent); transition: background .16s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate .16s ease; }
+  .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate 160ms var(--gb-ease-out); }
   .switch[aria-checked="true"] { background: var(--gb-focus-ring); }
   .switch[aria-checked="true"] span { translate: 14px 0; }
   .switch:disabled { opacity: .5; }
-  @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .switch span { transition: none; } }
   .button:hover { color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
 
   .panel :global(.intro) { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 2px 16px; }
