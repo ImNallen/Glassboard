@@ -305,7 +305,7 @@
   .tabs { margin: 14px 14px 0; }
   .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
   .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--gb-strong-text); }
-  .tabs button:active, .segmented button:active:not(:disabled) { transform: scale(0.97); }
+  @media (prefers-reduced-motion: no-preference) { .tabs button:active, .segmented button:active:not(:disabled) { transform: scale(0.97); } }
   .tabs button[aria-selected="true"], .segmented button.chosen { background: var(--raised); color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
   .segmented button { font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
@@ -318,7 +318,7 @@
   .positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .position { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px 9px; border-radius: 10px; border: 1px solid var(--gb-divider); background: var(--gb-subtle-surface); font-size: 11.5px; color: var(--gb-secondary-text); transition: border-color .12s, background .12s, color .12s, transform 160ms var(--gb-ease-out); }
   .position:hover:not(:disabled) { background: var(--gb-hover); color: var(--gb-strong-text); }
-  .position:active:not(:disabled) { transform: scale(0.97); }
+  @media (prefers-reduced-motion: no-preference) { .position:active:not(:disabled) { transform: scale(0.97); } }
   .position.chosen { border-color: var(--gb-focus-ring); box-shadow: inset 0 0 0 1px var(--gb-focus-ring); color: var(--gb-strong-text); }
   .screen { position: relative; width: 58px; height: 38px; border-radius: 6px; border: 1px solid var(--gb-border); background: var(--gb-input-surface); }
   .screen span { position: absolute; border-radius: 2px; background: var(--gb-muted); opacity: .55; transition: background .12s, opacity .12s; }

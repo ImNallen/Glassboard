@@ -102,7 +102,7 @@
   .banner p { margin: 0; min-width: 0; }
   .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 34px; padding: 0 12px 0 14px; border: 0; border-radius: 9px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; transition: background .12s, transform 160ms var(--gb-ease-out); }
   .banner button:hover { background: #b9f0dc; }
-  .banner button:active { transform: scale(0.97); }
+  @media (prefers-reduced-motion: no-preference) { .banner button:active { transform: scale(0.97); } }
   .banner button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .banner kbd { font: inherit; font-size: 11px; line-height: 1; padding: 3px 5px; border-radius: 4px; background: #143d331f; }
   @keyframes banner-in { from { opacity: 0; } to { opacity: 1; } }

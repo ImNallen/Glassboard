@@ -168,7 +168,7 @@
   .capture-actions { position: fixed; z-index: 20; top: 18px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); }
   /* Keep the shared control independent of the host page's button/kbd defaults. */
   .capture-actions button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border-radius: 8px; font: 600 12px/normal -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 0 10px; appearance: none; border: 0; box-shadow: none; cursor: pointer; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; transition: background .12s, transform 160ms var(--gb-ease-out); }
-  .capture-actions button:active:not(:disabled) { transform: scale(0.97); }
+  @media (prefers-reduced-motion: no-preference) { .capture-actions button:active:not(:disabled) { transform: scale(0.97); } }
   .capture-actions button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .capture-actions button:disabled { opacity: .45; cursor: default; }
   .copy { background: #a3e9d1; color: #143d33; }
