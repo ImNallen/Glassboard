@@ -149,7 +149,7 @@
      A separate dim layer avoids replaying the entrance when reselecting a region. */
   .capture-dim { position: absolute; inset: 0; pointer-events: none; background: rgb(0 0 0 / .18); opacity: 0; }
   .capture-tools, .capture-actions { opacity: 0; pointer-events: none; }
-  .ready .capture-dim, .ready .capture-tools, .ready .capture-actions { opacity: 1; animation: capture-reveal 140ms cubic-bezier(.16, 1, .3, 1); }
+  .ready .capture-dim, .ready .capture-tools, .ready .capture-actions { opacity: 1; animation: capture-reveal 140ms var(--gb-ease-out); }
   .ready .capture-tools, .ready .capture-actions, .unavailable .capture-tools, .unavailable .capture-actions { opacity: 1; pointer-events: auto; }
   .ready .capture-actions { animation-name: capture-controls-in; }
   @keyframes capture-reveal { from { opacity: 0; } to { opacity: 1; } }
