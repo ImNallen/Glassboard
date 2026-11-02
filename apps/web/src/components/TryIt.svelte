@@ -100,12 +100,12 @@
      stacking layer so tooltips can rise over it. */
   .banner { position: fixed; z-index: 5; bottom: 124px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; width: max-content; max-width: calc(100vw - 24px); padding: 8px 8px 8px 16px; border: 1px solid var(--gb-border); border-radius: 14px; background: var(--gb-surface); color: var(--gb-text); font-size: 14px; line-height: 1.4; box-shadow: 0 4px 10px var(--gb-shadow); color-scheme: light dark; animation: banner-in 180ms ease-out both; }
   .banner p { margin: 0; min-width: 0; }
-  .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 34px; padding: 0 12px 0 14px; border: 0; border-radius: 9px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; }
+  .banner button { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; min-height: 34px; padding: 0 12px 0 14px; border: 0; border-radius: 9px; background: #a3e9d1; color: #143d33; font: inherit; font-weight: 600; cursor: pointer; transition: background .12s, transform 160ms var(--gb-ease-out); }
   .banner button:hover { background: #b9f0dc; }
+  @media (prefers-reduced-motion: no-preference) { .banner button:active { transform: scale(0.97); } }
   .banner button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .banner kbd { font: inherit; font-size: 11px; line-height: 1; padding: 3px 5px; border-radius: 4px; background: #143d331f; }
   @keyframes banner-in { from { opacity: 0; } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .banner { animation: none; } }
   /* No keyboard to speak of: drop the Esc hint and sit closer to the toolbar. */
   @media (hover: none) { .banner { bottom: 76px; } .banner kbd { display: none; } }
   @media (max-width: 640px) { .banner { left: 12px; right: 12px; width: auto; max-width: none; transform: none; padding: 8px 8px 8px 14px; font-size: 13px; } .banner button { padding: 0 12px; } .banner kbd { display: none; } }

@@ -79,12 +79,19 @@
       render(ctx!, layout(shapes, elapsed, width, height, fadeEnd), null, width, height, scale, now);
       frame = requestAnimationFrame(tick);
     }
+    function play() {
+      if (frame) return;
+      loopStart = performance.now(); shapes = newLoop();
+      frame = requestAnimationFrame(tick);
+    }
+    function pause() { cancelAnimationFrame(frame); frame = 0; }
 
     const observer = new ResizeObserver(() => { fit(); if (reduced) still(); });
+    const visibility = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) play(); else pause(); });
     observer.observe(host);
     fit();
-    if (reduced) still(); else frame = requestAnimationFrame(tick);
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+    if (reduced) still(); else visibility.observe(host);
+    return () => { observer.disconnect(); visibility.disconnect(); cancelAnimationFrame(frame); };
   });
 </script>
 

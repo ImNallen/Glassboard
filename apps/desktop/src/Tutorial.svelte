@@ -79,8 +79,9 @@
   .hint { color: var(--gb-muted); font-size: 12px; }
   footer { margin-top: auto; padding-top: 6px; }
   footer button { font-size: 12px; min-height: 34px; border-radius: 8px; }
-  .primary { display: flex; align-items: center; gap: 8px; background: var(--gb-selected); padding: 8px 12px; margin-left: auto; }
+  .primary { display: flex; align-items: center; gap: 8px; background: var(--gb-selected); padding: 8px 12px; margin-left: auto; transition: background .12s, transform 160ms var(--gb-ease-out); }
   .primary:hover { background: var(--gb-selected-border); }
+  @media (prefers-reduced-motion: no-preference) { .primary:active:not(:disabled) { transform: scale(0.97); } }
   .secondary { color: var(--gb-secondary-text); padding: 0; }
   .secondary:hover { text-decoration: underline; }
   .mode { font-size: 11px; color: var(--gb-muted); }

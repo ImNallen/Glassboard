@@ -149,12 +149,12 @@
      A separate dim layer avoids replaying the entrance when reselecting a region. */
   .capture-dim { position: absolute; inset: 0; pointer-events: none; background: rgb(0 0 0 / .18); opacity: 0; }
   .capture-tools, .capture-actions { opacity: 0; pointer-events: none; }
-  .ready .capture-dim, .ready .capture-tools, .ready .capture-actions { opacity: 1; animation: capture-reveal 140ms cubic-bezier(.16, 1, .3, 1); }
+  .ready .capture-dim, .ready .capture-tools, .ready .capture-actions { opacity: 1; animation: capture-reveal 140ms var(--gb-ease-out); }
   .ready .capture-tools, .ready .capture-actions, .unavailable .capture-tools, .unavailable .capture-actions { opacity: 1; pointer-events: auto; }
   .ready .capture-actions { animation-name: capture-controls-in; }
   @keyframes capture-reveal { from { opacity: 0; } to { opacity: 1; } }
   @keyframes capture-controls-in { from { opacity: 0; translate: 0 -4px; } to { opacity: 1; translate: 0 0; } }
-  @media (prefers-reduced-motion: reduce) { .ready .capture-dim, .ready .capture-tools, .ready .capture-actions { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .ready .capture-actions { animation-name: capture-reveal; } }
   .selection-surface { position: absolute; inset: 0; cursor: crosshair; touch-action: none; }
   .selection { position: fixed; pointer-events: none; border: 1px solid #a3e9d1; box-shadow: 0 0 0 100vmax rgb(0 0 0 / .45); }
   .finished { z-index: 1; }
@@ -167,7 +167,8 @@
   .capture-editor .capture-tools.busy :global(.toolbar-host) { pointer-events: none; }
   .capture-actions { position: fixed; z-index: 20; top: 18px; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 24px); }
   /* Keep the shared control independent of the host page's button/kbd defaults. */
-  .capture-actions button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border-radius: 8px; font: 600 12px/normal -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 0 10px; appearance: none; border: 0; box-shadow: none; cursor: pointer; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+  .capture-actions button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 7px; min-height: 34px; border-radius: 8px; font: 600 12px/normal -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 0 10px; appearance: none; border: 0; box-shadow: none; cursor: pointer; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; transition: background .12s, transform 160ms var(--gb-ease-out); }
+  @media (prefers-reduced-motion: no-preference) { .capture-actions button:active:not(:disabled) { transform: scale(0.97); } }
   .capture-actions button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .capture-actions button:disabled { opacity: .45; cursor: default; }
   .copy { background: #a3e9d1; color: #143d33; }

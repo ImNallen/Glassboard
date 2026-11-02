@@ -289,7 +289,7 @@
   .brand { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; letter-spacing: -.2px; color: var(--gb-strong-text); }
   .version { margin-left: 1px; padding: 2px 6px; border-radius: 999px; background: color-mix(in srgb, var(--gb-text) 7%, transparent); font-size: 10px; font-weight: 500; letter-spacing: 0; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
   .header-actions { display: flex; gap: 2px; }
-  .icon-link { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--gb-muted); }
+  .icon-link { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--gb-muted); transition: background .12s, color .12s; }
   .icon-link:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .icon-link:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .update.ready { color: var(--gb-focus-ring); }
@@ -303,8 +303,9 @@
 
   .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--gb-text) 6%, transparent); }
   .tabs { margin: 14px 14px 0; }
-  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s; }
+  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
   .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--gb-strong-text); }
+  @media (prefers-reduced-motion: no-preference) { .tabs button:active, .segmented button:active:not(:disabled) { transform: scale(0.97); } }
   .tabs button[aria-selected="true"], .segmented button.chosen { background: var(--raised); color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
   .segmented button { font-size: 11.5px; font-variant-numeric: tabular-nums; }
 
@@ -315,8 +316,9 @@
   .note { margin: 8px 2px 0; font-size: 11px; color: var(--gb-muted); }
 
   .positions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .position { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px 9px; border-radius: 10px; border: 1px solid var(--gb-divider); background: var(--gb-subtle-surface); font-size: 11.5px; color: var(--gb-secondary-text); transition: border-color .12s, background .12s, color .12s; }
+  .position { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px 6px 9px; border-radius: 10px; border: 1px solid var(--gb-divider); background: var(--gb-subtle-surface); font-size: 11.5px; color: var(--gb-secondary-text); transition: border-color .12s, background .12s, color .12s, transform 160ms var(--gb-ease-out); }
   .position:hover:not(:disabled) { background: var(--gb-hover); color: var(--gb-strong-text); }
+  @media (prefers-reduced-motion: no-preference) { .position:active:not(:disabled) { transform: scale(0.97); } }
   .position.chosen { border-color: var(--gb-focus-ring); box-shadow: inset 0 0 0 1px var(--gb-focus-ring); color: var(--gb-strong-text); }
   .screen { position: relative; width: 58px; height: 38px; border-radius: 6px; border: 1px solid var(--gb-border); background: var(--gb-input-surface); }
   .screen span { position: absolute; border-radius: 2px; background: var(--gb-muted); opacity: .55; transition: background .12s, opacity .12s; }
@@ -335,19 +337,19 @@
   .swatch { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
   .row-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--gb-text); }
   .row-label small { display: block; margin-top: 1px; font-size: 10.5px; color: var(--gb-muted); }
-  .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; }
+  .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; transition: color .12s, box-shadow .12s; }
   .button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .switch { position: relative; flex-shrink: 0; width: 34px; height: 20px; margin-right: 4px; padding: 0; border-radius: 10px; background: color-mix(in srgb, var(--gb-text) 18%, transparent); transition: background .16s; }
-  .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate .16s ease; }
+  .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate 160ms var(--gb-ease-out); }
   .switch[aria-checked="true"] { background: var(--gb-focus-ring); }
   .switch[aria-checked="true"] span { translate: 14px 0; }
   .switch:disabled { opacity: .5; }
-  @media (prefers-reduced-motion: reduce) { .switch, .switch span { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .switch span { transition: none; } }
   .button:hover { color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
 
   .panel :global(.intro) { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 2px 16px; }
   .panel :global(.intro p) { margin: 0; font-size: 11.5px; color: var(--gb-muted); }
-  .panel :global(.text-button) { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 4px 6px; margin-right: 5px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--gb-secondary-text); }
+  .panel :global(.text-button) { display: flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 4px 6px; margin-right: 5px; border-radius: 6px; font-size: 11.5px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s; }
   .panel :global(.text-button:hover:not(:disabled)) { background: var(--gb-hover); color: var(--gb-strong-text); }
   .panel :global(.reset-all) { color: var(--reset); }
   .panel :global(.reset-all:hover:not(:disabled)) { background: color-mix(in srgb, var(--reset) 14%, transparent); color: var(--reset); }
@@ -356,11 +358,11 @@
   .status { padding: 0 16px; font-size: 11px; line-height: 1.4; color: var(--gb-muted); }
   .status p { margin: 0 0 9px; }
   .status .error { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; color: var(--gb-error-text); overflow-wrap: anywhere; }
-  .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--gb-muted); }
+  .status .dismiss { display: grid; place-items: center; flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; color: var(--gb-muted); transition: background .12s, color .12s; }
   .status .dismiss:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .note.unavailable { color: var(--gb-error-text); }
   footer { display: flex; align-items: center; justify-content: flex-end; padding: 10px 12px; border-top: 1px solid var(--gb-divider); }
-  footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--gb-secondary-text); }
+  footer button { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 6px; font-size: 11.5px; color: var(--gb-secondary-text); transition: background .12s, color .12s; }
   footer button:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .usage { margin-right: auto; padding-left: 6px; font-size: 11px; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
 </style>
