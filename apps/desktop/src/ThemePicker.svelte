@@ -83,10 +83,13 @@
   .dots { display: flex; }
   .dot { width: 12px; height: 12px; margin-left: -3px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--gb-input-surface), inset 0 0 0 1px var(--gb-swatch-border); }
   .strip { width: 64px; height: 8px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
-  .options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; max-height: 260px; overflow-y: auto; padding: 4px; border-radius: 10px; border: 1px solid var(--gb-border); background: var(--gb-surface); box-shadow: 0 8px 24px var(--gb-shadow), 0 2px 6px var(--gb-shadow); outline: none; }
+  .options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; max-height: 260px; overflow-y: auto; padding: 4px; border-radius: 10px; border: 1px solid var(--gb-border); background: var(--gb-surface); box-shadow: 0 8px 24px var(--gb-shadow), 0 2px 6px var(--gb-shadow); outline: none; transform-origin: top center; animation: options-in 150ms var(--gb-ease-out); }
   .option { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px 0 6px; border-radius: 7px; cursor: pointer; }
   .option.active { background: var(--gb-hover); }
   .option .dot { box-shadow: 0 0 0 1.5px var(--gb-surface), inset 0 0 0 1px var(--gb-swatch-border); }
   .option.active .dot { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gb-surface), var(--gb-text) 5%), inset 0 0 0 1px var(--gb-swatch-border); }
   .check { display: grid; place-items: center; width: 16px; color: var(--gb-focus-ring); }
+  @keyframes options-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
+  @keyframes options-fade { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .options { animation-name: options-fade; } }
 </style>
