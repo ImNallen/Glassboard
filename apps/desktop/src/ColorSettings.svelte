@@ -227,7 +227,7 @@
   .chips { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
   .chip-list { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
   .chip { width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: grab; touch-action: none; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: transform .12s, box-shadow .12s, opacity .12s; }
-  .chip:hover { transform: scale(1.1); }
+  @media (hover: hover) and (pointer: fine) { .chip:hover { transform: scale(1.1); } }
   .chip.selected { box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring); }
   .chip.dragging { transform: scale(1.18); cursor: grabbing; box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring), 0 4px 10px var(--gb-shadow); }
   .chip-actions { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 6px 2px 0; font-size: 10.5px; color: var(--gb-muted); }
@@ -237,6 +237,6 @@
 
   .presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 10px; padding: 8px; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
   .preset { justify-self: center; width: 26px; height: 26px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: transform .12s, box-shadow .12s; }
-  .preset:hover { transform: scale(1.1); }
+  @media (hover: hover) and (pointer: fine) { .preset:hover { transform: scale(1.1); } }
   .preset.chosen { box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring); }
 </style>
