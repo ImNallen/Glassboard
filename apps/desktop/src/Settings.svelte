@@ -355,7 +355,7 @@
   .icon-link:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .icon-link:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .update.ready { color: var(--gb-focus-ring); }
-  .update { gap: 7px; height: auto; min-height: 28px; padding-block: 5px; }
+  .button.update { gap: 7px; min-height: 28px; padding-block: 5px; }
   .update:disabled { opacity: .65; }
   .row.update-row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px; }
   .update-row small { line-height: 1.4; margin-top: 4px; }
@@ -369,8 +369,9 @@
 
   .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--gb-text) 6%, transparent); }
   .tabs { margin: 14px 14px 0; }
-  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
+  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 26px; padding-block: 3px; line-height: 1.2; overflow-wrap: break-word; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
   .tabs button:last-child { flex-grow: 1.8; }
+  .tabs button :global(svg) { flex-shrink: 0; }
   .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--gb-strong-text); }
   @media (prefers-reduced-motion: no-preference) { .tabs button:active, .segmented button:active:not(:disabled) { transform: scale(0.97); } }
   .tabs button[aria-selected="true"], .segmented button.chosen { background: var(--raised); color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
@@ -415,9 +416,10 @@
   .row.binding { position: relative; padding: 0; }
   .row-icon { display: grid; place-items: center; width: 16px; flex-shrink: 0; color: var(--gb-icon); }
   .swatch { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
-  .row-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--gb-text); }
+  .row-label { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12.5px; color: var(--gb-text); }
+  .row.binding .row-label { min-width: 5em; }
   .row-label small { display: block; margin-top: 1px; font-size: 10.5px; color: var(--gb-muted); }
-  .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; transition: color .12s, box-shadow .12s; }
+  .button { display: inline-flex; align-items: center; min-height: 26px; margin-right: 2px; padding: 4px 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; transition: color .12s, box-shadow .12s; }
   .button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .switch { position: relative; flex-shrink: 0; width: 34px; height: 20px; margin-right: 4px; padding: 0; border-radius: 10px; background: color-mix(in srgb, var(--gb-text) 18%, transparent); transition: background .16s; }
   .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate 160ms var(--gb-ease-out); }

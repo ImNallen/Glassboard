@@ -65,7 +65,7 @@
   .recorder:hover:not(:disabled) { background: var(--gb-hover); }
   .recorder.recording { background: color-mix(in srgb, var(--gb-focus-ring) 7%, transparent); }
   .recorder:focus-visible { outline-offset: -2px; }
-  .keys { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; flex-shrink: 0; min-width: 72px; height: 28px; padding: 0 4px; border-radius: 8px; border: 1px solid transparent; transition: background .12s, border-color .12s, box-shadow .12s; }
+  .keys { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 3px; min-width: 72px; min-height: 28px; padding: 0 4px; border-radius: 8px; border: 1px solid transparent; transition: background .12s, border-color .12s, box-shadow .12s; }
   .recording .keys { background: var(--gb-input-surface); border-color: var(--gb-focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gb-focus-ring) 22%, transparent); }
   kbd { display: inline-grid; place-items: center; min-width: 21px; height: 21px; padding: 0 5px; border-radius: 5px; background: var(--keycap); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 0 var(--gb-border); color: var(--gb-strong-text); font-size: 11px; font-weight: 500; line-height: 1; }
   .prompt { padding: 0 3px; font-size: 11px; color: var(--gb-muted); }

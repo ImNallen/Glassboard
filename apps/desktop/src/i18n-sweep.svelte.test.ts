@@ -230,6 +230,20 @@ describe.each<Mode>(['mounted in pseudo', 'mounted in English, then switched'])(
   });
 });
 
+it.each([
+  ['welcome', 'A QUICK INTRODUCTION|Your point, made clear.|Press Ctrl+Shift+A to draw over your screen. Press it again to get back to work.|Returning to work clears your marks. Your next annotation session starts fresh.'],
+  ['draw', '1 OF 2 · MAKE A MARK|Point something out.|Drag anywhere outside this guide to draw. Choose a pen, arrow, shape, or text from the open toolbar.|Hold Shift for straight arrows or equal-sided shapes. Undo with Ctrl+Z.'],
+  ['hide', '2 OF 2 · BACK TO WORK|Made your point?|Press Ctrl+Shift+A to hide Glassboard and use your screen again.|Esc also returns you to work. Your next annotation session starts clear.'],
+  ['done', 'YOU’RE READY|Work. Annotate. Repeat.|Press Ctrl+Shift+A whenever you want to make another point. You’ll start with a clear screen.|Find settings and this tutorial in the Glassboard menu-bar or tray icon.'],
+] as const)('the English tutorial reads as it did before translation, on the %s step', async (tutorial, text) => {
+  useSession(createPreviewSession({ tutorial }));
+  let session = $state<Session>(structuredClone(defaults));
+  stops.push(await subscribe(value => session = value));
+  mounted.push(mount(Tutorial, { target: document.body, props: { get session() { return session; }, errors: createErrors(() => session) } }));
+  await settle();
+  expect([...document.querySelector('[aria-live="polite"]')!.children].map(line => line.textContent!.trim()).join('|')).toBe(text);
+});
+
 describe('a language switch with no new error event', () => {
   const english = 'Could not capture the screen: busy';
   const translated = pseudo('Could not capture the screen: busy');

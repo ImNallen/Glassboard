@@ -36,12 +36,12 @@
         <span class="step">{t('1 OF 2 · MAKE A MARK')}</span>
         <h1>{t('Point something out.')}</h1>
         <p>{t('Drag anywhere outside this guide to draw. Choose a pen, arrow, shape, or text from the open toolbar.')}</p>
-        <p class="hint">{t('Hold Shift for straight arrows or equal-sided shapes.')}{#if undo} <Rich message={'Undo with <kbd>{shortcut}</kbd>.'} args={{ shortcut: undo }} {kbd}/>{/if}</p>
+        <p class="hint">{t('Hold Shift for straight arrows or equal-sided shapes.')}{#if undo}{' '}<Rich message={'Undo with <kbd>{shortcut}</kbd>.'} args={{ shortcut: undo }} {kbd}/>{/if}</p>
       {:else if session.tutorial === 'hide'}
         <span class="step">{t('2 OF 2 · BACK TO WORK')}</span>
         <h1>{t('Made your point?')}</h1>
         <p><Rich message={'Press <kbd>{shortcut}</kbd> to hide Glassboard and use your screen again.'} args={{ shortcut }} {kbd}/></p>
-        <p class="hint">{#if hide}<Rich message={'<kbd>{shortcut}</kbd> also returns you to work.'} args={{ shortcut: hide }} {kbd}/> {/if}{t('Your next annotation session starts clear.')}</p>
+        <p class="hint">{#if hide}<Rich message={'<kbd>{shortcut}</kbd> also returns you to work.'} args={{ shortcut: hide }} {kbd}/>{' '}{/if}{t('Your next annotation session starts clear.')}</p>
       {:else}
         <span class="step"><Check size={13}/> {t('YOU’RE READY')}</span>
         <h1>{t('Work. Annotate. Repeat.')}</h1>

@@ -223,7 +223,7 @@
 
 <style>
   .color-settings > section.group + section.group { margin-top: 12px; }
-  .theme-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .theme-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .theme-heading h2 { margin-bottom: 0; }
   .toolbar-note { margin: 0 2px 8px; font-size: 11px; line-height: 1.4; color: var(--gb-muted); }
   .toolbar-preview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
@@ -232,11 +232,11 @@
   .slot.editing { background: var(--gb-selected); border-color: var(--gb-focus-ring); box-shadow: inset 0 0 0 1px var(--gb-focus-ring); }
   .slot:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .dot { width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: background .12s; }
-  .slot-label { font-size: 10.5px; font-weight: 500; color: var(--gb-secondary-text); }
+  .slot-label { max-width: 100%; overflow-wrap: anywhere; text-align: center; font-size: 10.5px; font-weight: 500; color: var(--gb-secondary-text); }
   .editing .slot-label { color: var(--gb-strong-text); }
   .key { position: absolute; top: 4px; right: 4px; min-width: 13px; max-width: calc(100% - 8px); padding: 1px 3px; overflow: hidden; text-overflow: ellipsis; border-radius: 4px; background: var(--keycap); box-shadow: 0 0 0 1px var(--gb-border); font-size: 9px; line-height: 12px; color: var(--gb-muted); font-variant-numeric: tabular-nums; }
 
-  .edit-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .edit-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
   .edit-heading h2 { margin-bottom: 0; }
   .reset { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px; color: var(--reset); font-size: 11px; transition: background .12s; }
   .reset:hover:not(:disabled) { background: color-mix(in srgb, var(--reset) 14%, transparent); }
@@ -255,7 +255,7 @@
   @media (hover: hover) and (pointer: fine) { .chip:hover { transform: scale(1.1); } }
   .chip.selected { box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring); }
   .chip.dragging { transform: scale(1.18); cursor: grabbing; box-shadow: inset 0 0 0 1px var(--gb-swatch-border), 0 0 0 2px var(--gb-surface), 0 0 0 4px var(--gb-focus-ring), 0 4px 10px var(--gb-shadow); }
-  .chip-actions { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin: 6px 2px 0; font-size: 10.5px; color: var(--gb-muted); }
+  .chip-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px; margin: 6px 2px 0; font-size: 10.5px; color: var(--gb-muted); }
   .sequence-actions { display: flex; align-items: center; }
   .chip-actions .text-button { margin-right: 0; font-size: 10.5px; }
   .reorder-hint { margin: 4px 2px 0; font-size: 10px; color: var(--gb-muted); }
