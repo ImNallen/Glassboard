@@ -1,48 +1,15 @@
 <script lang="ts">
-  import { Check, ChevronDown } from '@lucide/svelte';
   import { t } from '@glassboard/ui/i18n';
   import { gradientStrip } from '@glassboard/ui/swatches';
   import type { ColorTheme } from '@glassboard/ui/themes';
+  import Listbox from './Listbox.svelte';
   /** A dropdown of color themes, each previewed by its Rainbow strip and swatches. `selected` is undefined for custom colors. */
   let { themes, selected, custom, onselect }: {
     themes: readonly ColorTheme[]; selected: ColorTheme | undefined; custom: { colors: readonly string[]; swatches: readonly string[] };
     onselect: (theme: ColorTheme) => void;
   } = $props();
-  let open = $state(false);
-  let active = $state(0);
-  let root: HTMLDivElement;
-  let trigger: HTMLButtonElement;
-  let list = $state<HTMLDivElement>();
   let name = $derived(selected ? t(selected.name) : t('Custom'));
-
-  function show() {
-    open = true;
-    active = selected ? themes.indexOf(selected) : 0;
-    queueMicrotask(() => list?.focus());
-  }
-  function close(refocus = true) {
-    open = false;
-    if (refocus) trigger.focus();
-  }
-  function choose(index: number) {
-    close();
-    if (themes[index] !== selected) onselect(themes[index]);
-  }
-  function triggerKeydown(event: KeyboardEvent) {
-    if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(event.key)) { event.preventDefault(); show(); }
-  }
-  function listKeydown(event: KeyboardEvent) {
-    const moves: Record<string, number> = { ArrowDown: active + 1, ArrowUp: active - 1, Home: 0, End: themes.length - 1 };
-    if (event.key in moves) { event.preventDefault(); active = Math.max(0, Math.min(themes.length - 1, moves[event.key])); }
-    else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(active); }
-    // Keep Escape from also closing the settings window.
-    else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
-    else if (event.key === 'Tab') close(false);
-  }
-  $effect(() => { if (open) list?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: 'nearest' }); });
 </script>
-
-<svelte:window onpointerdowncapture={event => { if (open && !root.contains(event.target as Node)) close(false); }}/>
 
 {#snippet preview(colors: readonly string[], swatches: readonly string[])}
   <span class="preview" aria-hidden="true">
@@ -51,47 +18,23 @@
   </span>
 {/snippet}
 
-<div class="theme-picker" bind:this={root}>
-  <button bind:this={trigger} class="trigger" class:open aria-haspopup="listbox" aria-expanded={open} aria-controls="theme-list"
-    aria-label={t('Color palette: {name}', { name })} onclick={() => open ? close() : show()} onkeydown={triggerKeydown}>
+<Listbox options={themes} {selected} id="theme-list" label={t('Color palette: {name}', { name })} listLabel={t('Color palettes')} {onselect}>
+  {#snippet trigger()}
     <span class="name">{name}</span>
     {@render preview(selected?.colors ?? custom.colors, selected?.swatches ?? custom.swatches)}
-    <ChevronDown size={14} strokeWidth={2.2}/>
-  </button>
-  {#if open}
-    <div bind:this={list} id="theme-list" class="options" role="listbox" tabindex="-1" aria-label={t('Color palettes')}
-      aria-activedescendant={`theme-${active}`} onkeydown={listKeydown}>
-      {#each themes as theme, index}
-        <!-- svelte-ignore a11y_click_events_have_key_events (the listbox handles keys) -->
-        <div id={`theme-${index}`} class="option" class:active={index === active} role="option" aria-selected={theme === selected} data-index={index}
-          tabindex="-1" onpointerenter={() => active = index} onclick={() => choose(index)}>
-          <span class="check">{#if theme === selected}<Check size={13} strokeWidth={2.4}/>{/if}</span>
-          <span class="name">{t(theme.name)}</span>
-          {@render preview(theme.colors, theme.swatches)}
-        </div>
-      {/each}
-    </div>
-  {/if}
-</div>
+  {/snippet}
+  {#snippet option(theme: ColorTheme)}
+    <span class="name">{t(theme.name)}</span>
+    {@render preview(theme.colors, theme.swatches)}
+  {/snippet}
+</Listbox>
 
 <style>
-  .theme-picker { position: relative; }
-  .trigger { display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 10px 0 12px; border-radius: 10px; border: 1px solid var(--gb-border); background: var(--gb-input-surface); color: var(--gb-muted); text-align: left; transition: border-color .12s, box-shadow .12s; }
-  .trigger:hover { border-color: color-mix(in srgb, var(--gb-text) 25%, transparent); }
-  .trigger.open { border-color: var(--gb-focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gb-focus-ring) 22%, transparent); }
-  .trigger:focus-visible { outline-offset: 0; }
   .name { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 500; color: var(--gb-text); }
   .preview { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .dots { display: flex; }
   .dot { width: 12px; height: 12px; margin-left: -3px; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--gb-input-surface), inset 0 0 0 1px var(--gb-swatch-border); }
   .strip { width: 64px; height: 8px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
-  .options { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0; max-height: 260px; overflow-y: auto; padding: 4px; border-radius: 10px; border: 1px solid var(--gb-border); background: var(--gb-surface); box-shadow: 0 8px 24px var(--gb-shadow), 0 2px 6px var(--gb-shadow); outline: none; transform-origin: top center; animation: options-in 150ms var(--gb-ease-out); }
-  .option { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px 0 6px; border-radius: 7px; cursor: pointer; }
-  .option.active { background: var(--gb-hover); }
-  .option .dot { box-shadow: 0 0 0 1.5px var(--gb-surface), inset 0 0 0 1px var(--gb-swatch-border); }
-  .option.active .dot { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gb-surface), var(--gb-text) 5%), inset 0 0 0 1px var(--gb-swatch-border); }
-  .check { display: grid; place-items: center; width: 16px; color: var(--gb-focus-ring); }
-  @keyframes options-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
-  @keyframes options-fade { from { opacity: 0; } to { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .options { animation-name: options-fade; } }
+  :global(.option) .dot { box-shadow: 0 0 0 1.5px var(--gb-surface), inset 0 0 0 1px var(--gb-swatch-border); }
+  :global(.option.active) .dot { box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--gb-surface), var(--gb-text) 5%), inset 0 0 0 1px var(--gb-swatch-border); }
 </style>
