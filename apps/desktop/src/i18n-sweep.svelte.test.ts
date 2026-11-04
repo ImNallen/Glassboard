@@ -121,6 +121,11 @@ describe.each<Mode>(['mounted in pseudo', 'mounted in English, then switched'])(
       { state: 'ready', version: '0.2.0' }, { state: 'installing', version: '0.2.0' },
     ];
     for (const status of statuses) { emit(status); flushSync(); expectNoLeaks(); }
+    document.querySelector<HTMLElement>('button[aria-controls="language-list"]')!.click();
+    await settle();
+    expect(document.querySelectorAll('#language-list [role="option"]').length).toBeGreaterThan(1);
+    expect(document.querySelector('#language-title small')?.getAttribute('lang')).toBe('en');
+    expectNoLeaks();
   });
   it('Settings, Colors tab, on a swatch and a sequence, with the palette list open and a bad hex code', async () => {
     await openSettings(mode);

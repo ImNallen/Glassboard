@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Minus, Palette, Plus, Power, Redo2, RefreshCw, RotateCcw, Scan, Search, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
+  import { CircleArrowUp, Copy, EyeOff, Keyboard, Languages, LoaderCircle, Minus, Palette, Plus, Power, Redo2, RefreshCw, RotateCcw, Scan, Search, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
@@ -11,6 +11,7 @@
   import { TOOL_ICONS } from '@glassboard/ui/tool-icons';
   import type { Errors } from '@glassboard/ui/errors';
   import ColorSettings from './ColorSettings.svelte';
+  import LanguagePicker from './LanguagePicker.svelte';
   import ShortcutRecorder from './ShortcutRecorder.svelte';
   import { getAutostart, setAutostart } from './lib/autostart';
   import { suspendGlobalShortcuts } from './lib/global-shortcuts';
@@ -78,7 +79,8 @@
   let updateFailure = $state('');
   $effect(() => {
     const stop = watchUpdates(next => {
-      const requested = awaitingOutcome || untrack(() => updateStatus.state) === 'installing';
+      // A language change republishes a failure already on screen. A real new failure passes through `checking` first, which clears the line.
+      const requested = awaitingOutcome || untrack(() => updateStatus.state === 'installing' || Boolean(updateFailure));
       updateStatus = next;
       if (['idle', 'ready', 'failed'].includes(next.state)) awaitingOutcome = false;
       updateFailure = next.state === 'failed' && requested ? next.message : '';
@@ -187,6 +189,11 @@
 
     <div class="panel" id="settings-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} bind:this={panel}>
       {#if tab === 'general'}
+        <section class="group" aria-labelledby="language-title">
+          <h2 id="language-title" class="language-title"><Languages size={12} strokeWidth={2.2} aria-hidden="true"/>{t('Language')}{#if locale().split('-')[0] !== 'en'}<small lang="en">Language</small>{/if}</h2>
+          <LanguagePicker language={preferences.language} onselect={language => update({ language })}/>
+        </section>
+
         <section class="group" aria-labelledby="drawing-title">
           <h2 id="drawing-title">{t('Drawing')}</h2>
           <div class="drawing-setting">
@@ -373,6 +380,8 @@
   /* Section styles are shared with tab components such as ColorSettings. */
   .panel :global(.group + .group) { margin-top: 20px; }
   .panel :global(h2) { margin: 0 0 8px 2px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--gb-muted); }
+  .language-title { display: flex; align-items: center; gap: 5px; }
+  .language-title small { font-size: inherit; font-weight: 400; letter-spacing: 0; text-transform: none; }
   .note { margin: 8px 2px 0; font-size: 11px; color: var(--gb-muted); }
 
   .drawing-setting + .drawing-setting { margin-top: 16px; }
