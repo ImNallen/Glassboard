@@ -1,10 +1,11 @@
 use crate::{
+    i18n::{t, Text},
     preference_saves::PreferenceSaves,
     preferences::{GlobalShortcut, Preferences},
     session::{HistoryAvailability, Mode, Session, Transition, TutorialStep},
     state::{publish, report, snapshot, AppState},
     windows::{
-        apply_windows, ensure_window, focus_drawing, raise_toolbar, select_cursor_monitor,
+        apply_windows, ensure_window, focus_drawing, raise_toolbar, retitle, select_cursor_monitor,
         settings::position_settings,
         sync_overlays, sync_tutorial,
         toolbar::{position_toolbar, Toolbar},
@@ -111,7 +112,7 @@ pub(crate) fn suspend_global_shortcuts(app: tauri::AppHandle, suspended: bool) -
                 .collect();
             shortcuts
                 .unregister_multiple(bound)
-                .map_err(|e| format!("Could not release the shortcuts: {e}").into())
+                .map_err(|e| t!("Could not release the shortcuts: {detail}", detail = e))
         }
         ShortcutBinding::Bound => {
             let unavailable = register_global_shortcuts(&app);
@@ -130,7 +131,7 @@ pub(crate) fn perform(app: &tauri::AppHandle, action: Action) -> Result<()> {
     let open = |url: String| -> Result<()> { Ok(app.opener().open_url(url, None::<&str>)?) };
     match action {
         Action::Capture => {
-            crate::capture::start(app).inspect_err(|error| crate::capture::fail(app, error))
+            crate::capture::start(app).inspect_err(|error| crate::capture::fail(app, error.clone()))
         }
         Action::OpenGithub => open(REPOSITORY_URL.into()),
         Action::ReportIssue => open(format!("{REPOSITORY_URL}/issues/new")),
@@ -259,7 +260,9 @@ pub(crate) fn report_history(
 ) -> Result<()> {
     let Some(surface @ (Surface::Overlay(_) | Surface::Capture)) = Surface::parse(window.label())
     else {
-        return Err("Only drawing windows can report history".into());
+        return Err(Text::untranslated(
+            "Only drawing windows can report history",
+        ));
     };
     app.state::<AppState>().0.lock().unwrap().record_history(
         surface,
@@ -276,7 +279,7 @@ pub(crate) fn expand_toolbar(
     expanded: bool,
 ) -> Result<()> {
     if Surface::parse(window.label()) != Some(Surface::Toolbar) {
-        return Err("Only the toolbar can resize itself".into());
+        return Err(Text::untranslated("Only the toolbar can resize itself"));
     }
     app.state::<Toolbar>().set_expanded(expanded);
     position_toolbar(&app)
@@ -292,7 +295,7 @@ pub(crate) fn get_autostart(app: tauri::AppHandle) -> Result<bool> {
     {
         app.autolaunch()
             .is_enabled()
-            .map_err(|e| format!("Could not read the login item: {e}").into())
+            .map_err(|e| t!("Could not read the login item: {detail}", detail = e))
     }
 }
 #[tauri::command]
@@ -301,9 +304,9 @@ pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool
     {
         let item = login_item(&app)?;
         item.set_enabled(enabled)
-            .map_err(|e| format!("Could not change the login item: {e}"))?;
+            .map_err(|e| t!("Could not change the login item: {detail}", detail = e))?;
         if enabled && !crate::autostart::approved(&item.agent) {
-            return Err("macOS keeps Glassboard from opening at login. Allow it under System Settings > General > Login Items & Extensions".into());
+            return Err(t!("macOS keeps Glassboard from opening at login. Allow it under System Settings > General > Login Items & Extensions"));
         }
         Ok(item.is_enabled())
     }
@@ -315,10 +318,10 @@ pub(crate) fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<bool
         } else {
             launcher.disable()
         }
-        .map_err(|e| format!("Could not change the login item: {e}"))?;
+        .map_err(|e| t!("Could not change the login item: {detail}", detail = e))?;
         launcher
             .is_enabled()
-            .map_err(|e| format!("Could not read the login item: {e}").into())
+            .map_err(|e| t!("Could not read the login item: {detail}", detail = e))
     }
 }
 #[cfg(target_os = "macos")]
@@ -336,7 +339,7 @@ fn login_item(app: &tauri::AppHandle) -> Result<crate::autostart::LoginItem> {
 pub(crate) fn repair_login_item(app: &tauri::AppHandle) -> Result<()> {
     login_item(app)?
         .repair()
-        .map_err(|e| format!("Could not repair the login item: {e}").into())
+        .map_err(|e| t!("Could not repair the login item: {detail}", detail = e))
 }
 fn register(
     app: &tauri::AppHandle,
@@ -359,7 +362,13 @@ fn register(
                 report(app, e);
             }
         })
-        .map_err(|e| format!("Could not register {}: {e}", shortcut.as_str()).into())
+        .map_err(|e| {
+            t!(
+                "Could not register {shortcut}: {detail}",
+                shortcut = shortcut.as_str(),
+                detail = e
+            )
+        })
 }
 /// Registers every bound global shortcut and returns the commands whose shortcut failed.
 pub(crate) fn register_global_shortcuts(app: &tauri::AppHandle) -> Vec<GlobalCommand> {
@@ -378,7 +387,8 @@ pub(crate) fn register_global_shortcuts(app: &tauri::AppHandle) -> Vec<GlobalCom
 /// Parsed here rather than by Tauri, which would prefix the messages Settings shows.
 #[tauri::command]
 pub(crate) fn set_preferences(app: tauri::AppHandle, preferences: serde_json::Value) -> Result<()> {
-    update_preferences(&app, Preferences::parse(preferences)?)
+    let preferences = Preferences::parse(preferences).map_err(Text::untranslated)?;
+    update_preferences(&app, preferences)
 }
 pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preferences) -> Result<()> {
     let old = snapshot(app).preferences;
@@ -410,6 +420,8 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
     }
     if old.language != preferences.language {
         crate::i18n::activate(&preferences.language);
+        crate::updates::publish(app);
+        retitle(app);
     }
     if !rebound {
         saves.queue(preferences)?;
@@ -455,7 +467,7 @@ fn rebind(
         }
         saves
             .save_now(new.clone())
-            .map_err(|e| format!("Could not save preferences: {e}"))?;
+            .map_err(|e| t!("Could not save preferences: {detail}", detail = e))?;
         saved = true;
         for &command in changed {
             let Some(shortcut) = command.shortcut(old) else {
@@ -483,7 +495,10 @@ fn rebind(
         }
         if saved {
             if let Err(error) = saves.save_now(old.clone()) {
-                report(app, format!("Could not restore preferences: {error}"));
+                report(
+                    app,
+                    t!("Could not restore preferences: {detail}", detail = error),
+                );
             }
         }
     }

@@ -1,6 +1,6 @@
 use crate::{
     commands::GlobalCommand,
-    i18n::ActiveLocale,
+    i18n::{ActiveLocale, Text},
     preferences::Preferences,
     windows::{geometry::Rect, Surface},
 };
@@ -62,7 +62,7 @@ pub(crate) struct Session {
     pub(crate) history_by_overlay: HashMap<Surface, HistoryAvailability>,
     pub(crate) preferences: Preferences,
     pub(crate) locale: ActiveLocale,
-    pub(crate) error: Option<String>,
+    pub(crate) error: Option<Text>,
     /// Commands whose shortcut could not be registered, usually because another app holds it.
     pub(crate) unavailable_shortcuts: Vec<GlobalCommand>,
     pub(crate) capture: Option<CaptureSession>,
@@ -262,7 +262,11 @@ mod tests {
                 "mode" => s.mode = serde_json::from_value(value).unwrap(),
                 "tutorial" => s.tutorial = serde_json::from_value(value).unwrap(),
                 "settingsOpen" => s.settings_open = serde_json::from_value(value).unwrap(),
-                "error" => s.error = serde_json::from_value(value).unwrap(),
+                "error" => {
+                    s.error = serde_json::from_value::<Option<String>>(value)
+                        .unwrap()
+                        .map(Text::untranslated);
+                }
                 other => panic!("transitions.json: unsupported `from` field {other}"),
             }
         }
@@ -323,6 +327,19 @@ mod tests {
                 panic!("{}: {problem}", case.name);
             }
         }
+    }
+    #[test]
+    fn a_stored_error_changes_language_with_the_next_snapshot() {
+        use crate::i18n::{t, Pseudo};
+        let mut s = Session::new(Preferences::default());
+        s.error = Some(t!("Capture window is unavailable"));
+        let published = serde_json::to_value(&s).unwrap();
+        assert_eq!(published["locale"], "en");
+        assert_eq!(published["error"], "Capture window is unavailable");
+        let _language = Pseudo::activate();
+        let published = serde_json::to_value(&s).unwrap();
+        assert_eq!(published["locale"], "x-pseudo");
+        assert_eq!(published["error"], "⟦Capture window⟧");
     }
     #[test]
     fn a_frame_only_attaches_to_the_capture_it_was_taken_for() {

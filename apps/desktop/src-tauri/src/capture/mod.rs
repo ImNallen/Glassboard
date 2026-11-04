@@ -3,6 +3,7 @@ mod screen;
 
 use crate::{
     commands::transition,
+    i18n::{t, Text},
     session::{ReadyCapture, Transition},
     state::{report, snapshot, AppState},
     windows::{
@@ -37,7 +38,7 @@ fn check_permission() -> Result<()> {
     if unsafe { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() } {
         Ok(())
     } else {
-        Err("Allow Glassboard in System Settings → Privacy & Security → Screen Recording, then try capturing again. macOS may require restarting Glassboard.".into())
+        Err(t!("Allow Glassboard in System Settings → Privacy & Security → Screen Recording, then try capturing again. macOS may require restarting Glassboard."))
     }
 }
 #[cfg(not(target_os = "macos"))]
@@ -59,7 +60,7 @@ fn capture_monitor(app: &tauri::AppHandle, origin: (i32, i32)) -> Result<tauri::
             let y = (position.y as f64 / scale).round() as i32;
             (x, y) == origin
         })
-        .ok_or_else(|| "The capture display is unavailable".into())
+        .ok_or_else(|| t!("The capture display is unavailable"))
 }
 
 /// Whether `id` is still the open capture. Work started for an older capture stops here.
@@ -84,12 +85,12 @@ fn ready(app: &tauri::AppHandle, window: &tauri::WebviewWindow, id: u32) -> Resu
             capture.id == id && Surface::parse(window.label()) == Some(Surface::Capture)
         })
         .and_then(|capture| capture.ready.clone())
-        .ok_or("This capture is no longer open".into())
+        .ok_or_else(|| t!("This capture is no longer open"))
 }
 
 /// Capture failures surface in Settings: the caller can be a hidden toolbar
 /// webview, so the shared session carries the explanation to a visible window.
-pub(crate) fn fail(app: &tauri::AppHandle, error: impl std::fmt::Display) {
+pub(crate) fn fail(app: &tauri::AppHandle, error: impl Into<Text>) {
     let _ = transition(app, Transition::Settings);
     report(app, error);
 }
@@ -123,15 +124,19 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
                 })
                 .contains(cursor.x, cursor.y, 0.0)
             })
-            .ok_or("Could not find the display under the cursor")?;
+            .ok_or_else(|| t!("Could not find the display under the cursor"))?;
         let position = monitor.position();
         let size = monitor.size();
         ((position.x, position.y), (size.width, size.height))
     };
     #[cfg(not(target_os = "linux"))]
     let (position, size) = {
-        let monitor = xcap::Monitor::from_point(capture_point.0, capture_point.1)
-            .map_err(|e| format!("Could not find the display under the cursor: {e}"))?;
+        let monitor = xcap::Monitor::from_point(capture_point.0, capture_point.1).map_err(|e| {
+            t!(
+                "Could not find the display under the cursor: {detail}",
+                detail = e
+            )
+        })?;
         let position = (monitor.x()?, monitor.y()?);
         let size = (monitor.width()?, monitor.height()?);
         (position, size)
@@ -147,7 +152,7 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
         let capture_app = handle.clone();
         let captured = tauri::async_runtime::spawn_blocking(move || {
             if !current(&capture_app, id) {
-                return Err("Capture cancelled".into());
+                return Err(Text::untranslated("Capture cancelled"));
             }
             screen::capture(&capture_app, capture_point, position, size)
         })
@@ -166,7 +171,10 @@ pub(crate) fn start(app: &tauri::AppHandle) -> Result<()> {
         }) {
             report(
                 &handle,
-                format!("Could not open the capture editor: {error}"),
+                t!(
+                    "Could not open the capture editor: {detail}",
+                    detail = error
+                ),
             );
         }
     });
@@ -232,7 +240,7 @@ fn finish_present(
 ) -> Result<()> {
     let window = Surface::Capture
         .window(app)
-        .ok_or("Capture window is unavailable")?;
+        .ok_or_else(|| t!("Capture window is unavailable"))?;
     let (origin, extent): (tauri::Position, tauri::Size) = if cfg!(target_os = "macos") {
         (
             LogicalPosition::new(position.0, position.1).into(),
@@ -321,12 +329,13 @@ fn write_clipboard(app: &tauri::AppHandle, id: u32, image: ::image::RgbaImage) -
     let state = app.state::<CaptureClipboard>();
     let mut clipboard = state.0.lock().unwrap();
     if !current(app, id) {
-        return Err("Capture cancelled".into());
+        return Err(Text::untranslated("Capture cancelled"));
     }
     let clipboard = match clipboard.as_mut() {
         Some(clipboard) => clipboard,
         None => clipboard.insert(
-            arboard::Clipboard::new().map_err(|e| format!("Could not open the clipboard: {e}"))?,
+            arboard::Clipboard::new()
+                .map_err(|e| t!("Could not open the clipboard: {detail}", detail = e))?,
         ),
     };
     clipboard
@@ -335,7 +344,7 @@ fn write_clipboard(app: &tauri::AppHandle, id: u32, image: ::image::RgbaImage) -
             height: image.height() as usize,
             bytes: Cow::Owned(image.into_raw()),
         })
-        .map_err(|e| format!("Could not copy the image. Try again: {e}").into())
+        .map_err(|e| t!("Could not copy the image. Try again: {detail}", detail = e))
 }
 
 fn finish_copy(app: &tauri::AppHandle, id: u32) -> Result<()> {
@@ -349,15 +358,15 @@ fn finish_copy(app: &tauri::AppHandle, id: u32) -> Result<()> {
 fn request_id(value: Option<&str>) -> Result<u32> {
     value
         .and_then(|id| id.parse().ok())
-        .ok_or("The capture ID is invalid".into())
+        .ok_or_else(|| Text::untranslated("The capture ID is invalid"))
 }
 
 fn request_bytes(body: &tauri::ipc::InvokeBody) -> Result<&[u8]> {
     let tauri::ipc::InvokeBody::Raw(bytes) = body else {
-        return Err("Expected a binary capture image".into());
+        return Err(Text::untranslated("Expected a binary capture image"));
     };
     if bytes.len() > MAX_REQUEST_BYTES {
-        return Err("The capture is too large to copy".into());
+        return Err(t!("The capture is too large to copy"));
     }
     Ok(bytes)
 }

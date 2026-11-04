@@ -10,6 +10,7 @@ pub(crate) use setup::{
 };
 
 use crate::{
+    i18n::{t, Text},
     session::Mode,
     state::{publish, snapshot, AppState},
     Result,
@@ -61,19 +62,39 @@ impl Surface {
     ) -> Option<tauri::WebviewWindow<R>> {
         app.get_webview_window(&self.label())
     }
-    pub(crate) fn title_and_size(self) -> Option<(&'static str, (f64, f64))> {
+    pub(crate) fn title(self) -> Text {
+        match self {
+            Self::Overlay(_) => t!("Glassboard annotations"),
+            Self::Capture => t!("Glassboard Capture"),
+            Self::Toolbar => t!("Glassboard"),
+            Self::Settings => t!("Glassboard Settings"),
+            Self::Tutorial => t!("Welcome to Glassboard"),
+        }
+    }
+    pub(crate) fn size(self) -> Option<(f64, f64)> {
         match self {
             Self::Overlay(_) => None,
-            Self::Capture => Some(("Glassboard Capture", (800.0, 600.0))),
-            Self::Toolbar => Some(("Glassboard", TOOLBAR_SIZE)),
-            Self::Settings => Some(("Glassboard Settings", SETTINGS_SIZE)),
-            Self::Tutorial => Some(("Welcome to Glassboard", TUTORIAL_SIZE)),
+            Self::Capture => Some((800.0, 600.0)),
+            Self::Toolbar => Some(TOOLBAR_SIZE),
+            Self::Settings => Some(SETTINGS_SIZE),
+            Self::Tutorial => Some(TUTORIAL_SIZE),
         }
     }
 }
 impl Serialize for Surface {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.label())
+    }
+}
+
+/// Gives every open window the current language's title. A stale title isn't worth failing a save.
+pub(crate) fn retitle(app: &tauri::AppHandle) {
+    for (label, window) in app.webview_windows() {
+        if let Some(surface) = Surface::parse(&label) {
+            if let Err(error) = window.set_title(&surface.title().render()) {
+                log::warn!("Could not retitle {label}: {error}");
+            }
+        }
     }
 }
 
@@ -271,19 +292,15 @@ mod tests {
     #[test]
     fn fixed_windows_have_titles_and_sizes() {
         use super::geometry::{SETTINGS_SIZE, TOOLBAR_SIZE, TUTORIAL_SIZE};
-        assert_eq!(Overlay(0).title_and_size(), None);
-        assert_eq!(
-            Capture.title_and_size(),
-            Some(("Glassboard Capture", (800.0, 600.0)))
-        );
-        assert_eq!(Toolbar.title_and_size(), Some(("Glassboard", TOOLBAR_SIZE)));
-        assert_eq!(
-            Settings.title_and_size(),
-            Some(("Glassboard Settings", SETTINGS_SIZE))
-        );
-        assert_eq!(
-            Tutorial.title_and_size(),
-            Some(("Welcome to Glassboard", TUTORIAL_SIZE))
-        );
+        for (surface, title, size) in [
+            (Overlay(0), "Glassboard annotations", None),
+            (Capture, "Glassboard Capture", Some((800.0, 600.0))),
+            (Toolbar, "Glassboard", Some(TOOLBAR_SIZE)),
+            (Settings, "Glassboard Settings", Some(SETTINGS_SIZE)),
+            (Tutorial, "Welcome to Glassboard", Some(TUTORIAL_SIZE)),
+        ] {
+            assert_eq!(surface.title().render(), title);
+            assert_eq!(surface.size(), size);
+        }
     }
 }

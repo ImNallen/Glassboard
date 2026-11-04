@@ -1,4 +1,9 @@
-use crate::{preferences::Preferences, state::report, Result};
+use crate::{
+    i18n::{t, Text},
+    preferences::Preferences,
+    state::report,
+    Result,
+};
 use std::{
     sync::mpsc::{self, Receiver, RecvTimeoutError, Sender},
     time::Duration,
@@ -24,7 +29,7 @@ impl PreferenceSaves {
 
     fn spawn(
         write: impl FnMut(&Preferences) -> Result<()> + Send + 'static,
-        on_error: impl FnMut(String) + Send + 'static,
+        on_error: impl FnMut(Text) + Send + 'static,
     ) -> Self {
         let (sender, receiver) = mpsc::channel();
         std::thread::spawn(move || save_loop(receiver, write, on_error));
@@ -34,7 +39,7 @@ impl PreferenceSaves {
     pub(crate) fn queue(&self, preferences: Preferences) -> Result<()> {
         self.0
             .send(SaveRequest::Update(preferences))
-            .map_err(|_| "Preference saving is unavailable".into())
+            .map_err(|_| Text::untranslated("Preference saving is unavailable"))
     }
 
     pub(crate) fn save_now(&self, preferences: Preferences) -> Result<()> {
@@ -49,17 +54,17 @@ impl PreferenceSaves {
         let (sender, receiver) = mpsc::channel();
         self.0
             .send(make(sender))
-            .map_err(|_| "Preference saving is unavailable".to_string())?;
+            .map_err(|_| Text::untranslated("Preference saving is unavailable"))?;
         receiver
             .recv()
-            .map_err(|_| "Preference saving stopped".to_string())?
+            .map_err(|_| Text::untranslated("Preference saving stopped"))?
     }
 }
 
 fn save_loop(
     receiver: Receiver<SaveRequest>,
     mut write: impl FnMut(&Preferences) -> Result<()>,
-    mut on_error: impl FnMut(String),
+    mut on_error: impl FnMut(Text),
 ) {
     let mut pending = None;
     let mut dirty = false;
@@ -72,7 +77,9 @@ fn save_loop(
                     if let Some(preferences) = pending.as_ref() {
                         match write(preferences) {
                             Ok(()) => pending = None,
-                            Err(error) => on_error(format!("Could not save preferences: {error}")),
+                            Err(error) => {
+                                on_error(t!("Could not save preferences: {detail}", detail = error))
+                            }
                         }
                     }
                     dirty = false;
@@ -112,7 +119,7 @@ fn save_loop(
     }
     if let Some(preferences) = pending {
         if let Err(error) = write(&preferences) {
-            on_error(format!("Could not save preferences: {error}"));
+            on_error(t!("Could not save preferences: {detail}", detail = error));
         }
     }
 }
@@ -207,7 +214,7 @@ mod tests {
         let writer = PreferenceSaves::spawn(
             move |p| {
                 if p.shortcut.as_str() == "Alt+A" {
-                    return Err("disk full".into());
+                    return Err(Text::untranslated("disk full"));
                 }
                 saved.lock().unwrap().push(p.tool);
                 Ok(())
@@ -238,7 +245,7 @@ mod tests {
             move |_| {
                 attempts += 1;
                 if attempts == 1 {
-                    Err("disk full".into())
+                    Err(Text::untranslated("disk full"))
                 } else {
                     Ok(())
                 }
@@ -251,6 +258,7 @@ mod tests {
         assert!(received
             .recv_timeout(Duration::from_secs(2))
             .unwrap()
+            .to_string()
             .contains("disk full"));
         writer.flush().unwrap();
     }

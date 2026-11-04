@@ -13,8 +13,6 @@ use std::sync::{
 };
 use tauri::{Manager, Monitor, WebviewUrl, WebviewWindowBuilder, Wry};
 
-const OVERLAY_TITLE: &str = "Glassboard annotations";
-
 fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::Result<()> {
     #[cfg(target_os = "linux")]
     {
@@ -85,7 +83,7 @@ pub(crate) fn create_windows(app: &tauri::App) -> tauri::Result<()> {
     let monitors = app.available_monitors()?;
     for (index, monitor) in monitors.iter().enumerate() {
         let surface = Surface::Overlay(index);
-        let window = window_builder(app, surface, OVERLAY_TITLE).build()?;
+        let window = window_builder(app, surface).build()?;
         place_overlay(&window, monitor)?;
         configure_overlay(&window, surface)?;
     }
@@ -118,10 +116,10 @@ fn build_window(
     app: &impl Manager<Wry>,
     surface: Surface,
 ) -> tauri::Result<tauri::WebviewWindow<Wry>> {
-    let (title, (width, height)) = surface
-        .title_and_size()
+    let (width, height) = surface
+        .size()
         .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
-    let window = window_builder(app, surface, title)
+    let window = window_builder(app, surface)
         .inner_size(width, height)
         .build()?;
     #[cfg(target_os = "linux")]
@@ -193,8 +191,8 @@ fn finish_lazy_window(
         if let Some((width, height)) = size {
             join_fixed_window(app, surface, width, height)?;
         } else if surface == Surface::Capture {
-            let (_, (width, height)) = surface
-                .title_and_size()
+            let (width, height) = surface
+                .size()
                 .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
             join_fixed_window(app, surface, width, height)?;
         }
@@ -237,11 +235,11 @@ pub(crate) fn ensure_window(
             }
             return;
         }
-        let (title, (width, height)) = surface
-            .title_and_size()
+        let (width, height) = surface
+            .size()
             .expect("ensure_window builds Capture, Toolbar, Settings, or Tutorial");
         let handle = app.clone();
-        let built = window_builder(&app, surface, title)
+        let built = window_builder(&app, surface)
             .inner_size(width, height)
             .build()
             .and_then(|_| {
@@ -318,15 +316,13 @@ fn add_overlays(app: tauri::AppHandle, missing: Vec<(usize, Monitor)>) {
                 continue;
             }
             let handle = app.clone();
-            let built = window_builder(&app, surface, OVERLAY_TITLE)
-                .build()
-                .and_then(|window| {
-                    app.run_on_main_thread(move || {
-                        if let Err(error) = join_overlay(&handle, &window, index, &monitor) {
-                            report(&handle, error);
-                        }
-                    })
-                });
+            let built = window_builder(&app, surface).build().and_then(|window| {
+                app.run_on_main_thread(move || {
+                    if let Err(error) = join_overlay(&handle, &window, index, &monitor) {
+                        report(&handle, error);
+                    }
+                })
+            });
             if let Err(error) = built {
                 report(&app, error);
             }
@@ -362,7 +358,6 @@ fn join_overlay(
 fn window_builder<'a, M: Manager<Wry>>(
     manager: &'a M,
     surface: Surface,
-    title: &str,
 ) -> WebviewWindowBuilder<'a, Wry, M> {
     WebviewWindowBuilder::new(
         manager,
@@ -376,7 +371,7 @@ fn window_builder<'a, M: Manager<Wry>>(
             .into(),
         ),
     )
-    .title(title)
+    .title(surface.title().render())
     // Drawing and controls should work on the click that activates their window.
     .accept_first_mouse(true)
     .transparent(true)

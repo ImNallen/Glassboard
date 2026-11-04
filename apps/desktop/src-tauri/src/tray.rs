@@ -1,5 +1,6 @@
 use crate::{
     commands::{perform, transition},
+    i18n::t,
     session::Transition,
     state::{report, snapshot},
     updates::UpdateStatus,
@@ -50,13 +51,19 @@ impl TrayToggle {
 }
 
 fn menu(app: &AppHandle, ready: bool) -> tauri::Result<Menu<tauri::Wry>> {
-    let quit = MenuItem::with_id(app, "quit", "Quit Glassboard", true, None::<&str>)?;
+    let quit = MenuItem::with_id(
+        app,
+        "quit",
+        t!("Quit Glassboard").render(),
+        true,
+        None::<&str>,
+    )?;
     let menu = Menu::with_items(app, &[&quit])?;
     #[cfg(target_os = "linux")]
     menu.prepend(&MenuItem::with_id(
         app,
         "settings",
-        "Settings",
+        t!("Settings").render(),
         true,
         None::<&str>,
     )?)?;
@@ -64,7 +71,7 @@ fn menu(app: &AppHandle, ready: bool) -> tauri::Result<Menu<tauri::Wry>> {
         let restart = MenuItem::with_id(
             app,
             "install-update",
-            "Restart to update",
+            t!("Restart to update").render(),
             true,
             None::<&str>,
         )?;
@@ -80,9 +87,9 @@ pub(crate) fn show_update(app: &AppHandle, status: &UpdateStatus) -> tauri::Resu
     let ready = matches!(status, UpdateStatus::Ready { .. });
     tray.set_menu(Some(menu(app, ready)?))?;
     tray.set_tooltip(Some(if ready {
-        "Glassboard: update ready"
+        t!("Glassboard: update ready").render()
     } else {
-        "Glassboard"
+        "Glassboard".into()
     }))
 }
 

@@ -9,7 +9,16 @@ const MESSAGES = join(ROOT, 'packages/ui/src/contract/messages.json');
 const SOURCE_ROOTS = ['packages/ui/src', 'apps/desktop/src', 'apps/desktop/src-tauri/src'];
 const BRAND = 'Glassboard';
 /** Every string that may skip translation. Otherwise `Text::untranslated` is the path that compiles without touching a catalog. */
-const UNTRANSLATED = new Set([]);
+const UNTRANSLATED = new Set([
+  'Capture cancelled',
+  'Expected a binary capture image',
+  'Only drawing windows can report history',
+  'Only the toolbar can resize itself',
+  'Preference saving is unavailable',
+  'Preference saving stopped',
+  'The capture ID is invalid',
+  'The selected capture region is invalid',
+]);
 
 const placeholders = text => (text.match(/\{\w+\}/g) ?? []).sort().join();
 const tags = text => (text.match(/<\/?\w+>/g) ?? []).sort().join();
