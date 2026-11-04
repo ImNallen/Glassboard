@@ -29,7 +29,7 @@ use session::{Session, Transition};
 use state::{report, snapshot, AppState};
 use std::sync::Mutex;
 use tauri::Manager;
-use tray::TrayAnchor;
+use tray::{TrayAnchor, TrayToggle};
 use windows::{
     apply_windows, ensure_window, mark_setup_complete, select_cursor_monitor,
     toolbar::{position_toolbar, watch_toolbar_proximity, Toolbar},
@@ -108,6 +108,14 @@ fn main() {
                     },
                 ) {
                     report(window.app_handle(), error);
+                }
+                // Closing destroys the webview on this thread, and a press on the tray
+                // icon waits behind it, so the gesture is timed from when closing ends.
+                if settings && matches!(event, tauri::WindowEvent::Focused(false)) {
+                    window
+                        .app_handle()
+                        .state::<TrayToggle>()
+                        .settings_blurred(std::time::Instant::now());
                 }
             }
         })
@@ -194,6 +202,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     }
     app.manage(capture::CaptureClipboard::default());
     app.manage(TrayAnchor(Mutex::new(None)));
+    app.manage(TrayToggle::default());
     app.manage(Toolbar::default());
     app.manage(usage::Usage::default());
     windows::create_windows(app)?;

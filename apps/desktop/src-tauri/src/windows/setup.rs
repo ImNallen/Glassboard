@@ -41,9 +41,42 @@ fn configure_overlay(window: &tauri::WebviewWindow, surface: Surface) -> tauri::
             _ => 26,
         });
     }
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    let _ = (window, surface);
+    #[cfg(target_os = "windows")]
+    {
+        let _ = surface;
+        window.with_webview(|webview| {
+            // SAFETY: Tauri runs this on the webview's thread with a live controller.
+            if let Err(error) = unsafe { disable_browser_shortcuts(&webview.controller()) } {
+                log::error!("Could not turn off browser shortcuts: {error}");
+            }
+        })?;
+    }
     Ok(())
+}
+/// Without this, F5 reloads a window and clears its drawing, and Ctrl+P and Ctrl+F
+/// open browser UI over the screen. Keys still reach the page for the user's bindings.
+/// `AreBrowserAcceleratorKeysEnabled` would only apply from the next navigation, and
+/// this window has already started loading.
+#[cfg(target_os = "windows")]
+unsafe fn disable_browser_shortcuts(
+    controller: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller,
+) -> windows_core::Result<()> {
+    use webview2_com::{
+        AcceleratorKeyPressedEventHandler,
+        Microsoft::Web::WebView2::Win32::ICoreWebView2AcceleratorKeyPressedEventArgs2,
+    };
+    use windows_core::Interface;
+    let handler = AcceleratorKeyPressedEventHandler::create(Box::new(|_, args| {
+        let Some(args) = args else {
+            return Ok(());
+        };
+        unsafe {
+            args.cast::<ICoreWebView2AcceleratorKeyPressedEventArgs2>()?
+                .SetIsBrowserAcceleratorKeyEnabled(false)
+        }
+    }));
+    let mut token = 0;
+    unsafe { controller.add_AcceleratorKeyPressed(&handler, &mut token) }
 }
 fn place_overlay(window: &tauri::WebviewWindow, monitor: &Monitor) -> tauri::Result<()> {
     Rect::monitor(monitor).place(window, monitor.scale_factor())

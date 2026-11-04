@@ -189,6 +189,19 @@ Run the native Linux checks from any Docker host, including macOS:
 bash scripts/linux/verify.sh
 ```
 
+The **Windows smoke** workflow installs the NSIS build on `windows-latest` and drives it
+with real input. It runs on pull requests that touch the app and uploads its screenshots
+and results as an artifact. To run it elsewhere, use a signed-in Windows desktop and pass
+it a setup EXE:
+
+```sh
+pip install pillow
+python scripts/windows/smoke.py Glassboard_x64-setup.exe evidence
+```
+
+It installs, uninstalls, and force-quits Glassboard and overwrites its settings, so use a
+disposable machine.
+
 The runner builds the app in Ubuntu 24.04 and drives it on a virtual X11 desktop at
 normal and double display scales. It checks drawing, undo, clear, window ordering,
 capture, clipboard ownership, tray Settings, autostart registration, and display
