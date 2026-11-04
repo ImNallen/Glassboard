@@ -3,6 +3,7 @@
   import type { Snippet } from 'svelte';
   import { heldModifiers, MODIFIER_KEYS, platformMac, recordShortcut, sameShortcut, shortcutKeys, shortcutLabel } from '@glassboard/ui/shortcuts';
   import type { Errors } from '@glassboard/ui/errors';
+  import { t } from '@glassboard/ui/i18n';
   /**
    * A full-row button that records a new shortcut when clicked; `children` renders the row's icon and label.
    * The parent row must be positioned so the reset button can sit over its right edge. `physical` records key positions for the
@@ -33,7 +34,7 @@
     if (clearable && bare && (event.key === 'Backspace' || event.key === 'Delete')) { stop(); onchange(''); return; }
     if (MODIFIER_KEYS.has(event.key)) { pending = heldModifiers(event, platformMac); return; }
     const next = recordShortcut(event, platformMac, physical);
-    if (!next) { errors.report('That key can’t be used in a shortcut.'); return; }
+    if (!next) { errors.report(t('That key can’t be used in a shortcut.')); return; }
     stop();
     onchange(next);
   }
@@ -47,17 +48,17 @@
 
 <svelte:window onkeydowncapture={keydown} onkeyupcapture={keyup} onpointerdowncapture={pointerdown} onblur={stop}/>
 <button bind:this={button} class="recorder" class:recording {disabled}
-  aria-label={`${label}: ${recording ? 'press a new shortcut' : shortcut ? shortcutLabel(shortcut) : 'not set'}`}
-  title={recording ? undefined : 'Click to change'}
+  aria-label={recording ? t('{label}: press a new shortcut', { label }) : t('{label}: {state}', { label, state: shortcut ? shortcutLabel(shortcut) : t('not set') })}
+  title={recording ? undefined : t('Click to change')}
   onclick={() => recording ? stop() : start()}>
   {@render children()}
   <span class="keys" class:unset={!recording && !keys.length}>
     {#each keys as key}<kbd>{key}</kbd>{/each}
-    {#if recording}<span class="prompt">{keys.length ? '…' : 'Press keys'}</span>{:else if !keys.length}<span class="prompt">Not set</span>{/if}
+    {#if recording}<span class="prompt">{keys.length ? '…' : t('Press keys')}</span>{:else if !keys.length}<span class="prompt">{t('Not set')}</span>{/if}
   </span>
 </button>
 <button class="reset" disabled={disabled || !modified}
-  title="Reset to default" aria-label={`Reset ${label} to ${shortcutLabel(fallback)}`} onclick={() => onchange(fallback)}><RotateCcw size={12} strokeWidth={2.2}/></button>
+  title={t('Reset to default')} aria-label={t('Reset {label} to {shortcut}', { label, shortcut: shortcutLabel(fallback) })} onclick={() => onchange(fallback)}><RotateCcw size={12} strokeWidth={2.2}/></button>
 
 <style>
   .recorder { flex: 1; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 40px; padding: 5px 30px 5px 12px; text-align: left; transition: background .12s; }

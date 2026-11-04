@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Plus, RotateCcw } from '@lucide/svelte';
+  import { t, type Message } from '@glassboard/ui/i18n';
   import type { Preferences } from '@glassboard/ui/session';
   import { COLOR_SHORTCUTS, keyLabel } from '@glassboard/ui/shortcuts';
   import { CYCLE_COLORS } from '@glassboard/ui/drawing';
@@ -10,7 +11,7 @@
   /** The Colors tab: apply a theme, or replace any swatch and the Rainbow and Shifting color lists. */
   let { preferences, onsave }: { preferences: Preferences; onsave: (patch: Partial<Preferences>, message?: string) => void } = $props();
   const previewId = $props.id();
-  type Sequence = { key: 'rainbowColors' | 'cycleColors'; name: string; command: string; description: string; dot: (colors: readonly string[]) => string };
+  type Sequence = { key: 'rainbowColors' | 'cycleColors'; name: Message; command: string; description: Message; dot: (colors: readonly string[]) => string };
   /** A color the toolbar offers. A swatch is a list of one color, so swatches and sequences edit the same way. */
   type Entry = { label: string; name: string; command: string; colors: readonly string[]; defaults: readonly string[]; dot: (colors: readonly string[]) => string; sequence?: Sequence; save: (colors: string[], select?: number) => void };
   const SEQUENCES: readonly Sequence[] = [
@@ -31,9 +32,9 @@
   let dropped = false;
   let swatches = $derived(DEFAULT_SWATCHES.map((_, slot) => swatchColor(preferences.swatches, slot)));
   let entries = $derived<Entry[]>([
-    ...SEQUENCES.map(sequence => ({ label: sequence.name, name: sequence.name, command: sequence.command, colors: preferences[sequence.key], defaults: CYCLE_COLORS, dot: sequence.dot, sequence,
+    ...SEQUENCES.map(sequence => ({ label: t(sequence.name), name: t(sequence.name), command: sequence.command, colors: preferences[sequence.key], defaults: CYCLE_COLORS, dot: sequence.dot, sequence,
       save: (next: string[], select: number = index) => { draft = null; chip = select; onsave({ [sequence.key]: next }); } })),
-    ...SLOTS.map(({ slot, command }) => ({ label: DEFAULT_SWATCHES[slot].name, name: swatchName(preferences.swatches, slot), command, colors: [swatches[slot]], defaults: [DEFAULT_SWATCHES[slot].color], dot: ([color]: readonly string[]) => color,
+    ...SLOTS.map(({ slot, command }) => ({ label: t(DEFAULT_SWATCHES[slot].name), name: swatchName(preferences.swatches, slot), command, colors: [swatches[slot]], defaults: [DEFAULT_SWATCHES[slot].color], dot: ([color]: readonly string[]) => color,
       save: ([color]: string[]) => saveSwatches(swatches.map((previous, i) => i === slot ? color : previous)) })),
   ]);
   let entry = $derived(entries[editing]);
@@ -133,23 +134,23 @@
 <div class="color-settings">
 <section class="group" aria-labelledby="theme-title">
   <div class="theme-heading">
-    <h2 id="theme-title">Color palette</h2>
-    <button class="text-button reset-all" disabled={!customized} onclick={() => saveColors(themeColors(COLOR_THEMES[0], defaultSwatches()), 'Colors reset.')}>Reset all<RotateCcw size={12}/></button>
+    <h2 id="theme-title">{t('Color palette')}</h2>
+    <button class="text-button reset-all" disabled={!customized} onclick={() => saveColors(themeColors(COLOR_THEMES[0], defaultSwatches()), t('Colors reset.'))}>{t('Reset all')}<RotateCcw size={12}/></button>
   </div>
   <ThemePicker themes={COLOR_THEMES} selected={matchTheme(preferences)} custom={{ colors: preferences.rainbowColors, swatches: themed }}
-    onselect={theme => saveColors(themeColors(theme, swatches), `${theme.name} palette applied.`)}/>
+    onselect={theme => saveColors(themeColors(theme, swatches), t('{theme} palette applied.', { theme: t(theme.name) }))}/>
 </section>
 
 <section class="group" aria-labelledby="toolbar-title">
-  <h2 id="toolbar-title">Toolbar colors</h2>
-  <p class="toolbar-note">Select a color to edit. Changes save automatically.</p>
+  <h2 id="toolbar-title">{t('Toolbar colors')}</h2>
+  <p class="toolbar-note">{t('Select a color to edit. Changes save automatically.')}</p>
   <div class="toolbar-preview" role="radiogroup" aria-labelledby="toolbar-title">
     {#each entries as item, i}
       <button class="slot" class:editing={editing === i} role="radio" aria-checked={editing === i}
-        aria-label={`${item.label}, key ${keyLabel(preferences.keybindings, item.command) || 'not set'}`} tabindex={editing === i ? 0 : -1} data-entry={i}
+        aria-label={t('{name}, key {key}', { name: item.label, key: keyLabel(preferences.keybindings, item.command) || t('not set') })} tabindex={editing === i ? 0 : -1} data-entry={i}
         onclick={() => choose(i)} onkeydown={event => slotKeydown(event, i)}>
         <span class="dot" style:background={item.dot(editing === i ? shownList : item.colors)}></span>
-        <span class="slot-label">{item.label}</span><span class="key">{keyLabel(preferences.keybindings, item.command) || 'None'}</span>
+        <span class="slot-label">{item.label}</span><span class="key">{keyLabel(preferences.keybindings, item.command) || t('None')}</span>
       </button>
     {/each}
   </div>
@@ -158,11 +159,11 @@
 <section class="group" aria-labelledby="edit-title">
   <div class="edit-heading">
     <h2 id="edit-title">{entry.name}</h2>
-    <button class="reset" disabled={sameColors(entry.colors, entry.defaults)} title="Reset to default" aria-label={`Reset ${entry.name} to default`} onclick={reset}><RotateCcw size={12} strokeWidth={2.2}/>Reset</button>
+    <button class="reset" disabled={sameColors(entry.colors, entry.defaults)} title={t('Reset to default')} aria-label={t('Reset {name} to default', { name: entry.name })} onclick={reset}><RotateCcw size={12} strokeWidth={2.2}/>{t('Reset')}</button>
   </div>
 
   <figure class="stroke-preview">
-    <svg viewBox="0 0 300 64" role="img" aria-label={`${entry.name} stroke preview`}>
+    <svg viewBox="0 0 300 64" role="img" aria-label={t('{name} stroke preview', { name: entry.name })}>
       <defs>
         <linearGradient id={previewId} x1="0" x2="1" y1="0" y2="0">
           {#each [...shownList, shownList[0]] as color, i}
@@ -180,41 +181,41 @@
         {/if}
       </g>
     </svg>
-    <figcaption>Stroke preview</figcaption>
+    <figcaption>{t('Stroke preview')}</figcaption>
   </figure>
 
   {#if entry.sequence}
-    <p class="note">{entry.sequence.description}</p>
+    <p class="note">{t(entry.sequence.description)}</p>
     <div class="chips">
-      <div bind:this={chipList} class="chip-list" role="listbox" aria-label={`${entry.name} colors`} aria-orientation="horizontal">
+      <div bind:this={chipList} class="chip-list" role="listbox" aria-label={t('{name} colors', { name: entry.name })} aria-orientation="horizontal">
         {#each shownList as color, i (i)}
           <button class="chip" class:selected={i === shownIndex} class:dragging={drag?.moved && drag.to === i} role="option" aria-selected={i === shownIndex} data-index={i}
             tabindex={i === index ? 0 : -1} style:background={color} title={color.toUpperCase()}
-            aria-label={`Color ${i + 1} of ${shownList.length}, ${color.toUpperCase()}`}
+            aria-label={t('Color {index} of {total}, {color}', { index: i + 1, total: shownList.length, color: color.toUpperCase() })}
             onclick={() => chipClick(i)} onkeydown={event => chipKeydown(event, i)} onpointerdown={event => dragStart(event, i)} onpointermove={dragMove}
             onpointerup={dragEnd} onpointercancel={() => drag = null}></button>
         {/each}
       </div>
     </div>
     <div class="chip-actions">
-      <span>{list.length} of {SEQUENCE_LIMITS.max} colors</span>
+      <span>{t('{count} of {max} colors', { count: list.length, max: SEQUENCE_LIMITS.max })}</span>
       <div class="sequence-actions">
-        <button class="text-button add" disabled={list.length >= SEQUENCE_LIMITS.max} aria-label="Add a color" onclick={add}><Plus size={12} strokeWidth={2.2}/>Add color</button>
-        <button class="text-button" disabled={list.length <= SEQUENCE_LIMITS.min} onclick={() => remove()}>Remove color</button>
+        <button class="text-button add" disabled={list.length >= SEQUENCE_LIMITS.max} aria-label={t('Add a color')} onclick={add}><Plus size={12} strokeWidth={2.2}/>{t('Add color')}</button>
+        <button class="text-button" disabled={list.length <= SEQUENCE_LIMITS.min} onclick={() => remove()}>{t('Remove color')}</button>
       </div>
     </div>
-    <p class="reorder-hint" title="Use arrow keys to select a color, Alt + arrow keys to reorder, or Delete to remove.">Drag colors to reorder.</p>
+    <p class="reorder-hint" title={t('Use arrow keys to select a color, Alt + arrow keys to reorder, or Delete to remove.')}>{t('Drag colors to reorder.')}</p>
   {/if}
 
-  <h3 id="quick-colors-title">Quick colors{#if entry.sequence}<span>Color {index + 1}</span>{/if}</h3>
+  <h3 id="quick-colors-title">{t('Quick colors')}{#if entry.sequence}<span>{t('Color {index}', { index: index + 1 })}</span>{/if}</h3>
   <div class="presets" role="group" aria-labelledby="quick-colors-title">
     {#each SWATCH_PRESETS as preset}
       <button class="preset" class:chosen={sameColor(preset, shown)} aria-pressed={sameColor(preset, shown)} title={preset.toUpperCase()}
-        aria-label={`Use ${preset.toUpperCase()}`} style:background={preset} onclick={() => { draft = null; setColor(preset); }}></button>
+        aria-label={t('Use {color}', { color: preset.toUpperCase() })} style:background={preset} onclick={() => { draft = null; setColor(preset); }}></button>
     {/each}
   </div>
   {#key `${editing}-${index}`}
-    <ColorPicker value={shown} label={entry.sequence ? `${entry.name} color ${index + 1}` : entry.name} oninput={color => draft = color} onchange={setColor}/>
+    <ColorPicker value={shown} label={entry.sequence ? t('{name} color {index}', { name: entry.name, index: index + 1 }) : entry.name} oninput={color => draft = color} onchange={setColor}/>
   {/key}
 </section>
 

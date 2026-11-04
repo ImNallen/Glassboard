@@ -9,6 +9,7 @@
   import { keyLabel, platformMac, toolShortcut } from '@glassboard/ui/shortcuts';
   import { annotatedCapture, captureKeydown, capturePixels, copiesOnClipboardEvent, captureRegion, type CaptureBackend, type CaptureRegion } from '@glassboard/ui/capture';
   import { createErrors } from '@glassboard/ui/errors';
+  import { t } from '@glassboard/ui/i18n';
 
   let { session, getImage, copyImage, copyRegion }: { session: Session } & CaptureBackend = $props();
   // The parent keys this editor by capture id.
@@ -104,7 +105,7 @@
       image.width = value instanceof HTMLImageElement ? value.naturalWidth : value.width;
       image.height = value instanceof HTMLImageElement ? value.naturalHeight : value.height;
       const context = image.getContext('2d');
-      if (!context) throw new Error('Could not display the screenshot. Cancel and try again.');
+      if (!context) throw new Error(t('Could not display the screenshot. Cancel and try again.'));
       if (value instanceof HTMLImageElement || value instanceof HTMLCanvasElement) context.drawImage(value, 0, 0);
       else context.putImageData(value, 0, 0);
       loaded = true;
@@ -114,11 +115,11 @@
 </script>
 
 <svelte:window bind:innerWidth={viewportWidth} bind:innerHeight={viewportHeight} onkeydown={keydown} oncopy={copied}/>
-<main class="capture-editor" style:width={`${viewportWidth}px`} style:height={`${viewportHeight}px`} class:ready={loaded} class:unavailable={!loaded && Boolean(error)} aria-label="Screenshot capture">
-  <canvas class="capture-image" bind:this={image} aria-label="Frozen screenshot"></canvas>
+<main class="capture-editor" style:width={`${viewportWidth}px`} style:height={`${viewportHeight}px`} class:ready={loaded} class:unavailable={!loaded && Boolean(error)} aria-label={t('Screenshot capture')}>
+  <canvas class="capture-image" bind:this={image} aria-label={t('Frozen screenshot')}></canvas>
   <div class="capture-dim" aria-hidden="true"></div>
   {#if selecting}
-    <div class="selection-surface" role="application" aria-label="Drag to select a screenshot region" onpointerdown={begin} onpointermove={move} onpointerup={finish} onpointercancel={abandon}>
+    <div class="selection-surface" role="application" aria-label={t('Drag to select a screenshot region')} onpointerdown={begin} onpointermove={move} onpointerup={finish} onpointercancel={abandon}>
       {#if region}<div class="selection" style:left={`${region.x}px`} style:top={`${region.y}px`} style:width={`${region.width}px`} style:height={`${region.height}px`}></div>{/if}
     </div>
   {:else if region}
@@ -132,8 +133,8 @@
     <Toolbar session={editingSession} {errors} onsave={save} onchoose={chooseDrawingTool} oncapture={reselect} selectingCapture={selecting} host="capture" pinned/>
   </div>
   {#if region && !dragging}
-    <div class="capture-actions" role="group" aria-label="Capture controls">
-      <button class="copy" disabled={busy || !loaded} onclick={copy} title={copyKey || undefined}><Copy size={16}/>{busy ? 'Copying…' : 'Copy & close'}{#if copyKey}<kbd>{copyKey}</kbd>{/if}</button>
+    <div class="capture-actions" role="group" aria-label={t('Capture controls')}>
+      <button class="copy" disabled={busy || !loaded} onclick={copy} title={copyKey || undefined}><Copy size={16}/>{busy ? t('Copying…') : t('Copy & close')}{#if copyKey}<kbd>{copyKey}</kbd>{/if}</button>
     </div>
   {/if}
   {#if error}<div class="capture-error" role="alert">{error}</div>{/if}

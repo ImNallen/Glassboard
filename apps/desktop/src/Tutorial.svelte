@@ -4,6 +4,8 @@
   import { action, native, type Session, type Action } from '@glassboard/ui/session';
   import { keyLabel, shortcutLabel } from '@glassboard/ui/shortcuts';
   import type { Errors } from '@glassboard/ui/errors';
+  import { t } from '@glassboard/ui/i18n';
+  import Rich from './Rich.svelte';
   let { session, errors }: { session: Session; errors: Errors } = $props();
   let busy = $state(false);
   let shortcut = $derived(shortcutLabel(session.preferences.shortcut));
@@ -16,51 +18,57 @@
   }
 </script>
 
+{#snippet kbd(text: string)}<kbd>{text}</kbd>{/snippet}
+
 {#if session.tutorial}
-  <aside class="tutorial" class:preview={!native} aria-label="Glassboard tutorial">
+  <aside class="tutorial" class:preview={!native} aria-label={t('Glassboard tutorial')}>
     <header>
       <span class="brand"><Logo size={20}/> Glassboard</span>
-      <button class="icon-button" aria-label="Dismiss tutorial" title="Dismiss tutorial" disabled={busy} onclick={() => run('dismiss-tutorial')}><X size={16}/></button>
+      <button class="icon-button" aria-label={t('Dismiss tutorial')} title={t('Dismiss tutorial')} disabled={busy} onclick={() => run('dismiss-tutorial')}><X size={16}/></button>
     </header>
     <div aria-live="polite" aria-atomic="true">
       {#if session.tutorial === 'welcome'}
-        <span class="step">A QUICK INTRODUCTION</span>
-        <h1>Your point, made clear.</h1>
-        <p>Press <kbd>{shortcut}</kbd> to draw over your screen. Press it again to get back to work.</p>
-        <p class="hint">Returning to work clears your marks. Your next annotation session starts fresh.</p>
+        <span class="step">{t('A QUICK INTRODUCTION')}</span>
+        <h1>{t('Your point, made clear.')}</h1>
+        <p><Rich message={'Press <kbd>{shortcut}</kbd> to draw over your screen. Press it again to get back to work.'} args={{ shortcut }} {kbd}/></p>
+        <p class="hint">{t('Returning to work clears your marks. Your next annotation session starts fresh.')}</p>
       {:else if session.tutorial === 'draw'}
-        <span class="step">1 OF 2 · MAKE A MARK</span>
-        <h1>Point something out.</h1>
-        <p>Drag anywhere outside this guide to draw. Choose a pen, arrow, shape, or text from the open toolbar.</p>
-        <p class="hint">Hold Shift for straight arrows or equal-sided shapes.{#if undo} Undo with <kbd>{undo}</kbd>.{/if}</p>
+        <span class="step">{t('1 OF 2 · MAKE A MARK')}</span>
+        <h1>{t('Point something out.')}</h1>
+        <p>{t('Drag anywhere outside this guide to draw. Choose a pen, arrow, shape, or text from the open toolbar.')}</p>
+        <p class="hint">{t('Hold Shift for straight arrows or equal-sided shapes.')}{#if undo} <Rich message={'Undo with <kbd>{shortcut}</kbd>.'} args={{ shortcut: undo }} {kbd}/>{/if}</p>
       {:else if session.tutorial === 'hide'}
-        <span class="step">2 OF 2 · BACK TO WORK</span>
-        <h1>Made your point?</h1>
-        <p>Press <kbd>{shortcut}</kbd> to hide Glassboard and use your screen again.</p>
-        <p class="hint">{#if hide}<kbd>{hide}</kbd> also returns you to work. {/if}Your next annotation session starts clear.</p>
+        <span class="step">{t('2 OF 2 · BACK TO WORK')}</span>
+        <h1>{t('Made your point?')}</h1>
+        <p><Rich message={'Press <kbd>{shortcut}</kbd> to hide Glassboard and use your screen again.'} args={{ shortcut }} {kbd}/></p>
+        <p class="hint">{#if hide}<Rich message={'<kbd>{shortcut}</kbd> also returns you to work.'} args={{ shortcut: hide }} {kbd}/> {/if}{t('Your next annotation session starts clear.')}</p>
       {:else}
-        <span class="step"><Check size={13}/> YOU’RE READY</span>
-        <h1>Work. Annotate. Repeat.</h1>
-        <p>Press <kbd>{shortcut}</kbd> whenever you want to make another point. You’ll start with a clear screen.</p>
-        <p class="hint">Find settings and this tutorial in the Glassboard menu-bar or tray icon.</p>
+        <span class="step"><Check size={13}/> {t('YOU’RE READY')}</span>
+        <h1>{t('Work. Annotate. Repeat.')}</h1>
+        <p><Rich message={'Press <kbd>{shortcut}</kbd> whenever you want to make another point. You’ll start with a clear screen.'} args={{ shortcut }} {kbd}/></p>
+        <p class="hint">{t('Find settings and this tutorial in the Glassboard menu-bar or tray icon.')}</p>
       {/if}
     </div>
     <footer>
       {#if session.tutorial === 'welcome'}
-        <button class="secondary" disabled={busy} onclick={() => run('dismiss-tutorial')}>Skip tutorial</button>
-        <button class="primary" disabled={busy} onclick={() => run('tutorial-start')}>Try annotating <ArrowUpRight size={15}/></button>
+        <button class="secondary" disabled={busy} onclick={() => run('dismiss-tutorial')}>{t('Skip tutorial')}</button>
+        <button class="primary" disabled={busy} onclick={() => run('tutorial-start')}>{t('Try annotating')} <ArrowUpRight size={15}/></button>
       {:else if session.tutorial === 'done'}
-        <button class="primary" disabled={busy} onclick={() => run('dismiss-tutorial')}>Got it <Check size={15}/></button>
+        <button class="primary" disabled={busy} onclick={() => run('dismiss-tutorial')}>{t('Got it')} <Check size={15}/></button>
       {:else}
-        <button class="secondary" disabled={busy} onclick={() => run('dismiss-tutorial')}>Skip tutorial</button>
-        <span class="mode">Annotation mode</span>
+        <button class="secondary" disabled={busy} onclick={() => run('dismiss-tutorial')}>{t('Skip tutorial')}</button>
+        <span class="mode">{t('Annotation mode')}</span>
       {/if}
     </footer>
     {#if session.unavailableShortcuts.includes('toggle')}
-      <p class="error" role="alert">Another app is using <kbd>{shortcut}</kbd>. <button class="link" disabled={busy} onclick={() => run('settings')}>Choose a different shortcut</button></p>
+      <p class="error" role="alert">
+        <Rich message={'Another app is using <kbd>{shortcut}</kbd>. <button>Choose a different shortcut</button>'} args={{ shortcut }} {kbd}>
+          {#snippet button(label: string)}<button class="link" disabled={busy} onclick={() => run('settings')}>{label}</button>{/snippet}
+        </Rich>
+      </p>
     {/if}
     {#if errors.message}
-      <p class="error" role="alert">{errors.message} <button class="link" onclick={errors.dismiss}>Dismiss</button></p>
+      <p class="error" role="alert">{errors.message} <button class="link" onclick={errors.dismiss}>{t('Dismiss')}</button></p>
     {/if}
   </aside>
 {/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Check, ChevronDown } from '@lucide/svelte';
+  import { t } from '@glassboard/ui/i18n';
   import { gradientStrip } from '@glassboard/ui/swatches';
   import type { ColorTheme } from '@glassboard/ui/themes';
   /** A dropdown of color themes, each previewed by its Rainbow strip and swatches. `selected` is undefined for custom colors. */
@@ -12,6 +13,7 @@
   let root: HTMLDivElement;
   let trigger: HTMLButtonElement;
   let list = $state<HTMLDivElement>();
+  let name = $derived(selected ? t(selected.name) : t('Custom'));
 
   function show() {
     open = true;
@@ -51,20 +53,20 @@
 
 <div class="theme-picker" bind:this={root}>
   <button bind:this={trigger} class="trigger" class:open aria-haspopup="listbox" aria-expanded={open} aria-controls="theme-list"
-    aria-label={`Color palette: ${selected?.name ?? 'Custom'}`} onclick={() => open ? close() : show()} onkeydown={triggerKeydown}>
-    <span class="name">{selected?.name ?? 'Custom'}</span>
+    aria-label={t('Color palette: {name}', { name })} onclick={() => open ? close() : show()} onkeydown={triggerKeydown}>
+    <span class="name">{name}</span>
     {@render preview(selected?.colors ?? custom.colors, selected?.swatches ?? custom.swatches)}
     <ChevronDown size={14} strokeWidth={2.2}/>
   </button>
   {#if open}
-    <div bind:this={list} id="theme-list" class="options" role="listbox" tabindex="-1" aria-label="Color palettes"
+    <div bind:this={list} id="theme-list" class="options" role="listbox" tabindex="-1" aria-label={t('Color palettes')}
       aria-activedescendant={`theme-${active}`} onkeydown={listKeydown}>
       {#each themes as theme, index}
         <!-- svelte-ignore a11y_click_events_have_key_events (the listbox handles keys) -->
         <div id={`theme-${index}`} class="option" class:active={index === active} role="option" aria-selected={theme === selected} data-index={index}
           tabindex="-1" onpointerenter={() => active = index} onclick={() => choose(index)}>
           <span class="check">{#if theme === selected}<Check size={13} strokeWidth={2.4}/>{/if}</span>
-          <span class="name">{theme.name}</span>
+          <span class="name">{t(theme.name)}</span>
           {@render preview(theme.colors, theme.swatches)}
         </div>
       {/each}

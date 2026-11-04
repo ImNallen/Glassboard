@@ -16,6 +16,8 @@ export function mistakes(anyString: string) {
   t('Size: {size}. Switch to {next}', { size: 'Small' });
   // @ts-expect-error a plain string instead of a literal sentence
   t(anyString);
+  // @ts-expect-error a sentence with markup belongs to Rich
+  t('Undo with <kbd>{shortcut}</kbd>.', { shortcut: 'Z' });
   // @ts-expect-error a table entry that is not a sentence
   const name: Message = 'Smal';
   return name;
