@@ -1,0 +1,10 @@
+{
+  "Annotation text. Enter commits, Shift+Enter adds a line, Escape cancels.": "Screen reader label for the text box on the drawing canvas.",
+  "Click for {choice}": "Tooltip on a toolbar button that steps through values. {choice} is a size name or a duration.",
+  "Large": "Stroke size.",
+  "Medium": "Stroke size.",
+  "Screen annotation canvas. Choose the eraser tool to remove drawings.": "Screen reader label for the drawing canvas.",
+  "Size: {size}": "Toolbar tooltip. {size} is Small, Medium, or Large.",
+  "Size: {size}. Switch to {next}": "Screen reader label on the size button. Both placeholders are Small, Medium, or Large.",
+  "Small": "Stroke size."
+}

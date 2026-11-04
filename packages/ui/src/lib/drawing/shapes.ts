@@ -1,5 +1,6 @@
 import preferenceDefaults from '../../contract/preference-defaults.json';
 import strokeWidths from '../../contract/stroke-sizes.json';
+import type { Message } from '../i18n.svelte';
 export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'step' | 'highlighter' | 'text' | 'eraser';
 /** Freehand tools append points as the pointer moves instead of anchoring a start and end. */
 export const FREEHAND_TOOLS: readonly Tool[] = ['pen', 'highlighter'];
@@ -9,7 +10,7 @@ export const AUTO_FADE_OPTIONS: readonly AutoFadeSeconds[] = [0, 3, 5, 10];
 export const FADE_MS = 500;
 export type StrokeSize = keyof typeof strokeWidths;
 export const STROKE_SIZES = (Object.keys(strokeWidths) as StrokeSize[]).sort((a, b) => strokeWidths[a] - strokeWidths[b]);
-export const STROKE_SIZE_NAMES: Record<StrokeSize, string> = { small: 'Small', medium: 'Medium', large: 'Large' };
+export const STROKE_SIZE_NAMES: Record<StrokeSize, Message> = { small: 'Small', medium: 'Medium', large: 'Large' };
 export function strokeWidth(size: StrokeSize): number { return strokeWidths[size]; }
 export function stepStrokeSize(size: StrokeSize, step: -1 | 1): StrokeSize {
   const index = STROKE_SIZES.indexOf(size) + step;

@@ -12,6 +12,7 @@
     "./selection": "./src/lib/selection.ts",
     "./keys": "./src/lib/keys.ts",
     "./errors": "./src/lib/errors.svelte.ts",
+    "./i18n": "./src/lib/i18n.svelte.ts",
     "./Overlay.svelte": "./src/Overlay.svelte",
     "./Toolbar.svelte": "./src/Toolbar.svelte",
     "./Logo.svelte": "./src/Logo.svelte",

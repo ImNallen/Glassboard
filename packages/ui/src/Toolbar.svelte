@@ -2,6 +2,7 @@
   import { Scan, Undo2, Redo2, Trash2, Infinity as InfinityIcon, X } from '@lucide/svelte';
   import { onMount, tick } from 'svelte';
   import { createToolbarHints } from './lib/toolbar-hints.svelte';
+  import { t } from './lib/i18n.svelte';
   import { COLOR_SHORTCUTS, keyLabel, SIZE_SHORTCUTS, TOOL_SHORTCUTS } from './lib/shortcuts';
   import { rainbowPreview, sameColor, shiftingPreview, swatchColor, swatchName } from './lib/swatches';
   import { TOOL_ICONS } from './lib/tool-icons';
@@ -112,7 +113,7 @@
       {/each}
     </div>
     <div class="divider"></div>
-    <button class="icon-button" onclick={() => change({ size: nextSize })} use:hint={{ label: `Size: ${STROKE_SIZE_NAMES[size]}`, key: sizeKeys, description: `Click for ${STROKE_SIZE_NAMES[nextSize]}` }} aria-label={`Size: ${STROKE_SIZE_NAMES[size]}. Switch to ${STROKE_SIZE_NAMES[nextSize]}`}>
+    <button class="icon-button" onclick={() => change({ size: nextSize })} use:hint={{ label: t('Size: {size}', { size: t(STROKE_SIZE_NAMES[size]) }), key: sizeKeys, description: t('Click for {choice}', { choice: t(STROKE_SIZE_NAMES[nextSize]) }) }} aria-label={t('Size: {size}. Switch to {next}', { size: t(STROKE_SIZE_NAMES[size]), next: t(STROKE_SIZE_NAMES[nextSize]) })}>
       <span class="size-sample" style:height={`${strokeWidth(size)}px`} aria-hidden="true"></span>
     </button>
     {#if host !== 'capture'}<button class="icon-button fade-button" class:active={fadeSeconds !== 0} onclick={() => change({ autoFadeSeconds: nextFade })} use:hint={{ label: `Auto-fade: ${fadeLabel(fadeSeconds)}`, description: `Click for ${fadeLabel(nextFade)}` }} aria-label={`Auto-fade: ${fadeLabel(fadeSeconds)}. Switch to ${fadeLabel(nextFade)}`}>
