@@ -21,7 +21,7 @@ it.each<[UpdateStatus, string]>([
   [{ state: 'downloading', version: '0.2.0', percent: 42 }, 'Downloading version 0.2.0… 42%'],
   [{ state: 'ready', version: '0.2.0' }, 'Restart to install version 0.2.0'],
   [{ state: 'installing', version: '0.2.0' }, 'Installing version 0.2.0…'],
-])('labels the header button for %o', (status, label) => {
+])('labels the update button for %o', (status, label) => {
   expect(updateLabel(status)).toBe(label);
 });
 
