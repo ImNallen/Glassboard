@@ -40,6 +40,62 @@ function press(key: string, code: string, init: KeyboardEventInit = {}) {
   flushSync();
 }
 
+it('searches shortcut names, groups, descriptions, and assigned keys, and recovers from no results', async () => {
+  await savePreferences(structuredClone(defaults.preferences));
+  await setup();
+  const search = document.querySelector<HTMLInputElement>('input[aria-label="Search keyboard shortcuts"]')!;
+  const filter = (value: string) => { search.value = value; search.dispatchEvent(new Event('input', { bubbles: true })); flushSync(); };
+  filter('  PEN  ');
+  expect(row('Pen')).not.toBeNull();
+  expect(row('Undo')).toBeNull();
+  expect(document.querySelectorAll('.group h2')).toHaveLength(1);
+  filter('Global screenshot');
+  expect(row('Take screenshot').getAttribute('aria-label')).toContain('Win+Ctrl+Shift+S');
+  expect(row('Toggle Glassboard')).toBeNull();
+  filter('screenshot editor');
+  expect(row('Copy & close')).not.toBeNull();
+  expect(row('Take screenshot')).toBeNull();
+  filter('Ctrl+Z');
+  expect(row('Undo')).not.toBeNull();
+  expect(row('Redo')).toBeNull();
+  filter('no matching command');
+  expect(document.querySelectorAll('.group')).toHaveLength(0);
+  expect(document.querySelector('[role="status"]')?.textContent).toContain('No shortcuts match your search.');
+  document.querySelector<HTMLButtonElement>('.empty-shortcuts button')!.click();
+  flushSync();
+  expect(search.value).toBe('');
+  expect(row('Undo')).not.toBeNull();
+  expect(row('Toggle Glassboard')).not.toBeNull();
+});
+
+it('filters customized local and global shortcuts, including cleared bindings, and updates after resetting', async () => {
+  await savePreferences({ ...structuredClone(defaults.preferences), captureShortcut: '', keybindings: { 'tool-pen': 'CommandOrControl+KeyP', undo: '', redo: 'CommandOrControl+Shift+KeyZ' } });
+  const session = await setup();
+  const toggle = document.querySelector<HTMLButtonElement>('.customized-filter [role="switch"]')!;
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  toggle.click();
+  flushSync();
+  expect(toggle.getAttribute('aria-checked')).toBe('true');
+  expect(document.querySelectorAll('.recorder')).toHaveLength(3);
+  expect(row('Take screenshot').getAttribute('aria-label')).toContain('not set');
+  expect(row('Undo').getAttribute('aria-label')).toContain('not set');
+  expect(row('Pen')).not.toBeNull();
+  expect(row('Redo')).toBeNull();
+  expect(row('Toggle Glassboard')).toBeNull();
+  document.querySelector<HTMLButtonElement>('button[aria-label="Reset Pen to Ctrl+2"]')!.click();
+  await tick();
+  expect(session().preferences.keybindings['tool-pen']).toBeUndefined();
+  expect(row('Pen')).toBeNull();
+  document.querySelector<HTMLButtonElement>('.reset-all')!.click();
+  await tick();
+  expect(document.querySelector('[role="status"]')?.textContent).toContain('No customized shortcuts.');
+  expect(document.querySelector<HTMLButtonElement>('.reset-all')!.disabled).toBe(true);
+  document.querySelector<HTMLButtonElement>('.empty-shortcuts button')!.click();
+  flushSync();
+  expect(toggle.getAttribute('aria-checked')).toBe('false');
+  expect(row('Pen')).not.toBeNull();
+});
+
 it('records a new binding after clicking anywhere on the row, even when the row is not focused', async () => {
   const session = await setup();
   row('Pen').click();
@@ -165,7 +221,7 @@ it('applies a theme from the dropdown to Rainbow, Shifting, and keys 5–8, keep
   Element.prototype.scrollIntoView = vi.fn();
   const session = await setup('colors');
   const trigger = document.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')!;
-  expect(trigger.getAttribute('aria-label')).toBe('Theme: Glassboard');
+  expect(trigger.getAttribute('aria-label')).toBe('Color palette: Glassboard');
   trigger.click();
   flushSync();
   await tick();
@@ -175,13 +231,13 @@ it('applies a theme from the dropdown to Rainbow, Shifting, and keys 5–8, keep
   await tick();
   const neon = ['#ff2bd6', '#ffe600', '#00ff9c', '#00e5ff', '#7c4dff'];
   expect(session().preferences).toMatchObject({ rainbowColors: neon, cycleColors: neon, swatches: ['#111111', '#eeeeee', '#00ff9c', '#ffe600', '#ff2bd6', '#00e5ff'], color: '#ff2bd6' });
-  expect(document.querySelector('[role="listbox"][aria-label="Themes"]')).toBeNull();
-  expect(trigger.getAttribute('aria-label')).toBe('Theme: Neon');
+  expect(document.querySelector('[role="listbox"][aria-label="Color palettes"]')).toBeNull();
+  expect(trigger.getAttribute('aria-label')).toBe('Color palette: Neon');
 
   // Escape closes the list without closing settings; a later edit makes the theme custom.
   trigger.click();
   flushSync();
-  const list = document.querySelector<HTMLElement>('[role="listbox"][aria-label="Themes"]')!;
+  const list = document.querySelector<HTMLElement>('[role="listbox"][aria-label="Color palettes"]')!;
   const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
   const reachedWindow = vi.fn();
   window.addEventListener('keydown', reachedWindow);
@@ -189,16 +245,42 @@ it('applies a theme from the dropdown to Rainbow, Shifting, and keys 5–8, keep
   window.removeEventListener('keydown', reachedWindow);
   flushSync();
   expect(reachedWindow).not.toHaveBeenCalled();
-  expect(document.querySelector('[role="listbox"][aria-label="Themes"]')).toBeNull();
+  expect(document.querySelector('[role="listbox"][aria-label="Color palettes"]')).toBeNull();
   // Black and White aren't part of a theme; the themed swatches are.
   document.querySelector<HTMLButtonElement>('button[aria-label="Use #000000"]')!.click();
   await tick();
-  expect(trigger.getAttribute('aria-label')).toBe('Theme: Neon');
+  expect(trigger.getAttribute('aria-label')).toBe('Color palette: Neon');
   document.querySelector<HTMLButtonElement>('button[aria-label^="Green,"]')!.click();
   flushSync();
   document.querySelector<HTMLButtonElement>('button[aria-label="Use #000000"]')!.click();
   await tick();
-  expect(trigger.getAttribute('aria-label')).toBe('Theme: Custom');
+  expect(trigger.getAttribute('aria-label')).toBe('Color palette: Custom');
+});
+
+it('previews solid, Rainbow, and Shifting strokes using the edited colors', async () => {
+  await savePreferences(structuredClone(defaults.preferences));
+  const session = await setup('colors');
+  const preview = () => document.querySelector<SVGSVGElement>('.stroke-preview svg')!;
+  expect(preview().getAttribute('aria-label')).toBe('Black stroke preview');
+  expect(preview().querySelector('path')?.getAttribute('stroke')).toBe('#000000');
+  document.querySelector<HTMLButtonElement>('button[aria-label="Use #5856D6"]')!.click();
+  await tick();
+  expect(preview().querySelector('path')?.getAttribute('stroke')).toBe(session().preferences.swatches[0]);
+  document.querySelector<HTMLButtonElement>('button[aria-label^="Rainbow,"]')!.click();
+  flushSync();
+  expect(preview().getAttribute('aria-label')).toBe('Rainbow stroke preview');
+  expect(preview().querySelector('path')?.getAttribute('stroke')).toMatch(/^url\(#.+\)$/);
+  document.querySelector<HTMLButtonElement>('button[aria-label="Use #5856D6"]')!.click();
+  await tick();
+  const rainbow = session().preferences.rainbowColors;
+  expect([...preview().querySelectorAll('stop')].map(stop => stop.getAttribute('stop-color'))).toEqual([...rainbow, rainbow[0]]);
+  document.querySelector<HTMLButtonElement>('button[aria-label^="Shifting,"]')!.click();
+  flushSync();
+  expect(preview().getAttribute('aria-label')).toBe('Shifting stroke preview');
+  expect([...preview().querySelectorAll('path')].map(path => path.getAttribute('stroke'))).toEqual(session().preferences.cycleColors);
+  document.querySelector<HTMLButtonElement>('button[aria-label="Add a color"]')!.click();
+  await tick();
+  expect([...preview().querySelectorAll('path')].map(path => path.getAttribute('stroke'))).toEqual(session().preferences.cycleColors);
 });
 
 it('reorders Rainbow colors by dragging a chip with the pointer', async () => {
@@ -242,14 +324,47 @@ it('turns opening at login on and off from the General tab', async () => {
   expect(await getAutostart()).toBe(false);
 });
 
-it('checks for updates from the header without a message when nothing is new', async () => {
+it('checks for updates beside the version information without a message when nothing is new', async () => {
   await setup('general');
-  const button = () => document.querySelector<HTMLButtonElement>('header button[aria-label="Check for updates"]')!;
+  const button = () => document.querySelector<HTMLButtonElement>('.update-row button[aria-label="Check for updates"]')!;
   expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
+  expect(button().textContent).toContain('Check for updates');
+  expect(document.querySelector('.update-row')?.textContent).toContain('Glassboard v');
   button().click();
   await tick();
   expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
   expect(document.querySelector('.status')!.textContent).toBe('');
+});
+
+it('shows update progress and restart actions beside the version, and disables repeated requests', async () => {
+  let emit: (status: UpdateStatus) => void = () => {};
+  vi.mocked(watchUpdates).mockImplementationOnce(async fn => { emit = fn; fn({ state: 'idle' }); return () => {}; });
+  await setup('general');
+  const button = () => document.querySelector<HTMLButtonElement>('.update-row button')!;
+  emit({ state: 'checking' });
+  flushSync();
+  expect(button().disabled).toBe(true);
+  expect(button().textContent).toContain('Checking…');
+  expect(button().getAttribute('aria-busy')).toBe('true');
+  emit({ state: 'downloading', version: '0.2.0', percent: 42 });
+  flushSync();
+  expect(button().disabled).toBe(true);
+  expect(document.querySelector('.update-row')?.textContent).toContain('42%');
+  emit({ state: 'ready', version: '0.2.0' });
+  flushSync();
+  expect(button().disabled).toBe(false);
+  expect(button().textContent).toContain('Restart to install version 0.2.0');
+  emit({ state: 'installing', version: '0.2.0' });
+  flushSync();
+  expect(button().disabled).toBe(true);
+  emit({ state: 'failed', message: 'Could not install the update.' });
+  flushSync();
+  expect(button().disabled).toBe(false);
+  expect(document.querySelector('.update-row')?.textContent).toContain('Could not install the update.');
+  emit({ state: 'disabled' });
+  flushSync();
+  expect(button()).toBeNull();
+  expect(document.querySelector('.update-row')?.textContent).toContain('Automatic updates are unavailable in this build.');
 });
 
 it('shows why an install started from the tray failed, but not a background check failure', async () => {

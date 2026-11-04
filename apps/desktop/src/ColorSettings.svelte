@@ -3,18 +3,19 @@
   import type { Preferences } from '@glassboard/ui/session';
   import { COLOR_SHORTCUTS, keyLabel } from '@glassboard/ui/shortcuts';
   import { CYCLE_COLORS } from '@glassboard/ui/drawing';
-  import { bandStrip, DEFAULT_SWATCHES, defaultSwatches, gradientStrip, rainbowPreview, sameColor, sameColors, SEQUENCE_LIMITS, shiftingPreview, swatchColor, swatchName, SWATCH_PRESETS } from '@glassboard/ui/swatches';
+  import { DEFAULT_SWATCHES, defaultSwatches, rainbowPreview, sameColor, sameColors, SEQUENCE_LIMITS, shiftingPreview, swatchColor, swatchName, SWATCH_PRESETS } from '@glassboard/ui/swatches';
   import { COLOR_THEMES, matchTheme, THEMED_SWATCHES_START, themeColors, type ThemeColors } from '@glassboard/ui/themes';
   import ColorPicker from './ColorPicker.svelte';
   import ThemePicker from './ThemePicker.svelte';
   /** The Colors tab: apply a theme, or replace any swatch and the Rainbow and Shifting color lists. */
   let { preferences, onsave }: { preferences: Preferences; onsave: (patch: Partial<Preferences>, message?: string) => void } = $props();
-  type Sequence = { key: 'rainbowColors' | 'cycleColors'; name: string; command: string; description: string; dot: (colors: readonly string[]) => string; strip: (colors: readonly string[]) => string };
+  const previewId = $props.id();
+  type Sequence = { key: 'rainbowColors' | 'cycleColors'; name: string; command: string; description: string; dot: (colors: readonly string[]) => string };
   /** A color the toolbar offers. A swatch is a list of one color, so swatches and sequences edit the same way. */
   type Entry = { label: string; name: string; command: string; colors: readonly string[]; defaults: readonly string[]; dot: (colors: readonly string[]) => string; sequence?: Sequence; save: (colors: string[], select?: number) => void };
   const SEQUENCES: readonly Sequence[] = [
-    { key: 'rainbowColors', name: 'Rainbow', command: 'color-rainbow', description: 'Each mark blends through these colors.', dot: rainbowPreview, strip: colors => gradientStrip([...colors, colors[0]]) },
-    { key: 'cycleColors', name: 'Shifting', command: 'color-cycle', description: 'Each new mark takes the next color.', dot: shiftingPreview, strip: bandStrip },
+    { key: 'rainbowColors', name: 'Rainbow', command: 'color-rainbow', description: 'Each mark blends through these colors.', dot: rainbowPreview },
+    { key: 'cycleColors', name: 'Shifting', command: 'color-cycle', description: 'Each new mark takes the next color.', dot: shiftingPreview },
   ];
   const SLOTS = COLOR_SHORTCUTS.flatMap(({ slot, command }) => slot === undefined ? [] : [{ slot, command }]);
   // Toolbar order: the sequences, then the swatches. Black is selected first.
@@ -132,11 +133,11 @@
 <div class="color-settings">
 <section class="group" aria-labelledby="theme-title">
   <div class="theme-heading">
-    <h2 id="theme-title">Theme</h2>
+    <h2 id="theme-title">Color palette</h2>
     <button class="text-button reset-all" disabled={!customized} onclick={() => saveColors(themeColors(COLOR_THEMES[0], defaultSwatches()), 'Colors reset.')}>Reset all<RotateCcw size={12}/></button>
   </div>
   <ThemePicker themes={COLOR_THEMES} selected={matchTheme(preferences)} custom={{ colors: preferences.rainbowColors, swatches: themed }}
-    onselect={theme => saveColors(themeColors(theme, swatches), `${theme.name} theme applied.`)}/>
+    onselect={theme => saveColors(themeColors(theme, swatches), `${theme.name} palette applied.`)}/>
 </section>
 
 <section class="group" aria-labelledby="toolbar-title">
@@ -160,9 +161,30 @@
     <button class="reset" disabled={sameColors(entry.colors, entry.defaults)} title="Reset to default" aria-label={`Reset ${entry.name} to default`} onclick={reset}><RotateCcw size={12} strokeWidth={2.2}/>Reset</button>
   </div>
 
+  <figure class="stroke-preview">
+    <svg viewBox="0 0 300 64" role="img" aria-label={`${entry.name} stroke preview`}>
+      <defs>
+        <linearGradient id={previewId} x1="0" x2="1" y1="0" y2="0">
+          {#each [...shownList, shownList[0]] as color, i}
+            <stop offset={i / shownList.length} stop-color={color}/>
+          {/each}
+        </linearGradient>
+      </defs>
+      <g fill="none" stroke-width="5" stroke-linecap="round">
+        {#if entry.sequence?.key === 'cycleColors'}
+          {#each shownList as color, i}
+            <path d="M 0 40 Q 8 16 16 30 T 32 24" stroke={color} vector-effect="non-scaling-stroke" transform={`translate(${10 + i * (280 / shownList.length)} 0) scale(${(280 / shownList.length - 6) / 32} 1)`}/>
+          {/each}
+        {:else}
+          <path d="M 14 42 C 46 8 78 12 106 34 S 164 52 192 28 S 244 14 286 32" stroke={entry.sequence ? `url(#${previewId})` : shown}/>
+        {/if}
+      </g>
+    </svg>
+    <figcaption>Stroke preview</figcaption>
+  </figure>
+
   {#if entry.sequence}
     <p class="note">{entry.sequence.description}</p>
-    <div class="sequence-preview" aria-hidden="true" style:background={entry.sequence.strip(shownList)}></div>
     <div class="chips">
       <div bind:this={chipList} class="chip-list" role="listbox" aria-label={`${entry.name} colors`} aria-orientation="horizontal">
         {#each shownList as color, i (i)}
@@ -223,7 +245,9 @@
 
   h3 span { font-weight: 400; letter-spacing: 0; text-transform: none; }
 
-  .sequence-preview { height: 10px; margin-bottom: 10px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
+  .stroke-preview { margin: 0 0 12px; }
+  .stroke-preview svg { display: block; width: 100%; height: 64px; border: 1px solid var(--gb-divider); border-radius: 9px; background: linear-gradient(115deg, #f1f3f5 0%, #f1f3f5 49.8%, #30343b 50.2%, #30343b 100%); }
+  .stroke-preview figcaption { margin-top: 5px; font-size: 10.5px; color: var(--gb-muted); }
   .chips { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid var(--gb-divider); border-radius: 10px; background: var(--gb-subtle-surface); }
   .chip-list { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
   .chip { width: 26px; height: 26px; padding: 0; border-radius: 50%; cursor: grab; touch-action: none; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); transition: transform .12s, box-shadow .12s, opacity .12s; }
