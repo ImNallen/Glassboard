@@ -5,6 +5,7 @@ import { setLocale, useCatalogs } from '@glassboard/ui/i18n';
 import { createPreviewSession, defaults, subscribe, useSession, type Session } from '@glassboard/ui/session';
 import { createErrors } from '@glassboard/ui/errors';
 import Settings from './Settings.svelte';
+import { LANGUAGES } from './lib/languages';
 import { watchUpdates, type UpdateStatus } from './lib/updates';
 
 vi.mock('./lib/updates', async original => {
@@ -60,22 +61,23 @@ it('is the first group on the General tab, and names itself in English when the 
 it('offers the system default and then each language by its own name, marked with its language', async () => {
   await setup();
   await openList();
-  expect(options().map(option => option.textContent?.trim())).toEqual(['System default', 'English']);
+  expect(options().map(option => option.textContent?.trim())).toEqual(['System default', ...LANGUAGES.map(language => language.name)]);
   expect(options()[0].querySelector('[lang]')).toBeNull();
-  expect(options()[1].querySelector('[lang]')?.getAttribute('lang')).toBe('en');
+  expect(options().slice(1).map(option => option.querySelector('[lang]')?.getAttribute('lang'))).toEqual(LANGUAGES.map(language => language.tag));
   expect(document.querySelectorAll('#language-list .divider')).toHaveLength(1);
 });
 
 it('applies a choice at once and returns focus to the trigger', async () => {
   await setup();
   await openList();
-  options()[1].click();
+  options().find(option => option.textContent?.trim() === 'Deutsch')!.click();
   await tick(); flushSync();
-  expect(session().preferences.language).toBe('en');
-  expect(session().locale).toBe('en');
+  expect(session().preferences.language).toBe('de');
+  expect(session().locale).toBe('de');
   expect(document.querySelector('#language-list')).toBeNull();
   expect(document.activeElement).toBe(trigger());
-  expect(trigger().textContent?.trim()).toBe('English');
+  expect(trigger().textContent?.trim()).toBe('Deutsch');
+  expect(document.documentElement.lang).toBe('de');
 });
 
 it('chooses by keyboard, and Escape closes only the list', async () => {
@@ -97,9 +99,9 @@ it('chooses by keyboard, and Escape closes only the list', async () => {
 });
 
 it('shows the system default for a saved language this build has no catalog for, and keeps the saved tag', async () => {
-  await setup('ko');
+  await setup('tlh');
   expect(trigger().textContent?.trim()).toBe('System default');
-  expect(session().preferences.language).toBe('ko');
+  expect(session().preferences.language).toBe('tlh');
 });
 
 it('rewords itself when the language changes, and the page language follows', async () => {
@@ -107,8 +109,10 @@ it('rewords itself when the language changes, and the page language follows', as
   expect(trigger().getAttribute('aria-label')).toBe('Language: System default');
   await unmount(settings!); settings = undefined; stop();
   await setup('de');
-  expect(trigger().getAttribute('aria-label')).toBe('Sprache: Systemstandard');
+  expect(trigger().getAttribute('aria-label')).toBe('Sprache: Deutsch');
   expect(document.documentElement.lang).toBe('de');
+  await openList();
+  expect(options()[0].textContent?.trim()).toBe('Systemstandard');
 });
 
 it('searches what the user sees in the current language, folding case and accents', async () => {

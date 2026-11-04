@@ -8,7 +8,6 @@ const LOCALES = join(ROOT, 'apps/desktop/locales');
 const MESSAGES = join(ROOT, 'packages/ui/src/contract/messages.json');
 const SOURCE_ROOTS = ['packages/ui/src', 'apps/desktop/src', 'apps/desktop/src-tauri/src'];
 const BRAND = 'Glassboard';
-/** Every string that may skip translation. Otherwise `Text::untranslated` is the path that compiles without touching a catalog. */
 const UNTRANSLATED = new Set([
   'Capture cancelled',
   'Expected a binary capture image',
@@ -29,7 +28,6 @@ function sourceFiles(directory) {
     .map(file => ({ path: join(directory, file), text: readFileSync(join(ROOT, directory, file), 'utf8') }));
 }
 
-/** Tests may build whatever text they need, so only shipping Rust counts. */
 function withoutRustTests(text) {
   const start = text.search(/#\[cfg\(test\)\]\s*mod tests \{/);
   if (start < 0) return text;
@@ -50,8 +48,14 @@ export function loadProject() {
   };
 }
 
+function isLanguageTag(tag) {
+  try { return Intl.getCanonicalLocales(tag)[0] === tag; }
+  catch { return false; }
+}
+
 function catalogProblems(tag, catalog, messages) {
   const problems = [];
+  if (!isLanguageTag(tag)) problems.push('file name is not a canonical language tag');
   if (!catalog.$language) problems.push('has no $language');
   const entries = Object.entries(catalog).filter(([key]) => key !== '$language');
   for (const [key] of entries) if (!(key in messages)) problems.push(`stale: ${JSON.stringify(key)}`);
@@ -70,7 +74,6 @@ function catalogProblems(tag, catalog, messages) {
   return problems;
 }
 
-/** Every mismatch between the sentences, the catalogs, and the source, as lines to show a contributor. */
 export function audit({ messages, catalogs, sources } = loadProject()) {
   const problems = [];
   for (const [tag, catalog] of Object.entries(catalogs)) {

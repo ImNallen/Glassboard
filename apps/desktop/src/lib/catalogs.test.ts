@@ -43,6 +43,10 @@ describe('the audit reports what a contributor got wrong', () => {
   it('a one-word sentence with no note', () => {
     expect(run(good, code, { ...messages, Step: '' })).toContain('no note: "Step" is one word, so a translator needs its meaning');
   });
+  it.each(['pt_BR', 'zh-hans'])('a catalog file named %s, which is not a canonical tag', tag => {
+    const problems = audit({ messages: {}, catalogs: { en: { $language: 'English' }, [tag]: { $language: 'Name' } }, sources: [] });
+    expect(problems).toEqual([`${tag}: file name is not a canonical language tag`]);
+  });
   it('Rust text that skips the macro or the list', () => {
     const rust = { path: 'x.rs', text: 'Text::message("a", vec![]); Text::untranslated("Sneaky");' };
     const problems = audit({ messages: {}, catalogs: { en: { $language: 'English' } }, sources: [rust] });

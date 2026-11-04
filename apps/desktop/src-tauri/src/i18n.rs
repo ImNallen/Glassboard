@@ -37,9 +37,6 @@ fn tags() -> Vec<&'static str> {
     LANGUAGES.iter().map(|&(tag, _)| tag).collect()
 }
 
-/// A sentence waiting for a language, and the crate's error type. Stored errors and notices
-/// stay `Text` until shown, so they follow a language change without a new event.
-/// `Serialize` renders the active language. `Display` renders English, for logs.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Text(Repr);
 #[derive(Clone, Debug, PartialEq)]
@@ -48,16 +45,13 @@ enum Repr {
         key: &'static str,
         args: Vec<(&'static str, String)>,
     },
-    /// A library's text, or an invariant no user reaches.
     Untranslated(String),
-    /// Sentences shown together, such as the startup problems.
     Joined(Vec<Text>),
 }
 
 pub(crate) type Result<T> = std::result::Result<T, Text>;
 
 impl Text {
-    /// Only `t!` calls this, after its `check` passes. The audit enforces that.
     pub(crate) fn message(key: &'static str, args: Vec<(&'static str, String)>) -> Self {
         Self(Repr::Message { key, args })
     }
@@ -67,7 +61,6 @@ impl Text {
     pub(crate) fn joined(parts: Vec<Text>) -> Self {
         Self(Repr::Joined(parts))
     }
-    /// For tray labels, titles, native dialogs, and serde errors, which need a string now.
     pub(crate) fn render(&self) -> String {
         self.render_in(&LANGUAGES[active().load(Relaxed)].1)
     }
@@ -121,7 +114,6 @@ fn fill(template: &str, args: &[(&'static str, String)]) -> String {
     filled
 }
 
-// A blanket `impl<E: std::error::Error>` would also cover `Text`'s own conversions.
 macro_rules! from_library {
     ($($source:ty),* $(,)?) => {$(
         impl From<$source> for Text {
@@ -132,8 +124,6 @@ macro_rules! from_library {
     )*};
 }
 
-/// A sentence from `messages.json`, with its placeholders as named arguments. A typo in
-/// either fails the build through `check`.
 macro_rules! t {
     ($key:literal $(, $name:ident = $value:expr)* $(,)?) => {{
         const _: () = $crate::i18n::check($key, &[$(stringify!($name)),*]);
@@ -167,8 +157,6 @@ const fn same(a: &[u8], b: &[u8]) -> bool {
     true
 }
 
-/// Evaluated at every `t!`. Panics, which fails the build, on a sentence missing from
-/// `messages.json` or arguments that differ from its placeholders.
 pub(crate) const fn check(key: &str, names: &[&str]) {
     let mut known = false;
     let mut index = 0;
@@ -216,13 +204,10 @@ pub(crate) const fn check(key: &str, names: &[&str]) {
     }
 }
 
-/// The saved request: "system" or a tag. Unvalidated, so a tag saved by a newer build
-/// survives a downgrade and falls through to the OS list without a reset notice.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub(crate) struct Language(String);
 
-/// A `Session` field that serializes the active tag, so no stored copy can disagree with it.
 #[derive(Clone, Copy)]
 pub(crate) struct ActiveLocale;
 impl Serialize for ActiveLocale {
@@ -243,8 +228,6 @@ fn os_locales() -> Vec<String> {
     }
 }
 
-/// Index into `LANGUAGES`. The first read uses the OS list, so text rendered before preferences
-/// load already follows the OS. Tests run in parallel, so each thread gets its own language.
 fn active() -> &'static AtomicUsize {
     #[cfg(test)]
     {
@@ -302,8 +285,6 @@ impl Subtags {
     }
 }
 
-/// The first requested tag with a compatible catalog wins. Among compatible catalogs the
-/// exact region is best, then one with no region. English is the last resort.
 fn negotiate(requested: impl IntoIterator<Item = String>, tags: &[&str]) -> usize {
     let catalogs: Vec<Subtags> = tags.iter().map(|tag| Subtags::parse(tag)).collect();
     requested
@@ -320,7 +301,6 @@ fn negotiate(requested: impl IntoIterator<Item = String>, tags: &[&str]) -> usiz
         .unwrap_or(0)
 }
 
-/// Switches this thread to the fixture until dropped, since `--test-threads=1` shares one thread.
 #[cfg(test)]
 pub(crate) struct Pseudo;
 #[cfg(test)]
@@ -417,7 +397,7 @@ mod tests {
     #[test]
     fn a_saved_language_with_no_catalog_falls_through_to_the_os_list() {
         let _restore = Pseudo::activate();
-        activate(&Language("ko".into()));
+        activate(&Language("tlh".into()));
         assert_eq!(active_tag(), "en");
     }
 
