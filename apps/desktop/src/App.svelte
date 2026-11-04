@@ -4,12 +4,16 @@
   import { parseSurface, windowParts } from './lib/surface';
   import { drawingKeydown } from '@glassboard/ui/keys';
   import { createErrors } from '@glassboard/ui/errors';
-  import { protectSelection } from '@glassboard/ui/selection';
+  import { isEditableTarget, protectSelection } from '@glassboard/ui/selection';
   const surface = parseSurface(location.search);
   let session = $state<Session>(structuredClone(defaults));
   let parts = $derived(windowParts(surface, native, session.capture));
   const errors = createErrors(() => session);
   function run(name: Action) { action(name).catch(errors.report); }
+  /** The webview's menu offers Refresh and Print, which break the app. Text fields keep Cut, Copy, and Paste. */
+  function contextmenu(event: MouseEvent) {
+    if (!isEditableTarget(event.target)) event.preventDefault();
+  }
   function keydown(event: KeyboardEvent) {
     if (surface === 'capture' || session.capture) return;
     if (surface === 'tutorial' && event.key === 'Escape') { event.preventDefault(); run(session.mode === 'draw' ? 'hide' : 'dismiss-tutorial'); return; }
@@ -39,7 +43,7 @@
     return () => { disposed = true; stop(); stopSelectionGuard(); errors.clear(); };
   });
 </script>
-<svelte:window onkeydown={keydown}/>
+<svelte:window onkeydown={keydown} oncontextmenu={contextmenu}/>
 {#if parts.includes('backdrop')}
   {#await import('./PreviewBackdrop.svelte') then { default: PreviewBackdrop }}
     <PreviewBackdrop {session} {run}/>
