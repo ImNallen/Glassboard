@@ -273,7 +273,7 @@ fn load_from(dir: &Path) -> (Preferences, Option<String>) {
     const ALL_RESET: &str = "Your settings could not be read, so Glassboard is using the defaults.";
     let path = dir.join(FILE_NAME);
     let backup = dir.join(BACKUP_NAME);
-    let (preferences, problem, backed_up) = match std::fs::read(&path) {
+    let (preferences, problem, backed_up) = match retry_while_held(|| std::fs::read(&path)) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             return (Preferences::default(), None)
         }
@@ -379,11 +379,34 @@ fn write_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         file.write_all(bytes)?;
         file.sync_all()
     });
-    let result = written.and_then(|()| std::fs::rename(&temporary, path));
+    let result = written.and_then(|()| retry_while_held(|| std::fs::rename(&temporary, path)));
     if result.is_err() {
         let _ = std::fs::remove_file(&temporary);
     }
     result
+}
+
+/// Antivirus and search indexers briefly hold files open on Windows, which fails
+/// a read or replace that would succeed moments later.
+fn retry_while_held<T>(mut attempt: impl FnMut() -> std::io::Result<T>) -> std::io::Result<T> {
+    const ACCESS_DENIED: i32 = 5;
+    const SHARING_VIOLATION: i32 = 32;
+    const LOCK_VIOLATION: i32 = 33;
+    for wait in [25, 50, 100, 200, 400, 800] {
+        match attempt() {
+            Err(error)
+                if cfg!(windows)
+                    && matches!(
+                        error.raw_os_error(),
+                        Some(ACCESS_DENIED | SHARING_VIOLATION | LOCK_VIOLATION)
+                    ) =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(wait));
+            }
+            result => return result,
+        }
+    }
+    attempt()
 }
 
 #[cfg(test)]
@@ -577,6 +600,37 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+    #[cfg(windows)]
+    #[test]
+    fn a_briefly_held_file_is_still_saved_and_loaded() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let hold = |path: std::path::PathBuf| {
+            let held = std::fs::OpenOptions::new()
+                .read(true)
+                .share_mode(0)
+                .open(path)
+                .unwrap();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                drop(held);
+            })
+        };
+        let dir = scratch_dir("held");
+        Preferences::default().save_to(&dir).unwrap();
+        let saved = Preferences {
+            tool: Tool::Pen,
+            ..Preferences::default()
+        };
+        let released = hold(dir.join(FILE_NAME));
+        saved.save_to(&dir).unwrap();
+        released.join().unwrap();
+        let released = hold(dir.join(FILE_NAME));
+        let (loaded, warning) = load_from(&dir);
+        released.join().unwrap();
+        assert_eq!(loaded, saved);
+        assert!(warning.is_none());
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn missing_preferences_load_defaults_without_a_warning() {
