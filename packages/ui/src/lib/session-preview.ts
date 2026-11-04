@@ -3,7 +3,6 @@ import { defaults, type Session, type SessionBackend, type Transition } from './
 const COMPLETED_KEY = 'glassboard-tutorial-completed';
 /** Mirrors `Transition::leaves_capture` in session.rs. */
 const LEAVES_CAPTURE: readonly Transition[] = ['toggle', 'show', 'hide', 'cancel-capture', 'tutorial-start', 'replay-tutorial', 'settings'];
-/** Stands in for `i18n::negotiate`, since a browser preview has no OS language list to read. */
 const previewLocale = (language: string) => language === 'system' ? 'en' : language;
 
 /** The browser stand-in for the Rust session state machine, starting from defaults overridden by `initial`. */

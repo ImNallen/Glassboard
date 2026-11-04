@@ -1,6 +1,5 @@
 import { t, type Message } from './i18n.svelte';
 
-// Checked by `npm run check` and never imported: each line must keep failing to compile.
 export function mistakes(anyString: string) {
   // @ts-expect-error a mistyped key
   t('Smal');

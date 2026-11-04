@@ -87,7 +87,6 @@ impl Serialize for Surface {
     }
 }
 
-/// Gives every open window the current language's title. A stale title isn't worth failing a save.
 pub(crate) fn retitle(app: &tauri::AppHandle) {
     for (label, window) in app.webview_windows() {
         if let Some(surface) = Surface::parse(&label) {

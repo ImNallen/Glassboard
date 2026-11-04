@@ -265,7 +265,6 @@ impl Preferences {
     }
 
     pub(crate) fn save(&self, app: &tauri::AppHandle) -> Result<()> {
-        // These stay bare because the callers wrap them in `Could not save preferences`.
         let dir = app.path().app_config_dir().map_err(Text::untranslated)?;
         self.save_to(&dir).map_err(Text::untranslated)
     }

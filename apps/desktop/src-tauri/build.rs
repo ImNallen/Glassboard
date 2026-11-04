@@ -1,7 +1,5 @@
 use std::{env, fs, path::Path};
 
-/// Generates `KEYS` from `messages.json` and `CATALOGS` from the locales directory, so the
-/// directory stays the only list of languages.
 fn generate_catalogs() {
     let manifest = env::var("CARGO_MANIFEST_DIR").unwrap();
     let messages = Path::new(&manifest).join("../../../packages/ui/src/contract/messages.json");

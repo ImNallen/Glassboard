@@ -1,7 +1,6 @@
 <script lang="ts" generics="T">
   import { Check, ChevronDown } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
-  /** A dropdown list. A native select's popup could take focus, which closes the settings window. */
   let { options, selected, id, label, listLabel, dividerAfter, trigger: triggerContent, option: optionContent, onselect }: {
     options: readonly T[]; selected: T | undefined; id: string; label: string; listLabel: string; dividerAfter?: number;
     trigger: Snippet; option: Snippet<[T]>; onselect: (option: T) => void;

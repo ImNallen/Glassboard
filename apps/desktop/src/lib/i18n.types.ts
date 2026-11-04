@@ -5,7 +5,6 @@ declare const snippet: Snippet<[string]>;
 const kbdSentence = 'Undo with <kbd>{shortcut}</kbd>.';
 const twoTags = 'Another app is using <kbd>{shortcut}</kbd>. <button>Choose a different shortcut</button>';
 
-// Checked by `npm run check` and never imported: each marked line must keep failing to compile.
 export function richMistakes() {
   Rich(null as never, { message: kbdSentence, args: { shortcut: 'A' }, kbd: snippet });
   Rich(null as never, { message: twoTags, args: { shortcut: 'A' }, kbd: snippet, button: snippet });

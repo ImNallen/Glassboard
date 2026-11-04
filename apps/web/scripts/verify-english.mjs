@@ -2,7 +2,6 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-/** Every catalog names itself with this key, and nothing else in the app uses it. */
 const CATALOG_MARKER = '$language';
 
 export function filesWithCatalogs(directory) {

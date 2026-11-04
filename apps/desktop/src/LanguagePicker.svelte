@@ -2,7 +2,6 @@
   import { t } from '@glassboard/ui/i18n';
   import Listbox from './Listbox.svelte';
   import { LANGUAGES } from './lib/languages';
-  /** `language` is the saved request. A tag this build doesn't list, saved by a newer one, reads as the system default. */
   let { language, onselect }: { language: string; onselect: (language: string) => void } = $props();
   type Option = (typeof OPTIONS)[number];
   const SYSTEM = { tag: 'system', name: '' };

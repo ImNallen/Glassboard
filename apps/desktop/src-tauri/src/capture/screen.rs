@@ -179,7 +179,6 @@ mod x11 {
 #[cfg(target_os = "macos")]
 #[allow(deprecated)]
 mod macos {
-    /// CoreGraphics causes stay English, as the detail of one translated sentence.
     type Result<T> = std::result::Result<T, String>;
     use objc2_core_foundation::{
         CFArray, CFDictionary, CFNumber, CFNumberType, CFString, CGPoint, CGRect, CGSize,

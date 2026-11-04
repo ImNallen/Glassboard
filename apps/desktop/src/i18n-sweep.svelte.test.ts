@@ -25,7 +25,6 @@ vi.mock('@glassboard/ui/drawing', async original => ({ ...await original<typeof 
 
 useCatalogs({ pseudo: pseudoCatalog() });
 const VISIBLE_ATTRIBUTES = ['aria-label', 'title', 'placeholder', 'aria-valuetext'];
-/** What stays unwrapped on purpose: the brand, color codes, and the units and list words Intl supplies, which a pseudo language can't reach. */
 const ALLOWED = [/⟦[^⟧]*⟧/g, /Glassboard/g, /#[0-9a-f]{3,8}\b/gi, /\b\d+ (seconds?|MB|GB)\b/g, /\b(and|or)\b/g];
 
 function leaks(root: Element = document.body) {
@@ -71,7 +70,6 @@ beforeEach(() => {
 type Mode = 'mounted in pseudo' | 'mounted in English, then switched';
 type Initial = Partial<Omit<Session, 'preferences'>> & { preferences?: Partial<Preferences> };
 
-/** Starts a session, mounts a surface on it, and leaves it in the pseudo language either way. */
 async function open<Props extends Record<string, unknown>>(mode: Mode, surface: Component<Props>, props: (session: () => Session) => Omit<Props, 'session'>, initial: Initial = {}) {
   const language = mode === 'mounted in pseudo' ? 'pseudo' : 'system';
   useSession(createPreviewSession({ ...initial, preferences: { ...defaults.preferences, ...initial.preferences, language } }));
@@ -260,7 +258,6 @@ describe('a language switch with no new error event', () => {
     const firstTab = () => document.querySelector('#tab-general')?.textContent;
     expect(error()).toBe(english);
     expect(firstTab()).toBe('General');
-    // What Rust publishes after `activate`: the stored error re-rendered, with no `report`.
     emit({ ...start, locale: 'pseudo', error: translated });
     await settle();
     expect(error()).toBe(translated);

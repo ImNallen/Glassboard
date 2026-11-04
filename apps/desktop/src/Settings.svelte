@@ -79,7 +79,6 @@
   let updateFailure = $state('');
   $effect(() => {
     const stop = watchUpdates(next => {
-      // A language change republishes a failure already on screen. A real new failure passes through `checking` first, which clears the line.
       const requested = awaitingOutcome || untrack(() => updateStatus.state === 'installing' || Boolean(updateFailure));
       updateStatus = next;
       if (['idle', 'ready', 'failed'].includes(next.state)) awaitingOutcome = false;
@@ -100,7 +99,6 @@
   });
   $effect(() => () => clearTimeout(noticeTimer));
 
-  // Typing `eclat` should find `éclat`, and half-width input should match full-width text.
   const fold = (text: string) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase(locale());
   function matchesBinding(binding: { label: string; group: string; shortcut: string; fallback: string; description?: string }) {
     if (onlyCustomized && sameShortcut(binding.shortcut, binding.fallback, platformMac)) return false;

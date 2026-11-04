@@ -11,7 +11,6 @@ const locale = new URLSearchParams(location.search).get('locale');
 if (isTauri()) useSession(nativeSession, { native: true });
 else if (locale) useSession(createPreviewSession({ preferences: { ...defaultPreferences, language: locale } }));
 useCatalogs(CATALOGS);
-// App paints once from the defaults before the first session arrives, so a window opens in its language only if this runs first.
 if (locale) setLocale(locale);
 const start = () => mount(App, { target: document.getElementById('app')! });
 if (import.meta.env.DEV && locale === 'pseudo') import('./lib/pseudo').then(({ pseudoCatalog }) => { useCatalogs({ pseudo: pseudoCatalog() }); start(); });
