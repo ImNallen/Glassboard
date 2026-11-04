@@ -1,9 +1,18 @@
 import { mount } from 'svelte';
 import { isTauri } from '@tauri-apps/api/core';
-import { useSession } from '@glassboard/ui/session';
+import { createPreviewSession, defaultPreferences, useSession } from '@glassboard/ui/session';
+import { setLocale, useCatalogs } from '@glassboard/ui/i18n';
+import { CATALOGS } from './lib/languages';
 import { nativeSession } from './lib/native-session';
 import App from './App.svelte';
 import '@glassboard/ui/toolbar.css';
 import './style.css';
+const locale = new URLSearchParams(location.search).get('locale');
 if (isTauri()) useSession(nativeSession, { native: true });
-mount(App, { target: document.getElementById('app')! });
+else if (locale) useSession(createPreviewSession({ preferences: { ...defaultPreferences, language: locale } }));
+useCatalogs(CATALOGS);
+// App paints once from the defaults before the first session arrives, so a window opens in its language only if this runs first.
+if (locale) setLocale(locale);
+const start = () => mount(App, { target: document.getElementById('app')! });
+if (import.meta.env.DEV && locale === 'pseudo') import('./lib/pseudo').then(({ pseudoCatalog }) => { useCatalogs({ pseudo: pseudoCatalog() }); start(); });
+else start();

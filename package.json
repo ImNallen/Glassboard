@@ -16,7 +16,8 @@
     "version:bump": "node scripts/bump-version.mjs",
     "version:check": "node scripts/bump-version.mjs --check",
     "build": "npm run build --workspaces --if-present",
-    "ui": "npm --workspace packages/ui run --"
+    "ui": "npm --workspace packages/ui run --",
+    "i18n": "node scripts/i18n.mjs"
   },
   "engines": {
     "node": ">=22.12"

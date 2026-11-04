@@ -15,8 +15,12 @@ pub(crate) struct Language(String);
 pub(crate) struct ActiveLocale;
 impl Serialize for ActiveLocale {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
-        serializer.serialize_str(TAGS[active().load(Relaxed)])
+        serializer.serialize_str(active_tag())
     }
+}
+
+pub(crate) fn active_tag() -> &'static str {
+    TAGS[active().load(Relaxed)]
 }
 
 fn os_locales() -> Vec<String> {

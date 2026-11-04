@@ -367,7 +367,14 @@ fn window_builder<'a, M: Manager<Wry>>(
     WebviewWindowBuilder::new(
         manager,
         surface.label(),
-        WebviewUrl::App(format!("index.html?surface={}", surface.url()).into()),
+        WebviewUrl::App(
+            format!(
+                "index.html?surface={}&locale={}",
+                surface.url(),
+                crate::i18n::active_tag()
+            )
+            .into(),
+        ),
     )
     .title(title)
     // Drawing and controls should work on the click that activates their window.
