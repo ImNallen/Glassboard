@@ -1,4 +1,4 @@
-use crate::{windows::geometry::ToolbarPosition, Result};
+use crate::{i18n::Language, windows::geometry::ToolbarPosition, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, io::Write, path::Path, sync::LazyLock};
@@ -195,6 +195,7 @@ pub(crate) struct Preferences {
     pub(crate) toolbar_position: ToolbarPosition,
     pub(crate) auto_fade_seconds: AutoFadeSeconds,
     pub(crate) tutorial_completed: bool,
+    pub(crate) language: Language,
 }
 /// The webviews import the same file, so the defaults have one source.
 const DEFAULTS_JSON: &str =
@@ -418,7 +419,7 @@ mod tests {
     fn hex(color: &str) -> HexColor {
         HexColor(color.into())
     }
-    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
+    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true,"language":"de"}"##;
     fn shortcut(text: &str) -> GlobalShortcut {
         String::from(text).try_into().unwrap()
     }
@@ -758,6 +759,35 @@ mod tests {
         }
         let preferences = Preferences::parse(json!({"tool": "pen"})).unwrap();
         assert_eq!(preferences.size, StrokeSize("medium".into()));
+    }
+    #[test]
+    fn a_language_saved_by_a_newer_build_survives_and_a_damaged_one_resets_alone() {
+        let parsed = |saved: Value| Preferences::parse(saved).map(|p| p.language);
+        assert_eq!(
+            parsed(json!({"tool": "pen"})).unwrap(),
+            Preferences::default().language
+        );
+        assert_eq!(
+            serde_json::to_value(parsed(json!({"language": "ko"})).unwrap()).unwrap(),
+            "ko"
+        );
+        let dir = scratch_dir("language");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            json!({"version": 1, "tool": "pen", "language": 7}).to_string(),
+        )
+        .unwrap();
+        let (preferences, warning) = load_from(&dir);
+        assert!(warning.is_some());
+        assert_eq!(
+            preferences,
+            Preferences {
+                tool: Tool::Pen,
+                ..Preferences::default()
+            }
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn an_unknown_size_resets_only_the_size() {

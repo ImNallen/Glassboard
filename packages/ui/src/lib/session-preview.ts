@@ -3,10 +3,13 @@ import { defaults, type Session, type SessionBackend, type Transition } from './
 const COMPLETED_KEY = 'glassboard-tutorial-completed';
 /** Mirrors `Transition::leaves_capture` in session.rs. */
 const LEAVES_CAPTURE: readonly Transition[] = ['toggle', 'show', 'hide', 'cancel-capture', 'tutorial-start', 'replay-tutorial', 'settings'];
+/** Stands in for `i18n::negotiate`, since a browser preview has no OS language list to read. */
+const previewLocale = (language: string) => language === 'system' ? 'en' : language;
 
 /** The browser stand-in for the Rust session state machine, starting from defaults overridden by `initial`. */
 export function createPreviewSession(initial: Partial<Session> = {}): SessionBackend {
   const preview: Session = structuredClone({ ...defaults, ...initial });
+  preview.locale = previewLocale(preview.preferences.language);
   try { if (localStorage.getItem(COMPLETED_KEY) === 'true') preview.preferences.tutorialCompleted = true; }
   catch { /* Storage may be unavailable in a browser preview. */ }
   if (initial.tutorial === undefined && preview.preferences.tutorialCompleted) preview.tutorial = null;
@@ -75,7 +78,9 @@ export function createPreviewSession(initial: Partial<Session> = {}): SessionBac
     },
     async savePreferences(preferences) {
       // Copy nested values so a Svelte state proxy never reaches structuredClone.
-      preview.preferences = { ...preferences, keybindings: { ...preferences.keybindings }, swatches: [...preferences.swatches], rainbowColors: [...preferences.rainbowColors], cycleColors: [...preferences.cycleColors] }; publish();
+      preview.preferences = { ...preferences, keybindings: { ...preferences.keybindings }, swatches: [...preferences.swatches], rainbowColors: [...preferences.rainbowColors], cycleColors: [...preferences.cycleColors] };
+      preview.locale = previewLocale(preferences.language);
+      publish();
     },
     async reportHistory(availability, annotationSession, advanceCycle) {
       if (annotationSession !== preview.annotationSession) return;

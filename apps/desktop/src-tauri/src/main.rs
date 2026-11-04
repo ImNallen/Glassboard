@@ -5,6 +5,7 @@ mod autostart;
 mod capture;
 mod commands;
 mod error;
+mod i18n;
 #[cfg(target_os = "linux")]
 mod linux_startup;
 mod preference_saves;
@@ -177,6 +178,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     );
     let (preferences, warning) = Preferences::load(app.handle());
     problems.extend(warning);
+    i18n::activate(&preferences.language);
     app.manage(AppState(Mutex::new(Session::new(preferences))));
     app.manage(PreferenceSaves::start(app.handle().clone()));
     updates::start(app);

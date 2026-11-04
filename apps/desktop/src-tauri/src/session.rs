@@ -1,5 +1,6 @@
 use crate::{
     commands::GlobalCommand,
+    i18n::ActiveLocale,
     preferences::Preferences,
     windows::{geometry::Rect, Surface},
 };
@@ -60,6 +61,7 @@ pub(crate) struct Session {
     pub(crate) cycle_index: u32,
     pub(crate) history_by_overlay: HashMap<Surface, HistoryAvailability>,
     pub(crate) preferences: Preferences,
+    pub(crate) locale: ActiveLocale,
     pub(crate) error: Option<String>,
     /// Commands whose shortcut could not be registered, usually because another app holds it.
     pub(crate) unavailable_shortcuts: Vec<GlobalCommand>,
@@ -111,6 +113,7 @@ impl Session {
             cycle_index: 0,
             history_by_overlay: HashMap::new(),
             preferences,
+            locale: ActiveLocale,
             error: None,
             unavailable_shortcuts: Vec::new(),
             capture: None,

@@ -408,6 +408,9 @@ pub(crate) fn update_preferences(app: &tauri::AppHandle, preferences: Preference
             .unavailable_shortcuts
             .retain(|command| !changed.contains(command));
     }
+    if old.language != preferences.language {
+        crate::i18n::activate(&preferences.language);
+    }
     if !rebound {
         saves.queue(preferences)?;
     }

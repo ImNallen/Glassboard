@@ -218,7 +218,7 @@ def webview_windows():
 
 def seed_preferences(**overrides):
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    PREFERENCES.write_text(json.dumps({"version": 1, "tutorialCompleted": True, "tool": "pen", "colorMode": "solid", **overrides}))
+    PREFERENCES.write_text(json.dumps({"version": 1, "tutorialCompleted": True, "tool": "pen", "colorMode": "solid", "language": "en", **overrides}))
 
 
 def stop_glassboard():

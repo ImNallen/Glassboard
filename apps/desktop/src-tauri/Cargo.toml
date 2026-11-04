@@ -22,6 +22,7 @@ log = "0.4"
 xcap = "0.9.8"
 arboard = "3.6.1"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
+sys-locale = "0.3"
 
 # Screen capture includes full-display pixel conversion loops. Keep these fast
 # even in local debug bundles while Glassboard's own code stays debuggable.
