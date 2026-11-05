@@ -141,13 +141,13 @@ impl TryFrom<String> for GlobalShortcut {
     fn try_from(text: String) -> std::result::Result<Self, Self::Error> {
         let parsed = text
             .parse::<Shortcut>()
-            .map_err(|e| t!("Invalid shortcut: {detail}", detail = e).render())?;
+            .map_err(|e| t!("Invalid keybinding: {detail}", detail = e).render())?;
         if !parsed
             .mods
             .intersects(Modifiers::CONTROL | Modifiers::SUPER | Modifiers::ALT)
         {
             return Err(
-                t!("Include CommandOrControl, Control, Super, or Alt in the shortcut.").render(),
+                t!("Include CommandOrControl, Control, Super, or Alt in the keybinding.").render(),
             );
         }
         Ok(Self { text, parsed })
@@ -247,7 +247,7 @@ impl Preferences {
             == Some(preferences.shortcut.parsed())
         {
             return Err(serde::de::Error::custom(
-                t!("Toggling Glassboard and taking a screenshot need different shortcuts.")
+                t!("Toggling Glassboard and taking a screenshot need different keybindings.")
                     .render(),
             ));
         }
@@ -504,7 +504,7 @@ mod tests {
                 with("shortcut", text.as_str().into())
                     .unwrap_err()
                     .to_string(),
-                "Include CommandOrControl, Control, Super, or Alt in the shortcut.",
+                "Include CommandOrControl, Control, Super, or Alt in the keybinding.",
                 "{text}"
             );
         }
@@ -572,7 +572,7 @@ mod tests {
         let parse = |fields: Value| Preferences::parse(fields).map_err(|e| e.to_string());
         assert_eq!(
             parse(json!({"shortcut": "Alt+KeyG", "captureShortcut": "Alt+G"})).unwrap_err(),
-            "Toggling Glassboard and taking a screenshot need different shortcuts."
+            "Toggling Glassboard and taking a screenshot need different keybindings."
         );
         assert_eq!(
             parse(json!({"shortcut": "Alt+KeyG", "captureShortcut": ""}))
@@ -583,7 +583,7 @@ mod tests {
         );
         assert_eq!(
             parse(json!({"captureShortcut": "Shift+KeyS"})).unwrap_err(),
-            "Include CommandOrControl, Control, Super, or Alt in the shortcut."
+            "Include CommandOrControl, Control, Super, or Alt in the keybinding."
         );
     }
     #[test]

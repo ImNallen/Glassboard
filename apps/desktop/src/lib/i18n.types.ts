@@ -3,7 +3,7 @@ import Rich from '../Rich.svelte';
 
 declare const snippet: Snippet<[string]>;
 const kbdSentence = 'Undo with <kbd>{shortcut}</kbd>.';
-const twoTags = 'Another app is using <kbd>{shortcut}</kbd>. <button>Choose a different shortcut</button>';
+const twoTags = 'Another app is using <kbd>{shortcut}</kbd>. <button>Choose a different keybinding</button>';
 
 export function richMistakes() {
   Rich(null as never, { message: kbdSentence, args: { shortcut: 'A' }, kbd: snippet });

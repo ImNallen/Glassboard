@@ -34,7 +34,7 @@
     if (clearable && bare && (event.key === 'Backspace' || event.key === 'Delete')) { stop(); onchange(''); return; }
     if (MODIFIER_KEYS.has(event.key)) { pending = heldModifiers(event, platformMac); return; }
     const next = recordShortcut(event, platformMac, physical);
-    if (!next) { errors.report(t('That key can’t be used in a shortcut.')); return; }
+    if (!next) { errors.report(t('That key can’t be used in a keybinding.')); return; }
     stop();
     onchange(next);
   }
@@ -48,7 +48,7 @@
 
 <svelte:window onkeydowncapture={keydown} onkeyupcapture={keyup} onpointerdowncapture={pointerdown} onblur={stop}/>
 <button bind:this={button} class="recorder" class:recording {disabled}
-  aria-label={recording ? t('{label}: press a new shortcut', { label }) : t('{label}: {state}', { label, state: shortcut ? shortcutLabel(shortcut) : t('not set') })}
+  aria-label={recording ? t('{label}: press a new keybinding', { label }) : t('{label}: {state}', { label, state: shortcut ? shortcutLabel(shortcut) : t('not set') })}
   title={recording ? undefined : t('Click to change')}
   onclick={() => recording ? stop() : start()}>
   {@render children()}

@@ -138,7 +138,7 @@
   function setGlobal(command: GlobalCommand, next: string) {
     const result = rebindGlobal(preferences, command, next);
     if (typeof result === 'string') errors.report(t(ALREADY_USED[result], { shortcut: shortcutLabel(next) }));
-    else if (result) update({ shortcut: result.shortcut, captureShortcut: result.captureShortcut, keybindings: result.keybindings }, result.moved.length ? t('Unbound {commands} to make room.', { commands: list(result.moved.map(name => t(name))) }) : next ? t('Shortcut saved.') : '');
+    else if (result) update({ shortcut: result.shortcut, captureShortcut: result.captureShortcut, keybindings: result.keybindings }, result.moved.length ? t('Unbound {commands} to make room.', { commands: list(result.moved.map(name => t(name))) }) : next ? t('Keybinding saved.') : '');
   }
   function setBinding(id: string, next: string) {
     const result = rebindCommand(preferences, id, next);
@@ -272,7 +272,7 @@
         <div class="shortcut-filters">
           <label class="shortcut-search">
             <Search size={14} aria-hidden="true"/>
-            <input type="search" aria-label={t('Search keybindings')} placeholder={t('Search shortcuts')} bind:value={shortcutSearch}/>
+            <input type="search" aria-label={t('Search keybindings')} placeholder={t('Search keybindings')} bind:value={shortcutSearch}/>
           </label>
           <div class="customized-filter">
             <span id="customized-label">{t('Customized only')}</span>
@@ -295,8 +295,8 @@
             </div>
             {/each}
           </div>
-          {#if session.unavailableShortcuts.includes('toggle')}<p class="note unavailable" role="alert">{t('Another app is using {shortcut}, so it can’t turn on drawing. Record a different shortcut.', { shortcut: shortcutLabel(preferences.shortcut) })}</p>{/if}
-          {#if session.unavailableShortcuts.includes('capture')}<p class="note unavailable" role="alert">{t('Another app is using {shortcut}, so it can’t take screenshots. Record a different shortcut.', { shortcut: shortcutLabel(preferences.captureShortcut) })}</p>{/if}
+          {#if session.unavailableShortcuts.includes('toggle')}<p class="note unavailable" role="alert">{t('Another app is using {shortcut}, so it can’t turn on drawing. Record a different keybinding.', { shortcut: shortcutLabel(preferences.shortcut) })}</p>{/if}
+          {#if session.unavailableShortcuts.includes('capture')}<p class="note unavailable" role="alert">{t('Another app is using {shortcut}, so it can’t take screenshots. Record a different keybinding.', { shortcut: shortcutLabel(preferences.captureShortcut) })}</p>{/if}
         </section>
         {/if}
 
@@ -320,8 +320,8 @@
         {/each}
         {#if !visibleGlobals.length && !visibleGroups.length}
           <div class="empty-shortcuts" role="status">
-            <p>{shortcutSearch.trim() ? t('No shortcuts match your search.') : t('No customized shortcuts.')}</p>
-            <button class="button" onclick={clearFilters}>{t('Show all shortcuts')}</button>
+            <p>{shortcutSearch.trim() ? t('No keybindings match your search.') : t('No customized keybindings.')}</p>
+            <button class="button" onclick={clearFilters}>{t('Show all keybindings')}</button>
           </div>
         {/if}
       {/if}
@@ -368,7 +368,6 @@
   .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--gb-text) 6%, transparent); }
   .tabs { margin: 14px 14px 0; }
   .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 26px; padding-block: 3px; line-height: 1.2; overflow-wrap: break-word; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
-  .tabs button:last-child { flex-grow: 1.8; }
   .tabs button :global(svg) { flex-shrink: 0; }
   .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--gb-strong-text); }
   @media (prefers-reduced-motion: no-preference) { .tabs button:active, .segmented button:active:not(:disabled) { transform: scale(0.97); } }

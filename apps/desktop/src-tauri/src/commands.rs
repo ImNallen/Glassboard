@@ -112,7 +112,7 @@ pub(crate) fn suspend_global_shortcuts(app: tauri::AppHandle, suspended: bool) -
                 .collect();
             shortcuts
                 .unregister_multiple(bound)
-                .map_err(|e| t!("Could not release the shortcuts: {detail}", detail = e))
+                .map_err(|e| t!("Could not release the keybindings: {detail}", detail = e))
         }
         ShortcutBinding::Bound => {
             let unavailable = register_global_shortcuts(&app);

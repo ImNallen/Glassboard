@@ -62,7 +62,7 @@
     </footer>
     {#if session.unavailableShortcuts.includes('toggle')}
       <p class="error" role="alert">
-        <Rich message={'Another app is using <kbd>{shortcut}</kbd>. <button>Choose a different shortcut</button>'} args={{ shortcut }} {kbd}>
+        <Rich message={'Another app is using <kbd>{shortcut}</kbd>. <button>Choose a different keybinding</button>'} args={{ shortcut }} {kbd}>
           {#snippet button(label: string)}<button class="link" disabled={busy} onclick={() => run('settings')}>{label}</button>{/snippet}
         </Rich>
       </p>
