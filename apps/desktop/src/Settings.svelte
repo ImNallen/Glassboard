@@ -22,7 +22,7 @@
   const TABS: readonly { id: Tab; label: Message; icon: typeof Keyboard }[] = [
     { id: 'general', label: 'General', icon: SlidersHorizontal },
     { id: 'colors', label: 'Colors', icon: Palette },
-    { id: 'keybindings', label: 'Keyboard shortcuts', icon: Keyboard },
+    { id: 'keybindings', label: 'Keybindings', icon: Keyboard },
   ];
   const POSITIONS: readonly { id: ToolbarPosition; label: Message }[] = [{ id: 'left', label: 'Left' }, { id: 'bottom', label: 'Bottom' }, { id: 'right', label: 'Right' }];
   const ICONS: Record<string, typeof Keyboard> = { undo: Undo2, redo: Redo2, hide: EyeOff, 'size-smaller': Minus, 'size-larger': Plus, capture: Scan, copy: Copy, ...Object.fromEntries(TOOL_SHORTCUTS.map(tool => [tool.command, TOOL_ICONS[tool.id]])) };
@@ -266,13 +266,13 @@
       {:else}
         <div class="intro">
           <p>{t('Click a row, then press new keys.')}</p>
-          <button class="text-button reset-all" disabled={busy || !customized} onclick={() => update({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: {} }, t('All keyboard shortcuts reset.'))}>{t('Reset all')}<RotateCcw size={12}/></button>
+          <button class="text-button reset-all" disabled={busy || !customized} onclick={() => update({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: {} }, t('All keybindings reset.'))}>{t('Reset all')}<RotateCcw size={12}/></button>
         </div>
 
         <div class="shortcut-filters">
           <label class="shortcut-search">
             <Search size={14} aria-hidden="true"/>
-            <input type="search" aria-label={t('Search keyboard shortcuts')} placeholder={t('Search shortcuts')} bind:value={shortcutSearch}/>
+            <input type="search" aria-label={t('Search keybindings')} placeholder={t('Search shortcuts')} bind:value={shortcutSearch}/>
           </label>
           <div class="customized-filter">
             <span id="customized-label">{t('Customized only')}</span>

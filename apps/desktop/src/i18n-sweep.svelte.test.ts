@@ -145,7 +145,7 @@ describe.each<Mode>(['mounted in pseudo', 'mounted in English, then switched'])(
     expect(document.querySelector('.hex-error')).not.toBeNull();
     expectNoLeaks();
   });
-  it('Settings, Keyboard shortcuts tab, with unavailable shortcuts, a recording row, and empty results', async () => {
+  it('Settings, Keybindings tab, with unavailable shortcuts, a recording row, and empty results', async () => {
     await openSettings(mode, { unavailableShortcuts: ['toggle', 'capture'] });
     await tab('keybindings');
     expect(document.querySelectorAll('.unavailable')).toHaveLength(2);

@@ -43,7 +43,7 @@ function press(key: string, code: string, init: KeyboardEventInit = {}) {
 it('searches shortcut names, groups, descriptions, and assigned keys, and recovers from no results', async () => {
   await savePreferences(structuredClone(defaults.preferences));
   await setup();
-  const search = document.querySelector<HTMLInputElement>('input[aria-label="Search keyboard shortcuts"]')!;
+  const search = document.querySelector<HTMLInputElement>('input[aria-label="Search keybindings"]')!;
   const filter = (value: string) => { search.value = value; search.dispatchEvent(new Event('input', { bubbles: true })); flushSync(); };
   filter('  PEN  ');
   expect(row('Pen')).not.toBeNull();

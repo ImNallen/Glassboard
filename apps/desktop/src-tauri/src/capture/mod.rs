@@ -38,7 +38,7 @@ fn check_permission() -> Result<()> {
     if unsafe { CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess() } {
         Ok(())
     } else {
-        Err(t!("Allow Glassboard in System Settings → Privacy & Security → Screen Recording, then try capturing again. macOS may require restarting Glassboard."))
+        Err(t!("Allow Glassboard in System Settings → Privacy & Security → Screen & System Audio Recording, then try capturing again. macOS may require restarting Glassboard."))
     }
 }
 #[cfg(not(target_os = "macos"))]
