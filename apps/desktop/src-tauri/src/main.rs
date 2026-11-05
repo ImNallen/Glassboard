@@ -4,7 +4,7 @@
 mod autostart;
 mod capture;
 mod commands;
-mod error;
+mod i18n;
 #[cfg(target_os = "linux")]
 mod linux_startup;
 mod preference_saves;
@@ -36,12 +36,12 @@ use windows::{
     Surface,
 };
 
-use error::Result;
+use i18n::{Result, Text};
 
 fn main() {
     #[cfg(target_os = "linux")]
     if let Err(error) = linux_startup::prepare() {
-        startup_error::exit(&error.to_string());
+        startup_error::exit(&error.text());
     }
 
     // Release builds have no console, so record panics in the log before the
@@ -138,12 +138,12 @@ fn main() {
         .setup(|app| {
             if let Err(error) = setup(app) {
                 // Tauri panics on a setup error, which closes the app silently.
-                startup_error::exit(&error.to_string());
+                startup_error::exit(&error);
             }
             Ok(())
         })
         .build(tauri::generate_context!());
-    let app = app.unwrap_or_else(|error| startup_error::exit(&error.to_string()));
+    let app = app.unwrap_or_else(|error| startup_error::exit(&error.into()));
     app.run(|app, event| {
         if matches!(
             event,
@@ -160,7 +160,7 @@ fn main() {
     });
 }
 
-fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Error>> {
+fn setup(app: &mut tauri::App) -> Result<()> {
     log::info!(
         "Starting Glassboard {} on {} {}",
         app.package_info().version,
@@ -170,13 +170,10 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
     // Problems found while starting are shown together once the windows exist.
     let mut problems = Vec::new();
     #[cfg(target_os = "macos")]
-    problems.extend(
-        commands::repair_login_item(app.handle())
-            .err()
-            .map(|e| e.to_string()),
-    );
+    problems.extend(commands::repair_login_item(app.handle()).err());
     let (preferences, warning) = Preferences::load(app.handle());
     problems.extend(warning);
+    i18n::activate(&preferences.language);
     app.manage(AppState(Mutex::new(Session::new(preferences))));
     app.manage(PreferenceSaves::start(app.handle().clone()));
     updates::start(app);
@@ -217,11 +214,11 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         .unavailable_shortcuts = unavailable;
     select_cursor_monitor(handle);
     // The app still works with a misplaced window, so these are not fatal.
-    problems.extend(position_toolbar(handle).err().map(|e| e.to_string()));
-    problems.extend(apply_windows(handle).err().map(|e| e.to_string()));
+    problems.extend(position_toolbar(handle).err());
+    problems.extend(apply_windows(handle).err());
     if snapshot(handle).tutorial.is_some() {
         if let Some(tutorial) = Surface::Tutorial.window(app) {
-            problems.extend(tutorial.set_focus().err().map(|e| e.to_string()));
+            problems.extend(tutorial.set_focus().err().map(Text::from));
         }
     }
     let session = snapshot(handle);
@@ -235,7 +232,7 @@ fn setup(app: &mut tauri::App) -> std::result::Result<(), Box<dyn std::error::Er
         }
     }
     if !problems.is_empty() {
-        report(handle, problems.join(" "));
+        report(handle, Text::joined(problems));
     }
     watch_toolbar_proximity(handle.clone());
     mark_setup_complete();

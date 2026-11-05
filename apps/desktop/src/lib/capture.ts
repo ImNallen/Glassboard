@@ -1,13 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CaptureBackend } from '@glassboard/ui/capture';
+import { t } from '@glassboard/ui/i18n';
 
 /** Read a native binary frame without PNG decompression or reducing pixel density. */
 export function decodeCaptureFrame(frame: ArrayBuffer): ImageData {
-  if (frame.byteLength < 8) throw new Error('The screenshot frame is incomplete.');
+  if (frame.byteLength < 8) throw new Error(t('The screenshot frame is incomplete.'));
   const header = new DataView(frame);
   const width = header.getUint32(0, true), height = header.getUint32(4, true);
   if (!width || !height || width * height * 4 !== frame.byteLength - 8) {
-    throw new Error('The screenshot frame has invalid dimensions.');
+    throw new Error(t('The screenshot frame has invalid dimensions.'));
   }
   return new ImageData(new Uint8ClampedArray(frame, 8), width, height);
 }

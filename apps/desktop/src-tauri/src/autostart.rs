@@ -1,3 +1,4 @@
+use crate::i18n::t;
 use objc2::runtime::AnyClass;
 use objc2_foundation::{NSString, NSURL};
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
@@ -30,9 +31,11 @@ impl LoginItem {
             return remove(&self.agent);
         }
         if is_transient(&self.executable) {
-            return Err(
-                "Move Glassboard to the Applications folder and open it from there first".into(),
-            );
+            return Err(t!(
+                "Move Glassboard to the Applications folder and open it from there first"
+            )
+            .render()
+            .into());
         }
         let directory = self
             .agent

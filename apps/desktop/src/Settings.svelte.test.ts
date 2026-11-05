@@ -43,7 +43,7 @@ function press(key: string, code: string, init: KeyboardEventInit = {}) {
 it('searches shortcut names, groups, descriptions, and assigned keys, and recovers from no results', async () => {
   await savePreferences(structuredClone(defaults.preferences));
   await setup();
-  const search = document.querySelector<HTMLInputElement>('input[aria-label="Search keyboard shortcuts"]')!;
+  const search = document.querySelector<HTMLInputElement>('input[aria-label="Search keybindings"]')!;
   const filter = (value: string) => { search.value = value; search.dispatchEvent(new Event('input', { bubbles: true })); flushSync(); };
   filter('  PEN  ');
   expect(row('Pen')).not.toBeNull();
@@ -60,7 +60,7 @@ it('searches shortcut names, groups, descriptions, and assigned keys, and recove
   expect(row('Redo')).toBeNull();
   filter('no matching command');
   expect(document.querySelectorAll('.group')).toHaveLength(0);
-  expect(document.querySelector('[role="status"]')?.textContent).toContain('No shortcuts match your search.');
+  expect(document.querySelector('[role="status"]')?.textContent).toContain('No keybindings match your search.');
   document.querySelector<HTMLButtonElement>('.empty-shortcuts button')!.click();
   flushSync();
   expect(search.value).toBe('');
@@ -88,7 +88,7 @@ it('filters customized local and global shortcuts, including cleared bindings, a
   expect(row('Pen')).toBeNull();
   document.querySelector<HTMLButtonElement>('.reset-all')!.click();
   await tick();
-  expect(document.querySelector('[role="status"]')?.textContent).toContain('No customized shortcuts.');
+  expect(document.querySelector('[role="status"]')?.textContent).toContain('No customized keybindings.');
   expect(document.querySelector<HTMLButtonElement>('.reset-all')!.disabled).toBe(true);
   document.querySelector<HTMLButtonElement>('.empty-shortcuts button')!.click();
   flushSync();
@@ -101,11 +101,11 @@ it('records a new binding after clicking anywhere on the row, even when the row 
   row('Pen').click();
   row('Pen').blur();
   flushSync();
-  expect(row('Pen').getAttribute('aria-label')).toBe('Pen: press a new shortcut');
+  expect(row('Pen').getAttribute('aria-label')).toBe('Pen: press a new keybinding');
   press('p', 'KeyP', { ctrlKey: true });
   await tick();
   expect(session().preferences.keybindings).toEqual({ 'tool-pen': 'CommandOrControl+KeyP' });
-  expect(row('Pen').getAttribute('aria-label')).not.toContain('press a new shortcut');
+  expect(row('Pen').getAttribute('aria-label')).not.toContain('press a new keybinding');
 });
 
 it('moves a taken shortcut, and stops recording on Escape or an outside click', async () => {
@@ -388,12 +388,12 @@ it('opens on keybindings and explains each global shortcut another app holds', a
   await tick();
   const notes = () => [...document.querySelectorAll('.note.unavailable')].map(note => note.textContent);
   expect(document.querySelector('#tab-keybindings')?.getAttribute('aria-selected')).toBe('true');
-  expect(notes()).toEqual(['Another app is using Win+Ctrl+Shift+S, so it can’t take screenshots. Record a different shortcut.']);
+  expect(notes()).toEqual(['Another app is using Win+Ctrl+Shift+S, so it can’t take screenshots. Record a different keybinding.']);
   session.unavailableShortcuts = ['toggle', 'capture'];
   flushSync();
   expect(notes()).toEqual([
-    'Another app is using Ctrl+Shift+A, so it can’t turn on drawing. Record a different shortcut.',
-    'Another app is using Win+Ctrl+Shift+S, so it can’t take screenshots. Record a different shortcut.',
+    'Another app is using Ctrl+Shift+A, so it can’t turn on drawing. Record a different keybinding.',
+    'Another app is using Win+Ctrl+Shift+S, so it can’t take screenshots. Record a different keybinding.',
   ]);
   session.unavailableShortcuts = [];
   flushSync();

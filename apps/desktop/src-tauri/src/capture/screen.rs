@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::{i18n::t, Result};
 
 pub(crate) fn capture(
     app: &tauri::AppHandle,
@@ -10,6 +10,7 @@ pub(crate) fn capture(
     {
         let _ = (app, point);
         macos::capture(position, size)
+            .map_err(|detail| t!("Could not capture the screen: {detail}", detail = detail))
     }
     #[cfg(target_os = "linux")]
     {
@@ -33,7 +34,7 @@ pub(crate) fn capture(
         }
         xcap::Monitor::from_point(point.0, point.1)
             .and_then(|monitor| monitor.capture_image())
-            .map_err(|e| format!("Could not capture the screen: {e}").into())
+            .map_err(|e| t!("Could not capture the screen: {detail}", detail = e))
     }
 }
 
@@ -68,7 +69,7 @@ mod x11 {
         let index = resolve_monitor(physical, geometry.into_iter())?;
         monitors[index]
             .capture_image()
-            .map_err(|error| format!("Could not capture the screen: {error}").into())
+            .map_err(|error| t!("Could not capture the screen: {detail}", detail = error))
     }
 
     fn resolve_monitor(
@@ -94,11 +95,11 @@ mod x11 {
             });
         let index = matching
             .next()
-            .ok_or("The capture display is unavailable")?;
+            .ok_or_else(|| t!("The capture display is unavailable"))?;
         if matching.next().is_some() {
-            return Err(
-                "The capture display is ambiguous. Try capturing on another display.".into(),
-            );
+            return Err(t!(
+                "The capture display is ambiguous. Try capturing on another display."
+            ));
         }
         Ok(index)
     }
@@ -178,7 +179,7 @@ mod x11 {
 #[cfg(target_os = "macos")]
 #[allow(deprecated)]
 mod macos {
-    use super::*;
+    type Result<T> = std::result::Result<T, String>;
     use objc2_core_foundation::{
         CFArray, CFDictionary, CFNumber, CFNumberType, CFString, CGPoint, CGRect, CGSize,
     };
@@ -220,7 +221,7 @@ mod macos {
         if !read {
             return Err("Could not read a capture window ID".into());
         }
-        Ok(u32::try_from(number)?)
+        u32::try_from(number).map_err(|error| error.to_string())
     }
 
     pub(super) fn capture(position: (i32, i32), size: (u32, u32)) -> Result<image::RgbaImage> {
@@ -253,7 +254,7 @@ mod macos {
         let image = unsafe {
             CGWindowListCreateImageFromArray(bounds, &window_array, CGWindowImageOption::Default)
         }
-        .ok_or("Could not capture the screen")?;
+        .ok_or("CoreGraphics returned no image")?;
         let width = CGImage::width(Some(&image));
         let height = CGImage::height(Some(&image));
         if CGImage::bits_per_pixel(Some(&image)) != 32
@@ -310,7 +311,7 @@ mod macos {
             vImagePermuteChannels_ARGB8888(&source, &destination, [2, 1, 0, 3].as_ptr(), 0)
         };
         if status != 0 {
-            return Err(format!("Could not convert screenshot pixels: {status}").into());
+            return Err(format!("Could not convert screenshot pixels: {status}"));
         }
         image::RgbaImage::from_raw(width as u32, height as u32, pixels)
             .ok_or("Could not prepare the screenshot pixels".into())

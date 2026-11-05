@@ -1,5 +1,6 @@
 use super::Surface;
-use crate::state::report;
+use crate::{i18n::t, state::report};
+use std::error::Error;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
 #[cfg(target_os = "windows")]
@@ -16,7 +17,7 @@ pub(super) fn raise_controls(app: &tauri::AppHandle) {
             let Some(window) = surface.window(&handle) else {
                 continue;
             };
-            let result = (|| -> crate::Result<()> {
+            let result = (|| -> Result<(), Box<dyn Error>> {
                 if !window.is_visible()? {
                     return Ok(());
                 }
@@ -25,20 +26,27 @@ pub(super) fn raise_controls(app: &tauri::AppHandle) {
             if let Err(error) = result {
                 report(
                     &handle,
-                    format!("Could not raise {}: {error}", surface.label()),
+                    t!(
+                        "Could not raise {window}: {detail}",
+                        window = surface.label(),
+                        detail = error
+                    ),
                 );
             }
         }
     }) {
         report(
             app,
-            format!("Could not restore control window order: {error}"),
+            t!(
+                "Could not restore control window order: {detail}",
+                detail = error
+            ),
         );
     }
 }
 
 #[cfg(target_os = "linux")]
-fn raise_window(window: &tauri::WebviewWindow) -> crate::Result<()> {
+fn raise_window(window: &tauri::WebviewWindow) -> Result<(), Box<dyn Error>> {
     use gtk::prelude::*;
     use tauri::Manager;
     let app = window.app_handle();
@@ -78,7 +86,7 @@ fn raise_window(window: &tauri::WebviewWindow) -> crate::Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn raise_window(window: &tauri::WebviewWindow) -> crate::Result<()> {
+fn raise_window(window: &tauri::WebviewWindow) -> Result<(), Box<dyn Error>> {
     let hwnd = window.hwnd()?;
     // SAFETY: Tauri owns this live HWND and this runs on its window thread.
     Ok(unsafe { raise_without_activation(hwnd.0) }?)

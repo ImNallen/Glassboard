@@ -1,5 +1,6 @@
 use super::geometry::{beside_icon, Rect, SETTINGS_SIZE};
 use crate::{
+    i18n::t,
     tray::{TrayAnchor, TRAY_ID},
     Result,
 };
@@ -33,7 +34,7 @@ pub(crate) fn position_settings(
                 .find(|monitor| Rect::monitor(monitor).contains(x, y, 0.0))
         })
         .or(app.primary_monitor()?)
-        .ok_or("No display is available for settings")?;
+        .ok_or_else(|| t!("No display is available for settings"))?;
     let scale = monitor.scale_factor();
     let work = Rect::work_area(&monitor);
     let icon = icon.unwrap_or(Rect {

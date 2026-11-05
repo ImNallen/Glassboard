@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { CircleArrowUp, Copy, EyeOff, Keyboard, LoaderCircle, Minus, Palette, Plus, Power, Redo2, RefreshCw, RotateCcw, Scan, Search, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
+  import { CircleArrowUp, Copy, EyeOff, Keyboard, Languages, LoaderCircle, Minus, Palette, Plus, Power, Redo2, RefreshCw, RotateCcw, Scan, Search, SlidersHorizontal, Undo2, X } from '@lucide/svelte';
   import { untrack } from 'svelte';
   import GitHubIcon from '@glassboard/ui/GitHubIcon.svelte';
   import Logo from '@glassboard/ui/Logo.svelte';
+  import { list, locale, number, t, type Message } from '@glassboard/ui/i18n';
   import { action, native, savePreferences, type Preferences, type Session, type ToolbarPosition, type Action } from '@glassboard/ui/session';
   import { COLOR_SHORTCUTS, DEFAULT_CAPTURE_SHORTCUT, DEFAULT_SHORTCUT, type GlobalCommand, KEYBINDING_GROUPS, KEYBINDINGS, keybinding, platformMac, rebindCommand, rebindGlobal, sameShortcut, shortcutLabel, TOOL_SHORTCUTS } from '@glassboard/ui/shortcuts';
   import { AUTO_FADE_OPTIONS } from '@glassboard/ui/drawing';
@@ -10,6 +11,7 @@
   import { TOOL_ICONS } from '@glassboard/ui/tool-icons';
   import type { Errors } from '@glassboard/ui/errors';
   import ColorSettings from './ColorSettings.svelte';
+  import LanguagePicker from './LanguagePicker.svelte';
   import ShortcutRecorder from './ShortcutRecorder.svelte';
   import { getAutostart, setAutostart } from './lib/autostart';
   import { suspendGlobalShortcuts } from './lib/global-shortcuts';
@@ -17,18 +19,20 @@
   import { checkForUpdates, installUpdate, updateDetail, updateLabel, watchUpdates, type UpdateStatus } from './lib/updates';
   let { session, errors }: { session: Session; errors: Errors } = $props();
   type Tab = 'general' | 'colors' | 'keybindings';
-  const TABS: readonly { id: Tab; label: string; icon: typeof Keyboard }[] = [
+  const TABS: readonly { id: Tab; label: Message; icon: typeof Keyboard }[] = [
     { id: 'general', label: 'General', icon: SlidersHorizontal },
     { id: 'colors', label: 'Colors', icon: Palette },
-    { id: 'keybindings', label: 'Keyboard shortcuts', icon: Keyboard },
+    { id: 'keybindings', label: 'Keybindings', icon: Keyboard },
   ];
-  const POSITIONS: readonly { id: ToolbarPosition; label: string }[] = [{ id: 'left', label: 'Left' }, { id: 'bottom', label: 'Bottom' }, { id: 'right', label: 'Right' }];
+  const POSITIONS: readonly { id: ToolbarPosition; label: Message }[] = [{ id: 'left', label: 'Left' }, { id: 'bottom', label: 'Bottom' }, { id: 'right', label: 'Right' }];
   const ICONS: Record<string, typeof Keyboard> = { undo: Undo2, redo: Redo2, hide: EyeOff, 'size-smaller': Minus, 'size-larger': Plus, capture: Scan, copy: Copy, ...Object.fromEntries(TOOL_SHORTCUTS.map(tool => [tool.command, TOOL_ICONS[tool.id]])) };
   const REPOSITORY_URL = 'https://github.com/ImNallen/Glassboard';
-  const GLOBAL_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels.`;
-  const CAPTURE_HINT = `Include ${platformMac ? '⌘, ⌃, or ⌥' : 'Ctrl, Win, or Alt'}. Esc cancels, ${platformMac ? '⌫' : 'Backspace'} clears.`;
-  const GLOBAL_PURPOSES: Record<GlobalCommand, string> = { toggle: 'toggle Glassboard', capture: 'take a screenshot' };
-  const LOCAL_HINT = `Press a key or combination. Esc cancels, ${platformMac ? '⌫' : 'Backspace'} clears.`;
+  const modifierChoices = () => list(platformMac ? ['⌘', '⌃', '⌥'] : [t('Ctrl'), t('Win'), t('Alt')], 'disjunction');
+  const clearKey = () => platformMac ? '⌫' : t('Backspace');
+  const globalHint = () => t('Include {keys}. Esc cancels.', { keys: modifierChoices() });
+  const captureHint = () => t('Include {keys}. Esc cancels, {clear} clears.', { keys: modifierChoices(), clear: clearKey() });
+  const localHint = () => t('Press a key or combination. Esc cancels, {clear} clears.', { clear: clearKey() });
+  const ALREADY_USED = { toggle: '{shortcut} is already used to toggle Glassboard.', capture: '{shortcut} is already used to take a screenshot.' } as const;
   let tab = $state<Tab>('general');
   let panel = $state<HTMLDivElement>();
   let shortcutSearch = $state('');
@@ -39,19 +43,19 @@
   let noticeTimer: ReturnType<typeof setTimeout>;
   let windowVisible = $derived(session.settingsOpen || !native);
   let preferences = $derived(session.preferences);
-  const GLOBAL_BINDINGS: readonly { command: GlobalCommand; label: string; fallback: string }[] = [
+  const GLOBAL_BINDINGS: readonly { command: GlobalCommand; label: Message; fallback: string }[] = [
     { command: 'toggle', label: 'Toggle Glassboard', fallback: DEFAULT_SHORTCUT },
     { command: 'capture', label: 'Take screenshot', fallback: DEFAULT_CAPTURE_SHORTCUT },
   ];
-  let globalBindings = $derived(GLOBAL_BINDINGS.map(binding => ({ ...binding,
+  let globalBindings = $derived(GLOBAL_BINDINGS.map(binding => ({ ...binding, label: t(binding.label),
     shortcut: binding.command === 'toggle' ? preferences.shortcut : preferences.captureShortcut,
   })));
   let customized = $derived(globalBindings.some(binding => !sameShortcut(binding.shortcut, binding.fallback, platformMac))
     || KEYBINDINGS.some(binding => !sameShortcut(keybinding(preferences.keybindings, binding.id), binding.shortcut, platformMac)));
-  let visibleGlobals = $derived(globalBindings.filter(binding => matchesBinding({ ...binding, group: 'Global' })));
+  let visibleGlobals = $derived(globalBindings.filter(binding => matchesBinding({ ...binding, group: t('Global') })));
   let visibleGroups = $derived(KEYBINDING_GROUPS.map(group => ({ name: group, bindings: KEYBINDINGS
     .filter(binding => binding.group === group)
-    .map(binding => ({ ...binding, label: swatches[binding.id]?.name ?? binding.name, fallback: binding.shortcut, shortcut: keybinding(preferences.keybindings, binding.id) }))
+    .map(binding => ({ ...binding, group: t(group), label: swatches[binding.id]?.name ?? t(binding.name), description: binding.description && t(binding.description), fallback: binding.shortcut, shortcut: keybinding(preferences.keybindings, binding.id) }))
     .filter(matchesBinding),
   })).filter(group => group.bindings.length));
   let fade = $derived(preferences.autoFadeSeconds);
@@ -75,7 +79,7 @@
   let updateFailure = $state('');
   $effect(() => {
     const stop = watchUpdates(next => {
-      const requested = awaitingOutcome || untrack(() => updateStatus.state) === 'installing';
+      const requested = awaitingOutcome || untrack(() => updateStatus.state === 'installing' || Boolean(updateFailure));
       updateStatus = next;
       if (['idle', 'ready', 'failed'].includes(next.state)) awaitingOutcome = false;
       updateFailure = next.state === 'failed' && requested ? next.message : '';
@@ -85,7 +89,7 @@
   // Color rows in Keybindings show each swatch's current color and name.
   let swatches = $derived(Object.fromEntries(COLOR_SHORTCUTS.map(choice => [choice.command,
     choice.slot !== undefined ? { background: swatchColor(preferences.swatches, choice.slot), name: swatchName(preferences.swatches, choice.slot) }
-      : { background: choice.colorMode === 'rainbow' ? rainbowPreview(preferences.rainbowColors) : shiftingPreview(preferences.cycleColors), name: choice.name }])));
+      : { background: choice.colorMode === 'rainbow' ? rainbowPreview(preferences.rainbowColors) : shiftingPreview(preferences.cycleColors), name: t(choice.name) }])));
   const run = (name: Action) => action(name).catch(errors.report);
   $effect(() => {
     if (!windowVisible) return;
@@ -95,10 +99,11 @@
   });
   $effect(() => () => clearTimeout(noticeTimer));
 
+  const fold = (text: string) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase(locale());
   function matchesBinding(binding: { label: string; group: string; shortcut: string; fallback: string; description?: string }) {
     if (onlyCustomized && sameShortcut(binding.shortcut, binding.fallback, platformMac)) return false;
-    const terms = shortcutSearch.trim().toLowerCase().split(/\s+/);
-    const text = `${binding.label} ${binding.group} ${binding.description ?? ''} ${binding.shortcut ? shortcutLabel(binding.shortcut) : 'not set'}`.toLowerCase();
+    const terms = fold(shortcutSearch).trim().split(/\s+/);
+    const text = fold(`${binding.label} ${binding.group} ${binding.description ?? ''} ${binding.shortcut ? shortcutLabel(binding.shortcut) : t('not set')}`);
     return terms.every(term => text.includes(term));
   }
   function clearFilters() { shortcutSearch = ''; onlyCustomized = false; }
@@ -132,13 +137,13 @@
   }
   function setGlobal(command: GlobalCommand, next: string) {
     const result = rebindGlobal(preferences, command, next);
-    if (typeof result === 'string') errors.report(`${shortcutLabel(next)} is already used to ${GLOBAL_PURPOSES[result]}.`);
-    else if (result) update({ shortcut: result.shortcut, captureShortcut: result.captureShortcut, keybindings: result.keybindings }, result.moved.length ? `Unbound ${result.moved.join(', ')} to make room.` : next ? 'Shortcut saved.' : '');
+    if (typeof result === 'string') errors.report(t(ALREADY_USED[result], { shortcut: shortcutLabel(next) }));
+    else if (result) update({ shortcut: result.shortcut, captureShortcut: result.captureShortcut, keybindings: result.keybindings }, result.moved.length ? t('Unbound {commands} to make room.', { commands: list(result.moved.map(name => t(name))) }) : next ? t('Keybinding saved.') : '');
   }
   function setBinding(id: string, next: string) {
     const result = rebindCommand(preferences, id, next);
-    if (typeof result === 'string') errors.report(`${shortcutLabel(next)} is already used to ${GLOBAL_PURPOSES[result]}.`);
-    else if (result) update({ keybindings: result.keybindings }, result.moved.length ? `Moved ${shortcutLabel(next)} from ${result.moved.join(', ')}.` : '');
+    if (typeof result === 'string') errors.report(t(ALREADY_USED[result], { shortcut: shortcutLabel(next) }));
+    else if (result) update({ keybindings: result.keybindings }, result.moved.length ? t('Moved {shortcut} from {commands}.', { shortcut: shortcutLabel(next), commands: list(result.moved.map(name => t(name))) }) : '');
   }
   /** Native webviews don't open links themselves; Rust opens the fixed URL behind each action. */
   function openLink(event: MouseEvent, name: Action) {
@@ -159,47 +164,52 @@
     catch (e) { errors.report(e); }
     finally { switchingAutostart = false; }
   }
-  const fadeNote = (seconds: number) => seconds === 0 ? 'Marks stay until you return to work.' : `Marks fade ${seconds} seconds after you draw them.`;
+  const fadeNote = (seconds: number) => seconds === 0 ? t('Marks stay until you return to work.') : t('Marks fade {duration} after you draw them.', { duration: number(seconds, { style: 'unit', unit: 'second', unitDisplay: 'long' }) });
 </script>
 
 <main class="settings-window">
-  <section class="settings" aria-label="Glassboard settings">
+  <section class="settings" aria-label={t('Glassboard settings')}>
     <header>
       <span class="brand"><Logo size={18}/>Glassboard</span>
       <div class="header-actions">
-        <a class="icon-link" href={REPOSITORY_URL} target="_blank" rel="noreferrer" title="Glassboard on GitHub" aria-label="Glassboard on GitHub"
+        <a class="icon-link" href={REPOSITORY_URL} target="_blank" rel="noreferrer" title={t('Glassboard on GitHub')} aria-label={t('Glassboard on GitHub')}
           onclick={event => openLink(event, 'open-github')}><GitHubIcon/></a>
-        <button class="icon-link" title="Close" aria-label="Close settings" onclick={() => run('close-settings')}><X size={15}/></button>
+        <button class="icon-link" title={t('Close')} aria-label={t('Close settings')} onclick={() => run('close-settings')}><X size={15}/></button>
       </div>
     </header>
 
-    <div class="tabs" role="tablist" aria-label="Settings sections">
+    <div class="tabs" role="tablist" aria-label={t('Settings sections')}>
       {#each TABS as item}
         <button role="tab" id={`tab-${item.id}`} aria-selected={tab === item.id} aria-controls="settings-panel" tabindex={tab === item.id ? 0 : -1}
-          onclick={() => select(item.id)} onkeydown={tabKeydown}><item.icon size={13} strokeWidth={2}/>{item.label}</button>
+          onclick={() => select(item.id)} onkeydown={tabKeydown}><item.icon size={13} strokeWidth={2}/>{t(item.label)}</button>
       {/each}
     </div>
 
     <div class="panel" id="settings-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} bind:this={panel}>
       {#if tab === 'general'}
+        <section class="group" aria-labelledby="language-title">
+          <h2 id="language-title" class="language-title"><Languages size={12} strokeWidth={2.2} aria-hidden="true"/>{t('Language')}{#if locale().split('-')[0] !== 'en'}<small lang="en">Language</small>{/if}</h2>
+          <LanguagePicker language={preferences.language} onselect={language => update({ language })}/>
+        </section>
+
         <section class="group" aria-labelledby="drawing-title">
-          <h2 id="drawing-title">Drawing</h2>
+          <h2 id="drawing-title">{t('Drawing')}</h2>
           <div class="drawing-setting">
-            <h3 id="position-title">Toolbar position</h3>
+            <h3 id="position-title">{t('Toolbar position')}</h3>
             <div class="positions" role="group" aria-labelledby="position-title">
               {#each POSITIONS as position}
                 <button class="position" class:chosen={preferences.toolbarPosition === position.id} aria-pressed={preferences.toolbarPosition === position.id}
                   disabled={busy} onclick={() => update({ toolbarPosition: position.id })}>
-                  <span class={`screen ${position.id}`} aria-hidden="true"><span></span></span>{position.label}
+                  <span class={`screen ${position.id}`} aria-hidden="true"><span></span></span>{t(position.label)}
                 </button>
               {/each}
             </div>
           </div>
           <div class="drawing-setting">
-            <h3 id="fade-title">Auto-fade</h3>
+            <h3 id="fade-title">{t('Auto-fade')}</h3>
             <div class="segmented" role="group" aria-labelledby="fade-title">
               {#each AUTO_FADE_OPTIONS as seconds}
-                <button class:chosen={fade === seconds} aria-pressed={fade === seconds} disabled={busy} onclick={() => update({ autoFadeSeconds: seconds })}>{seconds ? `${seconds}s` : 'Off'}</button>
+                <button class:chosen={fade === seconds} aria-pressed={fade === seconds} disabled={busy} onclick={() => update({ autoFadeSeconds: seconds })}>{seconds ? number(seconds, { style: 'unit', unit: 'second', unitDisplay: 'narrow' }) : t('Off')}</button>
               {/each}
             </div>
             <p class="note">{fadeNote(fade)}</p>
@@ -207,10 +217,10 @@
         </section>
 
         <section class="group" aria-labelledby="startup-title">
-          <h2 id="startup-title">Startup</h2>
+          <h2 id="startup-title">{t('Startup')}</h2>
           <div class="list">
             <div class="row">
-              <span class="row-label" id="autostart-label">Open at login<small>Glassboard waits in the {platformMac ? 'menu bar' : 'tray'} until you need it</small></span>
+              <span class="row-label" id="autostart-label">{t('Open at login')}<small>{platformMac ? t('Glassboard waits in the menu bar until you need it') : t('Glassboard waits in the tray until you need it')}</small></span>
               <button class="switch" role="switch" aria-checked={autostart === true} aria-labelledby="autostart-label"
                 disabled={autostart === null || switchingAutostart} onclick={toggleAutostart}><span></span></button>
             </div>
@@ -218,22 +228,22 @@
         </section>
 
         <section class="group" aria-labelledby="help-title">
-          <h2 id="help-title">Help</h2>
+          <h2 id="help-title">{t('Help')}</h2>
           <div class="list">
             <div class="row">
-              <span class="row-label">Tutorial<small>A quick walkthrough of the basics</small></span>
-              <button class="button" onclick={() => run('replay-tutorial')}>Replay</button>
+              <span class="row-label">{t('Tutorial')}<small>{t('A quick walkthrough of the basics')}</small></span>
+              <button class="button" onclick={() => run('replay-tutorial')}>{t('Replay')}</button>
             </div>
             <div class="row">
-              <span class="row-label">Feedback<small>Found a bug or have an idea? Open an issue.</small></span>
-              <a class="button" href={`${REPOSITORY_URL}/issues/new`} target="_blank" rel="noreferrer" title="Opens GitHub Issues in your browser"
-                onclick={event => openLink(event, 'report-issue')}>Report</a>
+              <span class="row-label">{t('Feedback')}<small>{t('Found a bug or have an idea? Open an issue.')}</small></span>
+              <a class="button" href={`${REPOSITORY_URL}/issues/new`} target="_blank" rel="noreferrer" title={t('Opens GitHub Issues in your browser')}
+                onclick={event => openLink(event, 'report-issue')}>{t('Report')}</a>
             </div>
           </div>
         </section>
 
         <section class="group" aria-labelledby="about-title">
-          <h2 id="about-title">About</h2>
+          <h2 id="about-title">{t('About')}</h2>
           <div class="list">
             <div class="row update-row">
               <span class="row-label">Glassboard v{__APP_VERSION__}<small>{updateDetail(updateStatus)}</small></span>
@@ -255,17 +265,17 @@
         <ColorSettings {preferences} onsave={update}/>
       {:else}
         <div class="intro">
-          <p>Click a row, then press new keys.</p>
-          <button class="text-button reset-all" disabled={busy || !customized} onclick={() => update({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: {} }, 'All keyboard shortcuts reset.')}>Reset all<RotateCcw size={12}/></button>
+          <p>{t('Click a row, then press new keys.')}</p>
+          <button class="text-button reset-all" disabled={busy || !customized} onclick={() => update({ shortcut: DEFAULT_SHORTCUT, captureShortcut: DEFAULT_CAPTURE_SHORTCUT, keybindings: {} }, t('All keybindings reset.'))}>{t('Reset all')}<RotateCcw size={12}/></button>
         </div>
 
         <div class="shortcut-filters">
           <label class="shortcut-search">
             <Search size={14} aria-hidden="true"/>
-            <input type="search" aria-label="Search keyboard shortcuts" placeholder="Search shortcuts" bind:value={shortcutSearch}/>
+            <input type="search" aria-label={t('Search keybindings')} placeholder={t('Search keybindings')} bind:value={shortcutSearch}/>
           </label>
           <div class="customized-filter">
-            <span id="customized-label">Customized only</span>
+            <span id="customized-label">{t('Customized only')}</span>
             <button class="switch" role="switch" aria-checked={onlyCustomized} aria-labelledby="customized-label"
               onclick={() => onlyCustomized = !onlyCustomized}><span></span></button>
           </div>
@@ -273,33 +283,33 @@
 
         {#if visibleGlobals.length}
         <section class="group" aria-labelledby="keys-global">
-          <h2 id="keys-global">Global</h2>
+          <h2 id="keys-global">{t('Global')}</h2>
           <div class="list">
             {#each visibleGlobals as binding (binding.command)}
             <div class="row binding">
               <ShortcutRecorder label={binding.label} shortcut={binding.shortcut} fallback={binding.fallback} physical clearable={binding.command === 'capture'} active={windowVisible} disabled={busy}
-                onchange={next => setGlobal(binding.command, next)} {errors} onrecord={recording => record(recording, binding.command === 'toggle' ? GLOBAL_HINT : CAPTURE_HINT)}>
+                onchange={next => setGlobal(binding.command, next)} {errors} onrecord={recording => record(recording, binding.command === 'toggle' ? globalHint() : captureHint())}>
                 <span class="row-icon">{#if binding.command === 'toggle'}<Logo size={14}/>{:else}<Scan size={15} strokeWidth={1.9}/>{/if}</span>
                 <span class="row-label">{binding.label}</span>
               </ShortcutRecorder>
             </div>
             {/each}
           </div>
-          {#if session.unavailableShortcuts.includes('toggle')}<p class="note unavailable" role="alert">Another app is using {shortcutLabel(preferences.shortcut)}, so it can’t turn on drawing. Record a different shortcut.</p>{/if}
-          {#if session.unavailableShortcuts.includes('capture')}<p class="note unavailable" role="alert">Another app is using {shortcutLabel(preferences.captureShortcut)}, so it can’t take screenshots. Record a different shortcut.</p>{/if}
+          {#if session.unavailableShortcuts.includes('toggle')}<p class="note unavailable" role="alert">{t('Another app is using {shortcut}, so it can’t turn on drawing. Record a different keybinding.', { shortcut: shortcutLabel(preferences.shortcut) })}</p>{/if}
+          {#if session.unavailableShortcuts.includes('capture')}<p class="note unavailable" role="alert">{t('Another app is using {shortcut}, so it can’t take screenshots. Record a different keybinding.', { shortcut: shortcutLabel(preferences.captureShortcut) })}</p>{/if}
         </section>
         {/if}
 
         {#each visibleGroups as group (group.name)}
           <section class="group" aria-labelledby={`keys-${group.name}`}>
-            <h2 id={`keys-${group.name}`}>{group.name}</h2>
+            <h2 id={`keys-${group.name}`}>{t(group.name)}</h2>
             <div class="list">
               {#each group.bindings as binding (binding.id)}
                 {@const Icon = ICONS[binding.id]}
                 {@const swatch = swatches[binding.id]}
                 <div class="row binding">
                   <ShortcutRecorder label={binding.label} shortcut={binding.shortcut} fallback={binding.fallback} clearable active={windowVisible} disabled={busy}
-                    onchange={next => setBinding(binding.id, next)} {errors} onrecord={recording => record(recording, LOCAL_HINT)}>
+                    onchange={next => setBinding(binding.id, next)} {errors} onrecord={recording => record(recording, localHint())}>
                     <span class="row-icon">{#if swatch}<span class="swatch" style:background={swatch.background}></span>{:else if Icon}<Icon size={15} strokeWidth={1.9}/>{/if}</span>
                     <span class="row-label">{binding.label}{#if binding.description}<small>{binding.description}</small>{/if}</span>
                   </ShortcutRecorder>
@@ -310,23 +320,23 @@
         {/each}
         {#if !visibleGlobals.length && !visibleGroups.length}
           <div class="empty-shortcuts" role="status">
-            <p>{shortcutSearch.trim() ? 'No shortcuts match your search.' : 'No customized shortcuts.'}</p>
-            <button class="button" onclick={clearFilters}>Show all shortcuts</button>
+            <p>{shortcutSearch.trim() ? t('No keybindings match your search.') : t('No customized keybindings.')}</p>
+            <button class="button" onclick={clearFilters}>{t('Show all keybindings')}</button>
           </div>
         {/if}
       {/if}
     </div>
 
     <div class="status" aria-live="polite">
-      {#if errors.message}<p class="error" role="alert">{errors.message}<button class="dismiss" aria-label="Dismiss error" onclick={errors.dismiss}><X size={12}/></button></p>
+      {#if errors.message}<p class="error" role="alert">{errors.message}<button class="dismiss" aria-label={t('Dismiss error')} onclick={errors.dismiss}><X size={12}/></button></p>
       {:else if hint}<p>{hint}</p>
       {:else if updateFailure}<p>{updateFailure}</p>
       {:else if notice}<p>{notice}</p>{/if}
     </div>
 
     <footer>
-      {#if usage}<span class="usage" title="Memory and CPU used by Glassboard and its windows">{usageLabel(usage)}</span>{/if}
-      <button onclick={() => run('quit')}><Power size={13}/>Quit</button>
+      {#if usage}<span class="usage" title={t('Memory and CPU used by Glassboard and its windows')}>{usageLabel(usage)}</span>{/if}
+      <button onclick={() => run('quit')}><Power size={13}/>{t('Quit')}</button>
     </footer>
   </section>
 </main>
@@ -343,7 +353,7 @@
   .icon-link:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .icon-link:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .update.ready { color: var(--gb-focus-ring); }
-  .update { gap: 7px; height: auto; min-height: 28px; padding-block: 5px; }
+  .button.update { gap: 7px; min-height: 28px; padding-block: 5px; }
   .update:disabled { opacity: .65; }
   .row.update-row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px; }
   .update-row small { line-height: 1.4; margin-top: 4px; }
@@ -357,8 +367,8 @@
 
   .tabs, .segmented { display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: color-mix(in srgb, var(--gb-text) 6%, transparent); }
   .tabs { margin: 14px 14px 0; }
-  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
-  .tabs button:last-child { flex-grow: 1.8; }
+  .tabs button, .segmented button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 26px; padding-block: 3px; line-height: 1.2; overflow-wrap: break-word; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--gb-secondary-text); transition: background .12s, color .12s, box-shadow .12s, transform 160ms var(--gb-ease-out); }
+  .tabs button :global(svg) { flex-shrink: 0; }
   .tabs button:hover, .segmented button:hover:not(:disabled) { color: var(--gb-strong-text); }
   @media (prefers-reduced-motion: no-preference) { .tabs button:active, .segmented button:active:not(:disabled) { transform: scale(0.97); } }
   .tabs button[aria-selected="true"], .segmented button.chosen { background: var(--raised); color: var(--gb-strong-text); box-shadow: 0 0 0 1px var(--gb-selected-border), 0 1px 2px var(--gb-shadow); }
@@ -368,6 +378,8 @@
   /* Section styles are shared with tab components such as ColorSettings. */
   .panel :global(.group + .group) { margin-top: 20px; }
   .panel :global(h2) { margin: 0 0 8px 2px; font-size: 10px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--gb-muted); }
+  .language-title { display: flex; align-items: center; gap: 5px; }
+  .language-title small { font-size: inherit; font-weight: 400; letter-spacing: 0; text-transform: none; }
   .note { margin: 8px 2px 0; font-size: 11px; color: var(--gb-muted); }
 
   .drawing-setting + .drawing-setting { margin-top: 16px; }
@@ -401,9 +413,10 @@
   .row.binding { position: relative; padding: 0; }
   .row-icon { display: grid; place-items: center; width: 16px; flex-shrink: 0; color: var(--gb-icon); }
   .swatch { width: 13px; height: 13px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--gb-swatch-border); }
-  .row-label { flex: 1; min-width: 0; font-size: 12.5px; color: var(--gb-text); }
+  .row-label { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12.5px; color: var(--gb-text); }
+  .row.binding .row-label { min-width: 5em; }
   .row-label small { display: block; margin-top: 1px; font-size: 10.5px; color: var(--gb-muted); }
-  .button { display: inline-flex; align-items: center; height: 26px; margin-right: 2px; padding: 0 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; transition: color .12s, box-shadow .12s; }
+  .button { display: inline-flex; align-items: center; min-height: 26px; margin-right: 2px; padding: 4px 11px; color: inherit; text-decoration: none; border-radius: 7px; background: var(--raised); box-shadow: 0 0 0 1px var(--gb-border), 0 1px 1px var(--gb-shadow); font-size: 11.5px; font-weight: 500; transition: color .12s, box-shadow .12s; }
   .button:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .switch { position: relative; flex-shrink: 0; width: 34px; height: 20px; margin-right: 4px; padding: 0; border-radius: 10px; background: color-mix(in srgb, var(--gb-text) 18%, transparent); transition: background .16s; }
   .switch span { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0000004d; transition: translate 160ms var(--gb-ease-out); }

@@ -1,5 +1,6 @@
 import preferenceDefaults from '../contract/preference-defaults.json';
 import type { ColorMode, Tool } from './drawing';
+import { t, type Message } from './i18n.svelte';
 import { swatchColor } from './swatches';
 
 export const DEFAULT_SHORTCUT = preferenceDefaults.shortcut;
@@ -12,7 +13,7 @@ export type Keybindings = Partial<Record<string, string>>;
 export type KeybindingGroup = 'Drawing' | 'Tools' | 'Colors' | 'Screenshot';
 export const KEYBINDING_GROUPS: readonly KeybindingGroup[] = ['Drawing', 'Tools', 'Colors', 'Screenshot'];
 
-export const TOOL_SHORTCUTS: readonly { id: Tool; command: string; name: string; shortcut: string }[] = [
+export const TOOL_SHORTCUTS: readonly { id: Tool; command: string; name: Message; shortcut: string }[] = [
   { id: 'arrow', command: 'tool-arrow', name: 'Arrow', shortcut: 'CommandOrControl+Digit1' },
   { id: 'pen', command: 'tool-pen', name: 'Pen', shortcut: 'CommandOrControl+Digit2' },
   { id: 'rectangle', command: 'tool-rectangle', name: 'Square', shortcut: 'CommandOrControl+Digit3' },
@@ -24,7 +25,7 @@ export const TOOL_SHORTCUTS: readonly { id: Tool; command: string; name: string;
 ];
 
 /** Solid colors select a swatch slot, whose color the user can change. Command ids keep their default color names. */
-export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMode: ColorMode; slot?: number; shortcut: string }[] = [
+export const COLOR_SHORTCUTS: readonly { command: string; name: Message; colorMode: ColorMode; slot?: number; shortcut: string }[] = [
   { command: 'color-rainbow', name: 'Rainbow', colorMode: 'rainbow', shortcut: 'Digit1' },
   { command: 'color-cycle', name: 'Shifting', colorMode: 'cycle', shortcut: 'Digit2' },
   { command: 'color-black', name: 'Black', colorMode: 'solid', slot: 0, shortcut: 'Digit3' },
@@ -35,13 +36,13 @@ export const COLOR_SHORTCUTS: readonly { command: string; name: string; colorMod
   { command: 'color-blue', name: 'Blue', colorMode: 'solid', slot: 5, shortcut: 'Digit8' },
 ];
 
-export const SIZE_SHORTCUTS: readonly { command: string; name: string; step: -1 | 1; shortcut: string }[] = [
+export const SIZE_SHORTCUTS: readonly { command: string; name: Message; step: -1 | 1; shortcut: string }[] = [
   { command: 'size-smaller', name: 'Smaller size', step: -1, shortcut: 'BracketLeft' },
   { command: 'size-larger', name: 'Larger size', step: 1, shortcut: 'BracketRight' },
 ];
 
 /** Every in-app binding with its default. Global shortcuts live in `Preferences.shortcut` and `Preferences.captureShortcut`. */
-export const KEYBINDINGS: readonly { id: string; group: KeybindingGroup; name: string; shortcut: string; description?: string }[] = [
+export const KEYBINDINGS: readonly { id: string; group: KeybindingGroup; name: Message; shortcut: string; description?: Message }[] = [
   { id: 'undo', group: 'Drawing', name: 'Undo', shortcut: 'CommandOrControl+KeyZ' },
   { id: 'redo', group: 'Drawing', name: 'Redo', shortcut: 'CommandOrControl+Shift+KeyZ' },
   { id: 'hide', group: 'Drawing', name: 'Close Glassboard', shortcut: 'Escape' },
@@ -66,7 +67,7 @@ const GLOBAL_FIELDS = { toggle: 'shortcut', capture: 'captureShortcut' } as cons
 /** The global shortcuts and the in-app bindings, which must not share a shortcut. An empty `captureShortcut` is unbound. */
 export type Bindings = { shortcut: string; captureShortcut: string; keybindings: Keybindings };
 /** New bindings, with the names of the commands unbound to make room. */
-export type Rebound = Bindings & { moved: string[] };
+export type Rebound = Bindings & { moved: Message[] };
 
 function unbind(keybindings: Keybindings, shortcut: string, mac: boolean, except?: string): Pick<Rebound, 'keybindings' | 'moved'> {
   const taken = KEYBINDINGS.filter(binding => binding.id !== except && sameShortcut(keybinding(keybindings, binding.id), shortcut, mac));
@@ -196,16 +197,19 @@ export function recordShortcut(event: KeyEvent & Pick<KeyboardEvent, 'code'>, ma
   return [...heldModifiers(event, mac), key].join('+');
 }
 
-const KEY_NAMES: Record<string, string> = {
-  Escape: 'Esc', Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End',
-  PageUp: 'Page Up', PageDown: 'Page Down', Backquote: '`', Backslash: '\\', BracketLeft: '[', BracketRight: ']', Comma: ',',
+const WORD_KEYS: Record<string, Message> = {
+  Escape: 'Esc', Space: 'Space', Enter: 'Enter', Tab: 'Tab', Backspace: 'Backspace', Delete: 'Delete', Insert: 'Insert', Home: 'Home', End: 'End', PageUp: 'Page Up', PageDown: 'Page Down',
+  NumpadAdd: 'Num Add', NumpadSubtract: 'Num Subtract', NumpadMultiply: 'Num Multiply', NumpadDivide: 'Num Divide', NumpadDecimal: 'Num Decimal', NumpadEnter: 'Num Enter', NumpadEqual: 'Num Equal',
+};
+const SYMBOL_KEYS: Record<string, string> = {
+  Backquote: '`', Backslash: '\\', BracketLeft: '[', BracketRight: ']', Comma: ',',
   Period: '.', Slash: '/', Semicolon: ';', Quote: "'", Minus: '-', Equal: '=', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
 };
 function keyName(code: string): string {
   if (/^Key[A-Z]$/.test(code)) return code.slice(3);
   if (/^Digit\d$/.test(code)) return code.slice(5);
-  if (/^Numpad/.test(code)) return `Num ${code.slice(6)}`;
-  return KEY_NAMES[code] ?? code.toUpperCase();
+  if (/^Numpad\d$/.test(code)) return t('Num {key}', { key: code.slice(6) });
+  return WORD_KEYS[code] ? t(WORD_KEYS[code]) : SYMBOL_KEYS[code] ?? code.toUpperCase();
 }
 
 /** Render a shortcut string using platform conventions. */
@@ -218,11 +222,11 @@ export function shortcutLabel(shortcut: string) { return formatShortcut(shortcut
 export function shortcutKeys(shortcut: string, mac: boolean): string[] {
   return shortcut.split('+').map(part => part.trim()).filter(Boolean).map(part => {
     const lower = part.toLowerCase();
-    if (COMMAND_ALIASES.includes(lower)) return mac ? '⌘' : 'Ctrl';
-    if (['command', 'cmd', 'super'].includes(lower)) return mac ? '⌘' : 'Win';
-    if (['control', 'ctrl'].includes(lower)) return mac ? '⌃' : 'Ctrl';
-    if (['alt', 'option'].includes(lower)) return mac ? '⌥' : 'Alt';
-    if (lower === 'shift') return mac ? '⇧' : 'Shift';
+    if (COMMAND_ALIASES.includes(lower)) return mac ? '⌘' : t('Ctrl');
+    if (['command', 'cmd', 'super'].includes(lower)) return mac ? '⌘' : t('Win');
+    if (['control', 'ctrl'].includes(lower)) return mac ? '⌃' : t('Ctrl');
+    if (['alt', 'option'].includes(lower)) return mac ? '⌥' : t('Alt');
+    if (lower === 'shift') return mac ? '⇧' : t('Shift');
     return keyName(part);
   });
 }

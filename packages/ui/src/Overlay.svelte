@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { DrawingHistory, OverlayRenderer, FREEHAND_TOOLS, constrainEnd, createShape, cycleColor, measureText, nextStep, placeStep, shiftRainbow, shapeAtPoint, strokeWidth, textFont, textFontSize, textLineHeight, type Shape, type Point } from './lib/drawing';
+  import { t } from './lib/i18n.svelte';
   import { gradientStrip } from './lib/swatches';
   import { activateOverlay, drawingEvents, reportHistory, type Session } from './lib/session';
   let { session, onerror, bounds, showGlow = true }: { session: Session; onerror: (error: unknown) => void; bounds?: { x: number; y: number; width: number; height: number }; showGlow?: boolean } = $props();
@@ -224,12 +225,12 @@
 {#if session.mode === 'draw' && showGlow}
   <div class="annotation-glow" aria-hidden="true"></div>
 {/if}
-<canvas style:clip-path={bounds ? `inset(${bounds.y}px calc(100% - ${bounds.x + bounds.width}px) calc(100% - ${bounds.y + bounds.height}px) ${bounds.x}px)` : undefined} bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={finish} oncontextmenu={event => event.preventDefault()} aria-label="Screen annotation canvas. Choose the eraser tool to remove drawings."></canvas>
+<canvas style:clip-path={bounds ? `inset(${bounds.y}px calc(100% - ${bounds.x + bounds.width}px) calc(100% - ${bounds.y + bounds.height}px) ${bounds.x}px)` : undefined} bind:this={canvas} class:concealed={session.mode === 'hidden'} class:text-tool={session.preferences.tool === 'text'} class:eraser-tool={session.preferences.tool === 'eraser'} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={cancel} onlostpointercapture={finish} oncontextmenu={event => event.preventDefault()} aria-label={t('Screen annotation canvas. Choose the eraser tool to remove drawings.')}></canvas>
 {#if editor}
   <textarea bind:this={textarea} bind:value={() => editor?.text ?? '', value => { if (editor) editor.text = value; }} class="text-editor" class:rainbow={Boolean(editorGradient)} class:concealed={session.mode === 'hidden'}
     style:left={`${editor.origin.x}px`} style:top={`${editor.origin.y}px`} style:width={`${editorSize.width}px`} style:height={`${editorSize.height}px`}
     style:font={textFont(editorWidth)} style:line-height={`${editorLineHeight}px`} style:color={editorGradient ? 'transparent' : editorColor} style:background-image={editorGradient || 'none'}
-    rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Annotation text. Enter commits, Shift+Enter adds a line, Escape cancels."
+    rows="1" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label={t('Annotation text. Enter commits, Shift+Enter adds a line, Escape cancels.')}
     onkeydown={editorKeydown} onblur={event => { if (event.target === textarea) commitText(); }} onpointerdown={event => event.stopPropagation()}></textarea>
 {/if}
 <style>

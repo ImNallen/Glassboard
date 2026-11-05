@@ -60,6 +60,7 @@ jobs:
       - run: npm run web build
         env:
           PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
+      - run: npm run web verify:english
       - run: npm run web verify:downloads
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,5 @@
 import { CYCLE_COLORS } from './drawing';
+import type { Message } from './i18n.svelte';
 import { DEFAULT_SWATCHES, sameColors, swatchColor } from './swatches';
 
 /**
@@ -6,7 +7,7 @@ import { DEFAULT_SWATCHES, sameColors, swatchColor } from './swatches';
  * and the four swatches after Black and White (keys 5–8) to `swatches`.
  * To add a theme, append an entry: 2–8 `colors` and exactly 4 `swatches`, all `#rrggbb`.
  */
-export type ColorTheme = { name: string; colors: readonly string[]; swatches: readonly [string, string, string, string] };
+export type ColorTheme = { name: Message; colors: readonly string[]; swatches: readonly [string, string, string, string] };
 
 export const COLOR_THEMES: readonly ColorTheme[] = [
   { name: 'Glassboard', colors: CYCLE_COLORS, swatches: ['#4dcaa0', '#f2c85b', '#f46b78', '#669df0'] },

@@ -1,4 +1,8 @@
-use crate::{windows::geometry::ToolbarPosition, Result};
+use crate::{
+    i18n::{t, Language, Text},
+    windows::geometry::ToolbarPosition,
+    Result,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::{collections::BTreeMap, io::Write, path::Path, sync::LazyLock};
@@ -135,12 +139,16 @@ impl GlobalShortcut {
 impl TryFrom<String> for GlobalShortcut {
     type Error = String;
     fn try_from(text: String) -> std::result::Result<Self, Self::Error> {
-        let parsed: Shortcut = text.parse().map_err(|e| format!("Invalid shortcut: {e}"))?;
+        let parsed = text
+            .parse::<Shortcut>()
+            .map_err(|e| t!("Invalid keybinding: {detail}", detail = e).render())?;
         if !parsed
             .mods
             .intersects(Modifiers::CONTROL | Modifiers::SUPER | Modifiers::ALT)
         {
-            return Err("Include CommandOrControl, Control, Super, or Alt in the shortcut.".into());
+            return Err(
+                t!("Include CommandOrControl, Control, Super, or Alt in the keybinding.").render(),
+            );
         }
         Ok(Self { text, parsed })
     }
@@ -195,6 +203,7 @@ pub(crate) struct Preferences {
     pub(crate) toolbar_position: ToolbarPosition,
     pub(crate) auto_fade_seconds: AutoFadeSeconds,
     pub(crate) tutorial_completed: bool,
+    pub(crate) language: Language,
 }
 /// The webviews import the same file, so the defaults have one source.
 const DEFAULTS_JSON: &str =
@@ -238,13 +247,14 @@ impl Preferences {
             == Some(preferences.shortcut.parsed())
         {
             return Err(serde::de::Error::custom(
-                "Toggling Glassboard and taking a screenshot need different shortcuts.",
+                t!("Toggling Glassboard and taking a screenshot need different keybindings.")
+                    .render(),
             ));
         }
         Ok(preferences)
     }
     /// Loads saved preferences, with a message for the user when any had to be reset.
-    pub(crate) fn load(app: &tauri::AppHandle) -> (Self, Option<String>) {
+    pub(crate) fn load(app: &tauri::AppHandle) -> (Self, Option<Text>) {
         match app.path().app_config_dir() {
             Ok(dir) => load_from(&dir),
             Err(error) => {
@@ -255,22 +265,21 @@ impl Preferences {
     }
 
     pub(crate) fn save(&self, app: &tauri::AppHandle) -> Result<()> {
-        let dir = app.path().app_config_dir()?;
-        self.save_to(&dir)
+        let dir = app.path().app_config_dir().map_err(Text::untranslated)?;
+        self.save_to(&dir).map_err(Text::untranslated)
     }
 
-    fn save_to(&self, dir: &Path) -> Result<()> {
+    fn save_to(&self, dir: &Path) -> std::io::Result<()> {
         std::fs::create_dir_all(dir)?;
         let mut saved = serde_json::to_value(self)?;
         saved["version"] = FORMAT_VERSION.into();
         let bytes = serde_json::to_vec_pretty(&saved)?;
-        Ok(write_atomically(&dir.join(FILE_NAME), &bytes)?)
+        write_atomically(&dir.join(FILE_NAME), &bytes)
     }
 }
 
-fn load_from(dir: &Path) -> (Preferences, Option<String>) {
-    const SOME_RESET: &str = "Some settings could not be read and were reset to their defaults.";
-    const ALL_RESET: &str = "Your settings could not be read, so Glassboard is using the defaults.";
+fn load_from(dir: &Path) -> (Preferences, Option<Text>) {
+    let all_reset = || t!("Your settings could not be read, so Glassboard is using the defaults.");
     let path = dir.join(FILE_NAME);
     let backup = dir.join(BACKUP_NAME);
     let (preferences, problem, backed_up) = match retry_while_held(|| std::fs::read(&path)) {
@@ -282,7 +291,7 @@ fn load_from(dir: &Path) -> (Preferences, Option<String>) {
             // Move the unreadable file aside so saving the defaults cannot replace it.
             (
                 Preferences::default(),
-                ALL_RESET,
+                all_reset(),
                 std::fs::rename(&path, &backup),
             )
         }
@@ -295,14 +304,17 @@ fn load_from(dir: &Path) -> (Preferences, Option<String>) {
                     }
                     let (preferences, reset) = recover(saved);
                     log::warn!("Reset unreadable preferences: {reset:?}");
-                    (preferences, SOME_RESET)
+                    (
+                        preferences,
+                        t!("Some settings could not be read and were reset to their defaults."),
+                    )
                 }
                 _ => {
                     log::warn!(
                         "Reset all preferences: {} is not a JSON object",
                         path.display()
                     );
-                    (Preferences::default(), ALL_RESET)
+                    (Preferences::default(), all_reset())
                 }
             };
             (preferences, problem, write_atomically(&backup, &bytes))
@@ -310,7 +322,7 @@ fn load_from(dir: &Path) -> (Preferences, Option<String>) {
     };
     if let Err(error) = backed_up {
         log::error!("Could not back up {}: {error}", path.display());
-        return (preferences, Some(problem.into()));
+        return (preferences, Some(problem));
     }
     // Replace the damaged file with what was recovered, so the next launch starts clean.
     if let Err(error) = preferences.save_to(dir) {
@@ -318,9 +330,10 @@ fn load_from(dir: &Path) -> (Preferences, Option<String>) {
     }
     (
         preferences,
-        Some(format!(
-            "{problem} The original file was kept as {BACKUP_NAME}."
-        )),
+        Some(Text::joined(vec![
+            problem,
+            t!("The original file was kept as {file}.", file = BACKUP_NAME),
+        ])),
     )
 }
 
@@ -418,7 +431,7 @@ mod tests {
     fn hex(color: &str) -> HexColor {
         HexColor(color.into())
     }
-    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true}"##;
+    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true,"language":"de"}"##;
     fn shortcut(text: &str) -> GlobalShortcut {
         String::from(text).try_into().unwrap()
     }
@@ -491,7 +504,7 @@ mod tests {
                 with("shortcut", text.as_str().into())
                     .unwrap_err()
                     .to_string(),
-                "Include CommandOrControl, Control, Super, or Alt in the shortcut.",
+                "Include CommandOrControl, Control, Super, or Alt in the keybinding.",
                 "{text}"
             );
         }
@@ -559,7 +572,7 @@ mod tests {
         let parse = |fields: Value| Preferences::parse(fields).map_err(|e| e.to_string());
         assert_eq!(
             parse(json!({"shortcut": "Alt+KeyG", "captureShortcut": "Alt+G"})).unwrap_err(),
-            "Toggling Glassboard and taking a screenshot need different shortcuts."
+            "Toggling Glassboard and taking a screenshot need different keybindings."
         );
         assert_eq!(
             parse(json!({"shortcut": "Alt+KeyG", "captureShortcut": ""}))
@@ -570,7 +583,7 @@ mod tests {
         );
         assert_eq!(
             parse(json!({"captureShortcut": "Shift+KeyS"})).unwrap_err(),
-            "Include CommandOrControl, Control, Super, or Alt in the shortcut."
+            "Include CommandOrControl, Control, Super, or Alt in the keybinding."
         );
     }
     #[test]
@@ -666,7 +679,7 @@ mod tests {
         std::fs::write(dir.join(FILE_NAME), truncated).unwrap();
         let (preferences, warning) = load_from(&dir);
         assert!(preferences == Preferences::default());
-        assert!(warning.unwrap().contains(BACKUP_NAME));
+        assert!(warning.unwrap().to_string().contains(BACKUP_NAME));
         assert_eq!(std::fs::read(dir.join(BACKUP_NAME)).unwrap(), truncated);
         let (reloaded, warning) = load_from(&dir);
         assert!(reloaded == preferences);
@@ -720,7 +733,7 @@ mod tests {
         }
         let (preferences, warning) = load_from(&dir);
         assert!(preferences == Preferences::default());
-        assert!(warning.unwrap().contains(BACKUP_NAME));
+        assert!(warning.unwrap().to_string().contains(BACKUP_NAME));
         let backup = dir.join(BACKUP_NAME);
         std::fs::set_permissions(&backup, std::fs::Permissions::from_mode(0o600)).unwrap();
         assert_eq!(std::fs::read(&backup).unwrap(), original);
@@ -758,6 +771,35 @@ mod tests {
         }
         let preferences = Preferences::parse(json!({"tool": "pen"})).unwrap();
         assert_eq!(preferences.size, StrokeSize("medium".into()));
+    }
+    #[test]
+    fn a_language_saved_by_a_newer_build_survives_and_a_damaged_one_resets_alone() {
+        let parsed = |saved: Value| Preferences::parse(saved).map(|p| p.language);
+        assert_eq!(
+            parsed(json!({"tool": "pen"})).unwrap(),
+            Preferences::default().language
+        );
+        assert_eq!(
+            serde_json::to_value(parsed(json!({"language": "ko"})).unwrap()).unwrap(),
+            "ko"
+        );
+        let dir = scratch_dir("language");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(FILE_NAME),
+            json!({"version": 1, "tool": "pen", "language": 7}).to_string(),
+        )
+        .unwrap();
+        let (preferences, warning) = load_from(&dir);
+        assert!(warning.is_some());
+        assert_eq!(
+            preferences,
+            Preferences {
+                tool: Tool::Pen,
+                ..Preferences::default()
+            }
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn an_unknown_size_resets_only_the_size() {

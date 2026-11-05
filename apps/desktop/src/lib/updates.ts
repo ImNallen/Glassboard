@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { number, t } from '@glassboard/ui/i18n';
 import { action, native } from '@glassboard/ui/session';
 
 export type UpdateStatus =
@@ -28,19 +29,21 @@ export const installUpdate = () => action('install-update');
 
 export function updateDetail(status: UpdateStatus) {
   switch (status.state) {
-    case 'disabled': return 'Automatic updates are unavailable in this build.';
-    case 'idle': return 'Glassboard checks GitHub for new versions once a day.';
-    case 'checking': return 'Checking…';
-    case 'downloading': return `Downloading version ${status.version}…${status.percent === null ? '' : ` ${status.percent}%`}`;
-    case 'ready': return `Version ${status.version} is ready.`;
-    case 'installing': return `Installing version ${status.version}…`;
+    case 'disabled': return t('Automatic updates are unavailable in this build.');
+    case 'idle': return t('Glassboard checks GitHub for new versions once a day.');
+    case 'checking': return t('Checking…');
+    case 'downloading': return status.percent === null
+      ? t('Downloading version {version}…', { version: status.version })
+      : t('Downloading version {version}… {percent}', { version: status.version, percent: number(status.percent / 100, { style: 'percent' }) });
+    case 'ready': return t('Version {version} is ready.', { version: status.version });
+    case 'installing': return t('Installing version {version}…', { version: status.version });
     case 'failed': return status.message;
   }
 }
 export function updateLabel(status: UpdateStatus) {
   switch (status.state) {
-    case 'ready': return `Restart to install version ${status.version}`;
+    case 'ready': return t('Restart to install version {version}', { version: status.version });
     case 'checking': case 'downloading': case 'installing': return updateDetail(status);
-    default: return 'Check for updates';
+    default: return t('Check for updates');
   }
 }

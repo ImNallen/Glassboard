@@ -12,6 +12,7 @@
     "test": "node --test scripts/*.test.mjs",
     "sync:release": "node scripts/sync-release.mjs",
     "verify:downloads": "node scripts/verify-downloads.mjs",
+    "verify:english": "node scripts/verify-english.mjs",
     "astro": "astro"
   },
   "dependencies": {

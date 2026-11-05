@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { number, t } from '@glassboard/ui/i18n';
   import { hexToHsv, hsvToHex, parseHexColor, sameColor, type Hsv } from '@glassboard/ui/swatches';
   /**
    * An inline color picker. The OS color panel would take focus and close the settings window,
@@ -14,6 +15,7 @@
   const id = $props.id();
   let field: HTMLDivElement;
   let current = $derived(hsvToHex(hsv));
+  const percent = (value: number) => number(Math.round(value * 100) / 100, { style: 'percent' });
   // Follow outside changes, keeping the hue for grays where the color alone can't say it.
   $effect(() => {
     const next = value;
@@ -58,10 +60,10 @@
 </script>
 
 <details class="custom-color">
-  <summary>Custom color<span class="summary-color"><span class="preview" style:background={current} aria-hidden="true"></span>{current.toUpperCase()}</span></summary>
+  <summary>{t('Custom color')}<span class="summary-color"><span class="preview" style:background={current} aria-hidden="true"></span>{current.toUpperCase()}</span></summary>
   <div class="picker">
     <div bind:this={field} class="field" style:--hue={`hsl(${hsv.h} 100% 50%)`} role="slider" tabindex="0"
-      aria-label={`${label} saturation and brightness`} aria-valuetext={`Saturation ${Math.round(hsv.s * 100)}%, brightness ${Math.round(hsv.v * 100)}%`}
+      aria-label={t('{label} saturation and brightness', { label })} aria-valuetext={t('Saturation {saturation}, brightness {brightness}', { saturation: percent(hsv.s), brightness: percent(hsv.v) })}
       aria-valuenow={Math.round(hsv.s * 100)} aria-valuemin={0} aria-valuemax={100}
       onpointerdown={event => { dragging = true; field.setPointerCapture(event.pointerId); pick(event); }}
       onpointermove={event => { if (dragging) pick(event); }}
@@ -70,17 +72,17 @@
       onkeydown={fieldKeydown}>
       <span class="thumb" style:left={`${hsv.s * 100}%`} style:top={`${(1 - hsv.v) * 100}%`} style:background={current}></span>
     </div>
-    <label class="hue-label"><span>Hue</span>
-      <input class="hue" type="range" min="0" max="359" step="1" aria-label={`${label} hue`} value={Math.round(hsv.h)}
+    <label class="hue-label"><span>{t('Hue')}</span>
+      <input class="hue" type="range" min="0" max="359" step="1" aria-label={t('{label} hue', { label })} value={Math.round(hsv.h)}
         oninput={event => set({ h: Number(event.currentTarget.value) }, false)} onchange={() => onchange(current)}/>
     </label>
     <label class="hex">
       <span class="preview" style:background={current} aria-hidden="true"></span>
-      <span class="hex-label">Hex</span>
-      <input type="text" spellcheck="false" autocomplete="off" maxlength="7" aria-label={`${label} hex code`} aria-invalid={invalidHex} aria-describedby={invalidHex ? `${id}-hex-error` : undefined} bind:value={hex} oninput={() => invalidHex = false}
+      <span class="hex-label">{t('Hex')}</span>
+      <input type="text" spellcheck="false" autocomplete="off" maxlength="7" aria-label={t('{label} hex code', { label })} aria-invalid={invalidHex} aria-describedby={invalidHex ? `${id}-hex-error` : undefined} bind:value={hex} oninput={() => invalidHex = false}
         onkeydown={event => { if (event.key === 'Enter') { event.preventDefault(); commitHex(); } }} onblur={commitHex}/>
     </label>
-    {#if invalidHex}<p class="hex-error" id={`${id}-hex-error`} role="alert">Use 3 or 6 hex digits, like #5856D6.</p>{/if}
+    {#if invalidHex}<p class="hex-error" id={`${id}-hex-error`} role="alert">{t('Use 3 or 6 hex digits, like #5856D6.')}</p>{/if}
   </div>
 </details>
 

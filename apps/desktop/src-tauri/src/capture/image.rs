@@ -1,4 +1,7 @@
-use crate::Result;
+use crate::{
+    i18n::{t, Text},
+    Result,
+};
 use image::RgbaImage;
 use std::io::Cursor;
 
@@ -31,10 +34,10 @@ pub(super) fn crop(image: &RgbaImage, region: CaptureRegion) -> Result<RgbaImage
     if !fits(region.x, region.width, image.width())
         || !fits(region.y, region.height, image.height())
     {
-        return Err("The selected capture region is invalid".into());
+        return Err(Text::untranslated("The selected capture region is invalid"));
     }
     if u64::from(region.width) * u64::from(region.height) * 4 > MAX_IMAGE_BYTES as u64 {
-        return Err("The capture is too large to copy".into());
+        return Err(t!("The capture is too large to copy"));
     }
     Ok(
         image::imageops::crop_imm(image, region.x, region.y, region.width, region.height)
@@ -50,7 +53,7 @@ pub(super) fn decode_png(png: &[u8]) -> Result<RgbaImage> {
     reader
         .decode()
         .map(|image| image.into_rgba8())
-        .map_err(|e| format!("Could not read the annotated image: {e}").into())
+        .map_err(|e| t!("Could not read the annotated image: {detail}", detail = e))
 }
 
 #[cfg(test)]

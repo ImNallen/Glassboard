@@ -1,5 +1,6 @@
 use crate::{
     commands::transition,
+    i18n::{t, Text},
     preference_saves::PreferenceSaves,
     session::Transition,
     state::{report, snapshot},
@@ -38,7 +39,7 @@ pub(crate) enum UpdateStatus {
         version: String,
     },
     Failed {
-        message: String,
+        message: Text,
     },
 }
 
@@ -49,7 +50,7 @@ enum Phase<Verified> {
     Downloading(String, Option<u8>),
     Ready(String, Verified),
     Installing(String),
-    Failed(String),
+    Failed(Text),
 }
 
 impl<Verified> Phase<Verified> {
@@ -87,7 +88,7 @@ impl<Verified> Phase<Verified> {
             }
         }
     }
-    fn fail(&mut self, message: String) {
+    fn fail(&mut self, message: Text) {
         if matches!(
             self,
             Phase::Checking | Phase::Downloading(..) | Phase::Installing(_)
@@ -176,7 +177,7 @@ fn advance(app: &AppHandle, change: impl FnOnce(&mut Phase<VerifiedDownload>)) {
     publish(app);
 }
 
-fn publish(app: &AppHandle) {
+pub(crate) fn publish(app: &AppHandle) {
     let status = status(app);
     if let Err(error) = app
         .emit("update", &status)
@@ -269,7 +270,7 @@ pub(crate) fn install(app: &AppHandle) {
             .flush()
             .map_err(|error| {
                 log::warn!("Could not save preferences before updating: {error}");
-                "Couldn't save preferences, so the update wasn't installed.".to_string()
+                t!("Couldn't save preferences, so the update wasn't installed.")
             })
             .and_then(|()| {
                 download.update.install(&download.bytes).map_err(|error| {
@@ -294,11 +295,11 @@ pub(crate) fn install(app: &AppHandle) {
     });
 }
 
-fn explain(error: &Error) -> String {
+fn explain(error: &Error) -> Text {
     match error {
-        Error::Reqwest(_) | Error::Network(_) => "Couldn't reach GitHub to check for updates.",
+        Error::Reqwest(_) | Error::Network(_) => t!("Couldn't reach GitHub to check for updates."),
         Error::Minisign(_) | Error::Base64(_) | Error::SignatureUtf8(_) => {
-            "The update's signature didn't match, so it was discarded."
+            t!("The update's signature didn't match, so it was discarded.")
         }
         Error::Io(error)
             if matches!(
@@ -306,14 +307,13 @@ fn explain(error: &Error) -> String {
                 ErrorKind::ReadOnlyFilesystem | ErrorKind::CrossesDevices
             ) =>
         {
-            "Move Glassboard to Applications to install updates."
+            t!("Move Glassboard to Applications to install updates.")
         }
         Error::Io(error) if error.kind() == ErrorKind::PermissionDenied => {
-            "Glassboard couldn't replace itself. Check that you can change Applications."
+            t!("Glassboard couldn't replace itself. Check that you can change Applications.")
         }
-        _ => "The update failed. Try again later.",
+        _ => t!("The update failed. Try again later."),
     }
-    .into()
 }
 
 #[cfg(test)]
@@ -328,7 +328,7 @@ mod tests {
             Phase::Downloading("0.2.0".into(), Some(40)),
             Phase::Ready("0.2.0".into(), ()),
             Phase::Installing("0.2.0".into()),
-            Phase::Failed("offline".into()),
+            Phase::Failed(Text::untranslated("offline")),
         ]
     }
 
@@ -365,7 +365,7 @@ mod tests {
     }
     fn failed(message: &str) -> UpdateStatus {
         UpdateStatus::Failed {
-            message: message.into(),
+            message: Text::untranslated(message),
         }
     }
 
@@ -439,17 +439,17 @@ mod tests {
     #[test]
     fn only_work_in_progress_can_fail() {
         assert_eq!(
-            changed(table(|phase| phase.fail("offline".into())))
+            changed(table(|phase| phase.fail(Text::untranslated("offline"))))
                 .into_iter()
                 .map(|(from, _)| from)
                 .collect::<Vec<_>>(),
             [UpdateStatus::Checking, downloading(Some(40)), installing()]
         );
         let mut phase = Phase::Ready("0.2.0".into(), ());
-        phase.fail("late".into());
+        phase.fail(Text::untranslated("late"));
         assert_eq!(phase.status(), ready());
         let mut phase = Phase::<()>::Downloading("0.2.0".into(), None);
-        phase.fail("offline".into());
+        phase.fail(Text::untranslated("offline"));
         assert_eq!(phase.status(), failed("offline"));
     }
 

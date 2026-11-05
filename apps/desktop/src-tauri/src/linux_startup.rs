@@ -1,3 +1,4 @@
+use crate::i18n::{t, Text};
 use std::ffi::OsStr;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -6,16 +7,14 @@ pub(crate) enum StartupError {
     MissingX11Display,
 }
 
-impl std::fmt::Display for StartupError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Self::WaylandSession => "Glassboard's experimental Linux support requires an X11 desktop session. Sign out and select an X11 or Xorg session at the login screen, then open Glassboard again. Wayland and XWayland sessions are not supported.",
-            Self::MissingX11Display => "Glassboard could not find an X11 display. Open Glassboard from an X11 desktop session with DISPLAY set.",
-        })
+impl StartupError {
+    pub(crate) fn text(&self) -> Text {
+        match self {
+            Self::WaylandSession => t!("Glassboard's experimental Linux support requires an X11 desktop session. Sign out and select an X11 or Xorg session at the login screen, then open Glassboard again. Wayland and XWayland sessions are not supported."),
+            Self::MissingX11Display => t!("Glassboard could not find an X11 display. Open Glassboard from an X11 desktop session with DISPLAY set."),
+        }
     }
 }
-
-impl std::error::Error for StartupError {}
 
 pub(crate) fn prepare() -> Result<(), StartupError> {
     validate(

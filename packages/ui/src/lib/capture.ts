@@ -1,4 +1,5 @@
 import { render, type Point, type Shape } from './drawing';
+import { t } from './i18n.svelte';
 import { isEditableTarget } from './selection';
 import { commandFor, keybinding, sameShortcut, type Keybindings } from './shortcuts';
 
@@ -26,12 +27,12 @@ export function capturePixels(region: CaptureRegion, viewport: { width: number; 
 export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, region: CaptureRegion, shapes: Shape[], viewport = { width: window.innerWidth, height: window.innerHeight }): Promise<Blob> {
   const size = image instanceof HTMLImageElement ? { width: image.naturalWidth, height: image.naturalHeight } : image;
   const source = capturePixels(region, viewport, size);
-  if (!source.width || !source.height) return Promise.reject(new Error('Select a region to copy.'));
+  if (!source.width || !source.height) return Promise.reject(new Error(t('Select a region to copy.')));
   const scaleX = size.width / viewport.width, scaleY = size.height / viewport.height;
   const output = document.createElement('canvas');
   output.width = source.width; output.height = source.height;
   const ctx = output.getContext('2d');
-  if (!ctx) return Promise.reject(new Error('Could not create the image. Try again.'));
+  if (!ctx) return Promise.reject(new Error(t('Could not create the image. Try again.')));
   ctx.drawImage(image, source.x, source.y, source.width, source.height, 0, 0, source.width, source.height);
   const translated = shapes.map(shape => ({ ...shape,
     points: shape.points.map(point => ({ x: point.x - source.x / scaleX, y: (point.y * scaleY - source.y) / scaleX })),
@@ -41,7 +42,7 @@ export function annotatedCapture(image: HTMLImageElement | HTMLCanvasElement, re
   return new Promise((resolve, reject) => output.toBlob(blob => {
     output.width = 0; output.height = 0;
     if (blob) resolve(blob);
-    else reject(new Error('Could not encode the image. Try again.'));
+    else reject(new Error(t('Could not encode the image. Try again.')));
   }, 'image/png'));
 }
 

@@ -1,9 +1,10 @@
 import preferenceDefaults from '../contract/preference-defaults.json';
 import { cycleColor, CYCLE_COLORS } from './drawing';
+import { t, type Message } from './i18n.svelte';
 
-const SWATCH_NAMES = ['Black', 'White', 'Green', 'Yellow', 'Red', 'Blue'];
+const SWATCH_NAMES: readonly Message[] = ['Black', 'White', 'Green', 'Yellow', 'Red', 'Blue'];
 /** The toolbar's solid color swatches, in toolbar order. Users can replace each color. */
-export const DEFAULT_SWATCHES: readonly { color: string; name: string }[] = preferenceDefaults.swatches.map((color, slot) => ({ color, name: SWATCH_NAMES[slot] }));
+export const DEFAULT_SWATCHES: readonly { color: string; name: Message }[] = preferenceDefaults.swatches.map((color, slot) => ({ color, name: SWATCH_NAMES[slot] }));
 export const defaultSwatches = () => DEFAULT_SWATCHES.map(swatch => swatch.color);
 
 /** Quick picks for the color editor: the Glassboard palette, vivid hues, then neutrals and deep tones. */
@@ -31,7 +32,7 @@ export function swatchColor(swatches: readonly string[] | undefined, slot: numbe
 /** A default swatch keeps its name; a replaced one is named by its hex code. */
 export function swatchName(swatches: readonly string[] | undefined, slot: number): string {
   const color = swatchColor(swatches, slot);
-  return sameColor(color, DEFAULT_SWATCHES[slot].color) ? DEFAULT_SWATCHES[slot].name : color.toUpperCase();
+  return sameColor(color, DEFAULT_SWATCHES[slot].color) ? t(DEFAULT_SWATCHES[slot].name) : color.toUpperCase();
 }
 
 /** Parse user input such as `#4DCAA0`, `4dcaa0`, or `#4ca`; undefined if it isn't a color. */
