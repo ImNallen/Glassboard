@@ -324,11 +324,11 @@ it('turns opening at login on and off from the General tab', async () => {
   expect(await getAutostart()).toBe(false);
 });
 
-it('checks for updates beside the version information without a message when nothing is new', async () => {
+it('checks for updates from the header without a message when nothing is new', async () => {
   await setup('general');
-  const button = () => document.querySelector<HTMLButtonElement>('.update-row button[aria-label="Check for updates"]')!;
+  const button = () => document.querySelector<HTMLButtonElement>('header button.update')!;
   expect(button().title).toBe('Glassboard checks GitHub for new versions once a day.');
-  expect(button().textContent).toContain('Check for updates');
+  expect(button().getAttribute('aria-label')).toBe('Check for updates');
   expect(document.querySelector('.update-row')?.textContent).toContain('Glassboard v');
   button().click();
   await tick();
@@ -336,15 +336,20 @@ it('checks for updates beside the version information without a message when not
   expect(document.querySelector('.status')!.textContent).toBe('');
 });
 
-it('shows update progress and restart actions beside the version, and disables repeated requests', async () => {
+it('offers the update button from tabs other than General', async () => {
+  await setup('keybindings');
+  expect(document.querySelector('header button.update')?.getAttribute('aria-label')).toBe('Check for updates');
+});
+
+it('shows update progress and restart actions in the header, and disables repeated requests', async () => {
   let emit: (status: UpdateStatus) => void = () => {};
   vi.mocked(watchUpdates).mockImplementationOnce(async fn => { emit = fn; fn({ state: 'idle' }); return () => {}; });
   await setup('general');
-  const button = () => document.querySelector<HTMLButtonElement>('.update-row button')!;
+  const button = () => document.querySelector<HTMLButtonElement>('header button.update')!;
   emit({ state: 'checking' });
   flushSync();
   expect(button().disabled).toBe(true);
-  expect(button().textContent).toContain('Checking…');
+  expect(button().getAttribute('aria-label')).toBe('Checking…');
   expect(button().getAttribute('aria-busy')).toBe('true');
   emit({ state: 'downloading', version: '0.2.0', percent: 42 });
   flushSync();
@@ -353,7 +358,7 @@ it('shows update progress and restart actions beside the version, and disables r
   emit({ state: 'ready', version: '0.2.0' });
   flushSync();
   expect(button().disabled).toBe(false);
-  expect(button().textContent).toContain('Restart to install version 0.2.0');
+  expect(button().getAttribute('aria-label')).toBe('Restart to install version 0.2.0');
   emit({ state: 'installing', version: '0.2.0' });
   flushSync();
   expect(button().disabled).toBe(true);
