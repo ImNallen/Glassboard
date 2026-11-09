@@ -172,6 +172,16 @@
     <header>
       <span class="brand"><Logo size={18}/>Glassboard</span>
       <div class="header-actions">
+        {#if updateStatus.state !== 'disabled'}
+          <button class="icon-link update" class:ready={updateStatus.state === 'ready'} aria-busy={updating} disabled={updating}
+            title={updateDetail(updateStatus)} aria-label={updateLabel(updateStatus)} onclick={updateClick}>
+            {#if updateStatus.state === 'ready'}<CircleArrowUp size={15}/>
+            {:else if updateStatus.state === 'downloading' && updateStatus.percent !== null}
+              <svg class="progress" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" pathLength="100"/><circle class="done" cx="8" cy="8" r="6.5" pathLength="100" stroke-dasharray={`${updateStatus.percent} 100`}/></svg>
+            {:else if updateStatus.state === 'downloading' || updateStatus.state === 'installing'}<span class="spin"><LoaderCircle size={15}/></span>
+            {:else}<span class:spin={updateStatus.state === 'checking'}><RefreshCw size={14}/></span>{/if}
+          </button>
+        {/if}
         <a class="icon-link" href={REPOSITORY_URL} target="_blank" rel="noreferrer" title={t('Glassboard on GitHub')} aria-label={t('Glassboard on GitHub')}
           onclick={event => openLink(event, 'open-github')}><GitHubIcon/></a>
         <button class="icon-link" title={t('Close')} aria-label={t('Close settings')} onclick={() => run('close-settings')}><X size={15}/></button>
@@ -247,17 +257,6 @@
           <div class="list">
             <div class="row update-row">
               <span class="row-label">Glassboard v{__APP_VERSION__}<small>{updateDetail(updateStatus)}</small></span>
-              {#if updateStatus.state !== 'disabled'}
-                <button class="button update" class:ready={updateStatus.state === 'ready'} aria-busy={updating} disabled={updating}
-                  title={updateDetail(updateStatus)} aria-label={updateLabel(updateStatus)} onclick={updateClick}>
-                  {#if updateStatus.state === 'ready'}<CircleArrowUp size={15}/>
-                  {:else if updateStatus.state === 'downloading' && updateStatus.percent !== null}
-                    <svg class="progress" width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" pathLength="100"/><circle class="done" cx="8" cy="8" r="6.5" pathLength="100" stroke-dasharray={`${updateStatus.percent} 100`}/></svg>
-                  {:else if updateStatus.state === 'downloading' || updateStatus.state === 'installing'}<span class="spin"><LoaderCircle size={15}/></span>
-                  {:else}<span class:spin={updateStatus.state === 'checking'}><RefreshCw size={14}/></span>{/if}
-                  <span>{updateLabel(updateStatus)}</span>
-                </button>
-              {/if}
             </div>
           </div>
         </section>
@@ -353,11 +352,9 @@
   .icon-link:hover { background: var(--gb-hover); color: var(--gb-strong-text); }
   .icon-link:focus-visible { outline: 2px solid var(--gb-focus-ring); outline-offset: 2px; }
   .update.ready { color: var(--gb-focus-ring); }
-  .button.update { gap: 7px; min-height: 28px; padding-block: 5px; }
   .update:disabled { opacity: .65; }
-  .row.update-row { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px; }
   .update-row small { line-height: 1.4; margin-top: 4px; }
-  .update span.spin { display: grid; }
+  .update span { display: grid; }
   .spin { animation: spin 1s linear infinite; }
   @keyframes spin { to { rotate: 360deg; } }
   @media (prefers-reduced-motion: reduce) { .spin { animation: none; opacity: .5; } }
