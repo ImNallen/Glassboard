@@ -4,6 +4,8 @@ import type { Message } from '../i18n.svelte';
 export type Tool = 'pen' | 'arrow' | 'rectangle' | 'ellipse' | 'step' | 'highlighter' | 'text' | 'eraser';
 /** Freehand tools append points as the pointer moves instead of anchoring a start and end. */
 export const FREEHAND_TOOLS: readonly Tool[] = ['pen', 'highlighter'];
+/** Tools that can paint a solid block instead of an outline. */
+export const FILLABLE_TOOLS: readonly Tool[] = ['rectangle', 'ellipse'];
 export type ColorMode = 'solid' | 'rainbow' | 'cycle';
 export type AutoFadeSeconds = 0 | 3 | 5 | 10;
 export const AUTO_FADE_OPTIONS: readonly AutoFadeSeconds[] = [0, 3, 5, 10];
@@ -27,6 +29,8 @@ export type Shape = {
   hue?: number;
   /** The rainbow's colors when the shape was drawn, so later palette edits leave it unchanged. */
   colors?: string[];
+  /** A square or circle painted as a solid block, fixed when drawn so a later toggle leaves it unchanged. */
+  fill?: boolean;
   fadeSeconds?: AutoFadeSeconds;
   expiresAt?: number;
   text?: string;
@@ -39,6 +43,7 @@ type DrawingStyle = {
   color: string;
   colorMode: ColorMode;
   size: StrokeSize;
+  fill?: boolean;
   autoFadeSeconds?: AutoFadeSeconds;
   rainbowColors?: readonly string[];
   cycleColors?: readonly string[];
@@ -59,6 +64,7 @@ export function createShape(style: DrawingStyle, cycleIndex: number, start: Poin
     colorMode: style.colorMode,
     hue: style.colorMode === 'rainbow' ? Math.random() * 360 : 0,
     ...(style.colorMode === 'rainbow' ? { colors: [...(style.rainbowColors ?? CYCLE_COLORS)] } : {}),
+    ...(style.fill && FILLABLE_TOOLS.includes(style.tool) ? { fill: true } : {}),
     points: [{ ...start }],
     fadeSeconds: style.autoFadeSeconds ?? 0,
   };

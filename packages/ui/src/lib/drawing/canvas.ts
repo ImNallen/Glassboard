@@ -100,8 +100,8 @@ export function shapeAtPoint(ctx: CanvasRenderingContext2D, shapes: Shape[], poi
       path(ctx, shape);
       const solid = shape.tool === 'arrow' || shape.tool === 'step';
       ctx.lineWidth = (solid ? 0 : shape.width * (shape.tool === 'highlighter' ? 5 : 1)) + 12;
-      const filled = solid || shape.tool === 'text';
-      if ((filled && ctx.isPointInPath(point.x, point.y)) || ctx.isPointInStroke(point.x, point.y)) return shape;
+      const hitInside = solid || shape.tool === 'text';
+      if ((hitInside && ctx.isPointInPath(point.x, point.y)) || ctx.isPointInStroke(point.x, point.y)) return shape;
     }
   } finally {
     ctx.restore();
@@ -169,7 +169,7 @@ export function render(ctx: CanvasRenderingContext2D, shapes: Shape[], draft: Sh
       ctx.stroke();
     } else {
       // Feather the same stroke color up to 3 px outward, including every rainbow segment.
-      const solid = shape.tool === 'arrow' || shape.tool === 'step';
+      const solid = shape.fill || shape.tool === 'arrow' || shape.tool === 'step';
       ctx.strokeStyle = color;
       ctx.globalAlpha = .055 * opacity;
       for (let spread = 6; spread >= 1; spread--) {
