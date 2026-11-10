@@ -201,3 +201,40 @@ it.each(['window', 'page', 'capture'] as const)('in a %s host, cycles the drawin
   expect(tip.querySelector('kbd')?.textContent).toBe('[ ]');
   expect(tip.textContent).toContain('Click for Small');
 });
+
+it('switches Square and Circle between outline and filled on a click of the selected tool', async () => {
+  const store = writable<Session>({ ...structuredClone(defaults), mode: 'draw', tutorial: null });
+  const current = fromStore(store);
+  const onsave = vi.fn(async (preferences: Session['preferences']) => store.update(session => ({ ...session, preferences })));
+  toolbar = mount(Toolbar, { target: document.body, props: { get session() { return current.current; }, errors: createErrors(() => current.current), host: 'page', onsave, pinned: true } });
+  await tick();
+  const click = async (label: string) => { button(label).click(); await vi.advanceTimersByTimeAsync(0); await tick(); };
+  const tooltip = async (label: string) => {
+    await hover(button(label));
+    const text = document.querySelector('[role="tooltip"]')!.textContent;
+    button(label).dispatchEvent(new Event('pointerleave'));
+    return text;
+  };
+  const solidIcons = () => [...document.querySelectorAll('.tool-group button')].filter(node => node.querySelector('svg')?.getAttribute('fill') !== 'none').map(node => node.getAttribute('aria-label'));
+
+  expect(await tooltip('Square')).not.toContain('Click for');
+  await click('Square');
+  expect(await tooltip('Square')).toContain('Click for Filled');
+  expect(await tooltip('Circle')).not.toContain('Click for');
+  expect(solidIcons()).toEqual([]);
+  await click('Square');
+  expect(await tooltip('Square')).toContain('Click for Outline');
+  expect(solidIcons()).toEqual(['Square', 'Circle']);
+  expect(button('Square').getAttribute('aria-pressed')).toBe('true');
+  await click('Square');
+  await click('Square');
+  await click('Pen');
+  await click('Pen');
+  await click('Circle');
+  expect(await tooltip('Circle')).toContain('Click for Outline');
+  await click('Circle');
+  expect(onsave.mock.calls.map(([{ tool, fill }]) => [tool, fill])).toEqual([
+    ['rectangle', false], ['rectangle', true], ['rectangle', false], ['rectangle', true],
+    ['pen', true], ['pen', true], ['ellipse', true], ['ellipse', false],
+  ]);
+});

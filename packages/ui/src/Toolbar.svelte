@@ -8,7 +8,7 @@
   import { TOOL_ICONS } from './lib/tool-icons';
   import type { Errors } from './lib/errors.svelte';
   import { action, expandToolbar, savePreferences, toolbarPointer, type Action, type Preferences, type Session } from './lib/session';
-  import { AUTO_FADE_OPTIONS, STROKE_SIZE_NAMES, STROKE_SIZES, strokeWidth, type Tool } from './lib/drawing';
+  import { AUTO_FADE_OPTIONS, FILLABLE_TOOLS, STROKE_SIZE_NAMES, STROKE_SIZES, strokeWidth, type Tool } from './lib/drawing';
   /**
    * `host` is where the toolbar lives: its own native window, which reports the cursor and resizes to fit; a web page; or the screenshot editor.
    * `pinned` keeps the toolbar open instead of collapsing to the pill when the cursor is away; hosts without a native window use it.
@@ -78,7 +78,13 @@
     try { await onsave({ ...session.preferences, ...patch }); return true; }
     catch (e) { errors.report(e); return false; }
   }
+  const isActive = (tool: Tool) => !selectingCapture && session.preferences.tool === tool && session.mode === 'draw';
+  let fill = $derived(session.preferences.fill);
+  const togglesFill = (tool: Tool) => isActive(tool) && FILLABLE_TOOLS.includes(tool);
+  // Lucide spreads props over its own fill="none", so an undefined fill would paint the icon black.
+  const iconFill = (tool: Tool) => fill && FILLABLE_TOOLS.includes(tool) ? 'currentColor' : 'none';
   async function choose(tool: Tool) {
+    if (togglesFill(tool)) { await change({ fill: !fill }); return; }
     if (!await change({ tool })) return;
     onchoose?.();
     if (session.mode === 'hidden') await run('show');
@@ -102,7 +108,7 @@
   {/if}
   <div class="toolbar" bind:this={bar} onscroll={hints.dismiss} role="toolbar" aria-label={t('Annotation tools')} aria-orientation={vertical ? 'vertical' : 'horizontal'}>
     <div class="tool-row">
-    <div class="tool-group">{#each tools as tool}<button class="icon-button tool" class:active={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'} onclick={() => choose(tool.id)} use:hint={{ label: t(tool.name), key: keyLabel(keybindings, tool.command) }} aria-label={t(tool.name)} aria-pressed={!selectingCapture && session.preferences.tool === tool.id && session.mode === 'draw'}><tool.icon size={19} strokeWidth={1.8}/></button>{/each}
+    <div class="tool-group">{#each tools as tool}<button class="icon-button tool" class:active={isActive(tool.id)} onclick={() => choose(tool.id)} use:hint={{ label: t(tool.name), key: keyLabel(keybindings, tool.command), description: togglesFill(tool.id) ? t('Click for {choice}', { choice: fill ? t('Outline') : t('Filled') }) : undefined }} aria-label={t(tool.name)} aria-pressed={isActive(tool.id)}><tool.icon size={19} strokeWidth={1.8} fill={iconFill(tool.id)}/></button>{/each}
       {#if oncapture}<button class="icon-button tool" class:active={selectingCapture} aria-pressed={selectingCapture} aria-label={t('Screenshot')} onclick={oncapture} use:hint={{ label: t('Screenshot'), key: keyLabel(keybindings, 'capture'), description: t('Drag to select or replace the capture area') }}><Scan size={19} strokeWidth={1.8}/></button>{/if}
     </div>
     <div class="divider"></div>

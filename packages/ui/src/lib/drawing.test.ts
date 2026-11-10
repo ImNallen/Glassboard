@@ -343,6 +343,58 @@ describe('step tool', () => {
   });
 });
 
+describe('filled squares and circles', () => {
+  const draw = (tool: Tool, fill: boolean) => createShape({ tool, color: '#ffffff', colorMode: 'solid', size: 'medium', fill }, 0, { x: 0, y: 0 });
+  const block = (shape: Partial<Shape> = {}): Shape => ({ ...arrow(), tool: 'rectangle', fill: true, points: [{ x: 0, y: 0 }, { x: 200, y: 100 }], ...shape });
+  function paint(shape: Shape, now = 0) {
+    const gradient = { addColorStop: vi.fn() }, strokes: number[] = [], fills: unknown[][] = [];
+    const ctx = {
+      setTransform: vi.fn(), clearRect: vi.fn(), save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), roundRect: vi.fn(), ellipse: vi.fn(),
+      createLinearGradient: () => gradient, globalAlpha: 1, fillStyle: '' as unknown,
+      stroke() { strokes.push(this.globalAlpha); },
+      fill() { fills.push([this.fillStyle, this.globalAlpha]); },
+    };
+    render(ctx as unknown as CanvasRenderingContext2D, [shape], null, 300, 200, 1, now);
+    return { gradient, strokes, fills };
+  }
+  it.each(['rectangle', 'ellipse'] as const)('the %s tool draws a solid block only while fill is on', tool => {
+    expect(draw(tool, true).fill).toBe(true);
+    expect(draw(tool, false)).not.toHaveProperty('fill');
+  });
+  it.each(['pen', 'arrow', 'step', 'highlighter', 'text', 'eraser'] as const)('the %s tool never draws a filled shape', tool => {
+    expect(draw(tool, true)).not.toHaveProperty('fill');
+  });
+  it.each(['rectangle', 'ellipse'] as const)('paints a filled %s as one block of its color that fades as a whole', tool => {
+    expect(paint(block({ tool, expiresAt: 3000 }), 2750).fills).toEqual([['#ff6259', .5]]);
+  });
+  it('strokes no outline over a filled block, only the faint glow around it', () => {
+    const opaque = 1;
+    expect(paint(block()).strokes).not.toContain(opaque);
+    expect(paint(block({ fill: undefined })).strokes).toContain(opaque);
+  });
+  it('fills a rainbow block with its gradient', () => {
+    const { gradient, fills } = paint(block({ colorMode: 'rainbow', hue: 80 }));
+    expect(fills).toEqual([[gradient, 1]]);
+  });
+  it('leaves an outline square unfilled', () => {
+    expect(paint(block({ fill: undefined })).fills).toEqual([]);
+  });
+  it('is picked up by its edge and not its interior, so erasing a sketch on top leaves the block', () => {
+    let box = { x: 0, y: 0, width: 0, height: 0 };
+    const within = (x: number, y: number, margin: number) => x >= box.x - margin && x <= box.x + box.width + margin && y >= box.y - margin && y <= box.y + box.height + margin;
+    const ctx = {
+      save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), beginPath: vi.fn(), lineWidth: 1,
+      roundRect: (x: number, y: number, width: number, height: number) => { box = { x, y, width, height }; },
+      isPointInPath: (x: number, y: number) => within(x, y, 0),
+      isPointInStroke(x: number, y: number) { return within(x, y, this.lineWidth / 2) && !within(x, y, -this.lineWidth / 2); },
+    };
+    const shape = block();
+    expect(shapeAtPoint(ctx as unknown as CanvasRenderingContext2D, [shape], { x: 100, y: 50 }, 0)).toBeUndefined();
+    expect(ctx.isPointInPath(100, 50)).toBe(true);
+    expect(shapeAtPoint(ctx as unknown as CanvasRenderingContext2D, [shape], { x: 200, y: 50 }, 0)).toBe(shape);
+  });
+});
+
 describe('drawing size', () => {
   const draw = (tool: Tool, size: StrokeSize) => createShape({ tool, color: '#000000', colorMode: 'solid', size }, 0, { x: 50, y: 40 });
   it('defaults to Medium, which draws at the 4 px width shapes have always used', () => {
