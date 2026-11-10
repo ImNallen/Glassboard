@@ -1,8 +1,8 @@
 {
-  "version": "0.1.9",
+  "version": "0.1.10",
   "assets": {
-    "macos": "Glassboard_0.1.9_universal.dmg",
-    "windows": "Glassboard_0.1.9_x64-setup.exe",
-    "linux": "Glassboard_0.1.9_amd64.AppImage"
+    "macos": "Glassboard_0.1.10_universal.dmg",
+    "windows": "Glassboard_0.1.10_x64-setup.exe",
+    "linux": "Glassboard_0.1.10_amd64.AppImage"
   }
 }
