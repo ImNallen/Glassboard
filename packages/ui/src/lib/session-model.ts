@@ -3,7 +3,7 @@ import type { AutoFadeSeconds, ColorMode, StrokeSize, Tool } from './drawing';
 import type { GlobalCommand, Keybindings } from './shortcuts';
 export type ToolbarPosition = 'left' | 'right' | 'bottom';
 export type ToolbarDock = { x: number; y: number; width: number; height: number };
-export type Preferences = { tool: Tool; color: string; colorMode: ColorMode; size: StrokeSize; shortcut: string; captureShortcut: string; keybindings: Keybindings; swatches: string[]; rainbowColors: string[]; cycleColors: string[]; toolbarPosition: ToolbarPosition; autoFadeSeconds: AutoFadeSeconds; tutorialCompleted: boolean; language: string };
+export type Preferences = { tool: Tool; color: string; colorMode: ColorMode; size: StrokeSize; fill: boolean; shortcut: string; captureShortcut: string; keybindings: Keybindings; swatches: string[]; rainbowColors: string[]; cycleColors: string[]; toolbarPosition: ToolbarPosition; autoFadeSeconds: AutoFadeSeconds; tutorialCompleted: boolean; language: string };
 /** Rust loads the same file. JSON widens literals, so the check here is the shape; the Rust parse of the file rejects a bad literal. */
 const widened = preferenceDefaults satisfies { [K in keyof Preferences]: Preferences[K] extends string ? string : Preferences[K] extends number ? number : Preferences[K] };
 export const defaultPreferences = widened as Preferences;

@@ -3,6 +3,7 @@
   "color": "#f46b78",
   "colorMode": "rainbow",
   "size": "medium",
+  "fill": false,
   "shortcut": "CommandOrControl+Shift+A",
   "captureShortcut": "Super+Control+Shift+KeyS",
   "keybindings": {},

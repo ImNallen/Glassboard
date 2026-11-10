@@ -190,6 +190,7 @@ pub(crate) struct Preferences {
     pub(crate) color: HexColor,
     pub(crate) color_mode: ColorMode,
     pub(crate) size: StrokeSize,
+    pub(crate) fill: bool,
     /// Toggles drawing. Saved files keep the name from when it was the only global shortcut.
     pub(crate) shortcut: GlobalShortcut,
     pub(crate) capture_shortcut: CaptureShortcut,
@@ -431,7 +432,7 @@ mod tests {
     fn hex(color: &str) -> HexColor {
         HexColor(color.into())
     }
-    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true,"language":"de"}"##;
+    const CUSTOM_JSON: &str = r##"{"tool":"highlighter","color":"#123aBC","colorMode":"cycle","size":"large","fill":true,"shortcut":"Alt+Shift+KeyG","captureShortcut":"","keybindings":{"color-red":"Digit9","copy":"","undo":"CommandOrControl+KeyU"},"swatches":["#111111","#eeeeee","#4dcaa0","#f2c85b","#F46B78","#669df0"],"rainbowColors":["#000000","#ffffff"],"cycleColors":["#f46b78","#f2c85b","#4dcaa0","#4fc5d5","#669df0","#a184e8","#e580b5","#123456"],"toolbarPosition":"left","autoFadeSeconds":5,"tutorialCompleted":true,"language":"de"}"##;
     fn shortcut(text: &str) -> GlobalShortcut {
         String::from(text).try_into().unwrap()
     }
@@ -522,6 +523,7 @@ mod tests {
             ("size", json!("huge")),
             ("size", json!("Medium")),
             ("size", json!(4)),
+            ("fill", json!("yes")),
             ("color", json!("")),
             ("color", json!("#fff")),
             ("color", json!("#12345678")),
