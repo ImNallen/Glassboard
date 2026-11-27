@@ -202,7 +202,8 @@ it('sets the inline text editor in the font the canvas draws committed text with
   flushSync();
   pointer(canvas, 'pointerdown', 10, 20);
   const editor = document.querySelector('textarea')!;
-  expect([editor.style.fontWeight, editor.style.fontSize, editor.style.fontFamily.replaceAll('"', "'")]).toEqual(['600', '24px', TEXT_FONT_FAMILY]);
+  const unquoted = (family: string) => family.replaceAll(/["']/g, '');
+  expect([editor.style.fontWeight, editor.style.fontSize, unquoted(editor.style.fontFamily)]).toEqual(['600', '24px', unquoted(TEXT_FONT_FAMILY)]);
   expect(editor.style.lineHeight).toBe('30px');
 });
 
